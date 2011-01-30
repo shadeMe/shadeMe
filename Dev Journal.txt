@@ -1,0 +1,6 @@
+To Do
+=====
+> Conditionally allow actors to be given more priority over other refs
+> Fix the back-face projection issue
+> Fix the additive blending of shadows
+> Fix fog blending
