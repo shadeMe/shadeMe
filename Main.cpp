@@ -44,7 +44,8 @@ bool OBSEPlugin_Load(const OBSEInterface * obse)
 
 	PatchShadowSceneLightInitialization();
 	PatchShadowRenderConstants();
-//	DeferShadowRendering();
+	PatchShadowMapRenderConstants();
+
 
 	g_PluginLoaded = true;
 

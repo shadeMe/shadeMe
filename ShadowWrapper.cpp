@@ -18,6 +18,8 @@ static NiVector3				ZeroVec3 = { 0.0, 0.0, 0.0 };
 static NiMatrix33				IdentityMatrix = { { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 } };
 static float					Unity = 1.0;
 
+static NiVector4*				ShadowLightShader__f4Toggles = (NiVector4*)0x00B46688;
+
 static bool*					g_ToggleShadowVolumesFlag = (bool*)0x00B42F3C;
 
 const UInt32					BSBound_Extents_Offset = offsetof(BSBound, extents);
@@ -136,10 +138,27 @@ void __stdcall OverrideFadeNodeEnumeration(UInt32 MaximumShadowsForCurrentCell)
 	ShadowSceneNode* RootNode = ((ShadowSceneNode* (__cdecl *)(void))kGetShadowSceneNode)();
 	NiAVObject* LODRootChild = RootNode->m_children.data[3];
 
-	TraverseNiNodeChildren(NI_CAST(LODRootChild, NiNode), &CurrentShadowCount, &MaximumShadowsForCurrentCell);
+	TESObjectCELL* ThisCell = (*g_TES)->currentInteriorCell;
+	if (ThisCell == 0)
+		ThisCell = (*g_TES)->currentExteriorCell;
+
+	bool HasWaterHeight = false;
+	float WaterHeight = 0;
+
+	if (ThisCell && (ThisCell->flags0 & TESObjectCELL::kFlags0_HasWater))
+	{
+		BSExtraData* xWaterHeight = ThisCell->extraData.GetByType(kExtraData_WaterHeight);
+		if (xWaterHeight)
+		{
+			WaterHeight = (OBLIVION_CAST(xWaterHeight, BSExtraData, ExtraWaterHeight))->waterHeight; 
+			HasWaterHeight = true;
+		}
+	}
+
+	TraverseNiNodeChildren(NI_CAST(LODRootChild, NiNode), &CurrentShadowCount, &MaximumShadowsForCurrentCell, NULL);
 }
 
-void TraverseNiNodeChildren(NiNode* RootNode, UInt32* CurrentShadowCount, UInt32* MaxShadowCount)
+void TraverseNiNodeChildren(NiNode* RootNode, UInt32* CurrentShadowCount, UInt32* MaxShadowCount, float* CellWaterHeight)
 {
 	if (RootNode == 0)
 		return;
@@ -152,17 +171,19 @@ void TraverseNiNodeChildren(NiNode* RootNode, UInt32* CurrentShadowCount, UInt32
 			continue;
 
 		NiNode* Node = NI_CAST(AVObject, NiNode);
-
+		NiExtraData* xFlags = (NiExtraData*)thisCall(kNiObjectNET_GetPropertyByName, Node, "BSX");
+		
 		if (Node && ((Node->m_flags & NiNode::kFlag_AppCulled) == 0))
 		{
 			BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
 			BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
+			BSXFlags* Flags = NI_CAST(xFlags, BSXFlags);
 
 			if (FadeNode)
 			{
-				if (FadeNode->m_pcName)
+				if (CellWaterHeight)
 				{
-					if (strstr(FadeNode->m_pcName, "->") == 0)
+					if (FadeNode->m_worldTranslate.z > *CellWaterHeight)
 					{
 						(*CurrentShadowCount)++;
 						EnumerateFadeNodeForShadowRendering(FadeNode);
@@ -176,11 +197,11 @@ void TraverseNiNodeChildren(NiNode* RootNode, UInt32* CurrentShadowCount, UInt32
 			}
 			else if (TreeNode)
 			{
-				(*CurrentShadowCount)++;
-				EnumerateFadeNodeForShadowRendering((NiNode*)TreeNode);
+	//			(*CurrentShadowCount)++;
+	//			EnumerateFadeNodeForShadowRendering((NiNode*)TreeNode);
 			}
 			else
-				TraverseNiNodeChildren(Node, CurrentShadowCount, MaxShadowCount);
+				TraverseNiNodeChildren(Node, CurrentShadowCount, MaxShadowCount, CellWaterHeight);
 		}
 	}
 }
@@ -209,10 +230,11 @@ void __declspec(naked) DeferredShadowsHook(void)
 	}
 }
 
-
 void PatchShadowSceneLightInitialization(void)
 {
 	kShadowManagerFadeNodeEnumerator.WriteJump();
+//	SafeWrite16(0x007D4F4A, 0x9090);   // DebugShader
+//	WriteRelJump(0x004826F0, 0x0048331A);	//ShadowLightingPass?
 }
 
 /*
@@ -247,7 +269,6 @@ float dword_B258EC = 0;
 float flt_B258F0 = 1.0;
 long double fConst_0_001 = 0.01;
 
-
 long double dbl_A91280 = 110.0;
 long double fConst_0_5 = 0.5;
 long double dbl_A91278 = 0.01745327934622765;
@@ -259,7 +280,7 @@ float dword_B258D4 = 0;
 float dword_B258D8 =0;
 
 long double dbl_A3F3E8 = 10.0;
-long double dbl_A6BEA0 = 12288.0;
+long double dbl_A6BEA0 = 16384.0;
 
 float flt_B25AD0 = 0.0;
 float flt_B25AD4 = 0.0;
@@ -269,11 +290,9 @@ long double dbl_A3D0C0 = 2.0;
 
 void PatchShadowRenderConstants(void)
 {
-	SafeWrite8(0x007D6533 + 3, 0);
 	SafeWrite8(0x007D64DD, 0xEB);
 	WriteRelJump(0x007D6442, 0x007D64AB);
 	
-
 	SafeWrite32(0x007D4740 + 2, (UInt32)&dbl_A30068);
 
 	SafeWrite32(0x007D4811 + 2, (UInt32)&dword_B258E8);
@@ -306,6 +325,38 @@ void PatchShadowRenderConstants(void)
 
 	SafeWrite32(0x007D511A + 2, (UInt32)&dbl_A3D0C0);
 	SafeWrite32(0x007D5161 + 2, (UInt32)&dbl_A3D0C0);
+}
+
+/*
+long double Const_f0 = 0.0;
+long double Const_f1000 = 1000.0;
+long double dbl_A31C70 = 0.75;
+long double dbl_A3B1B8 = 256.0;
+long double dbl_A38618 = 2.5;
+long double dbl_A3F3A0 = 6.0;
+long double dbl_A91270 = 0.4;
+long double dbl_A91268 = 0.8;
+*/
+
+long double Const_f0 = 0.0;
+long double Const_f1000 = 1000.0;
+long double dbl_A31C70 = 0.75;		// shadow distortion multiplier
+long double dbl_A3B1B8 = 4096.0;	// sampling resolution
+long double dbl_A38618 = 28.5;		// light projection angle
+long double dbl_A3F3A0 = 5.0;		
+long double dbl_A91270 = 0.4;
+long double dbl_A91268 = 0.6;		// shadow darkness
+
+void PatchShadowMapRenderConstants(void)
+{
+	SafeWrite32(0x007D24E5 + 2, (UInt32)&Const_f0);
+	SafeWrite32(0x007D28D2 + 2, (UInt32)&Const_f1000);
+	SafeWrite32(0x007D2CB4 + 2, (UInt32)&dbl_A31C70);
+	SafeWrite32(0x007D2CEC + 2, (UInt32)&dbl_A3B1B8);
+	SafeWrite32(0x007D2D01 + 2, (UInt32)&dbl_A38618);
+	SafeWrite32(0x007D2D94 + 2, (UInt32)&dbl_A3F3A0);
+	SafeWrite32(0x007D2DB2 + 2, (UInt32)&dbl_A91270);
+	SafeWrite32(0x007D2DC8 + 2, (UInt32)&dbl_A91268);
 }
 
 void DeferShadowRendering(void)

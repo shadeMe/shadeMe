@@ -314,6 +314,22 @@
 				>
 			</File>
 			<File
+				RelativePath="..\obse\obse\NiProperties.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\obse\obse\NiProperties.h"
+				>
+			</File>
+			<File
+				RelativePath="..\obse\obse\NiRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\obse\obse\NiRenderer.h"
+				>
+			</File>
+			<File
 				RelativePath="..\obse\obse\NiRTTI.cpp"
 				>
 			</File>
