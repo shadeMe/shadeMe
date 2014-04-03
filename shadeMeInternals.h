@@ -1,19 +1,71 @@
 #pragma once
 
-#include "[Libraries]\MemoryHandler\MemoryHandler.h"
 #include "obse/PluginAPI.h"
+#include "obse/CommandTable.h"
 #include "obse/GameAPI.h"
 #include "obse/GameObjects.h"
 #include "obse/GameData.h"
+#include "obse/GameMenus.h"
+#include "obse/GameOSDepend.h"
+#include "obse/GameExtraData.h"
+#include "obse/NiAPI.h"
 #include "obse/NiObjects.h"
-#include "obse/GameRTTI.h"
-#include "obse/NiRTTI.h"
+#include "obse/NiTypes.h"
+#include "obse/ParamInfos.h"
+#include "obse/GameActorValues.h"
+#include "obse/GameProcess.h"
+#include "obse/NiControllers.h"
+#include "obse/NiNodes.h"
+#include "obse/NiObjects.h"
 #include "obse/NiExtraData.h"
+#include "obse/NiRTTI.h"
+#include "obse/NiRenderer.h"
 
-extern TES** g_TES;
-extern bool g_PluginLoaded;
+#include <SME_Prefix.h>
+#include <MemoryHandler.h>
+#include <INIManager.h>
+#include <StringHelpers.h>
+#include <MersenneTwister.h>
+#include <MiscGunk.h>
 
+#include <d3d9.h>
+
+using namespace SME;
 using namespace SME::MemoryHandler;
+
+namespace Interfaces
+{
+	extern PluginHandle						kOBSEPluginHandle;
+
+	extern OBSESerializationInterface*		kOBSESerialization;
+	extern OBSEMessagingInterface*			kOBSEMessaging;
+}
+
+class shadeMeINIManager : public INI::INIManager
+{
+public:
+	virtual ~shadeMeINIManager();
+
+	virtual void							Initialize(const char* INIPath, void* Parameter);
+	
+	static shadeMeINIManager				Instance;
+};
+
+namespace Settings
+{
+	extern SME::INI::INISetting				kCasterMaxDistance;
+	extern SME::INI::INISetting				kEnableDebugShader;
+
+	extern SME::INI::INISetting				kRenderBackfacesInterior;
+	extern SME::INI::INISetting				kRenderBackfacesExterior;
+
+	extern SME::INI::INISetting				kExcludedTypesInterior;
+	extern SME::INI::INISetting				kExcludedTypesExterior;
+
+	extern SME::INI::INISetting				kExcludedPathInterior;
+	extern SME::INI::INISetting				kExcludedPathExterior;
+}
+
 class BSRenderedTexture;
 class NiRenderedTexture;
 class NiDX9Renderer;
@@ -56,7 +108,7 @@ public:
 		UInt8			pad42[2];	
 	};
 
-//	void*							vtbl;			// 00
+	//void*							vtbl;			// 00
 	NiRenderedTexture*				unk04;			// 04	parent texture
 	NiDX9Renderer*					unk08;			// 08	parent renderer
 	Unk0C							unk0C;			// 0C
@@ -83,8 +135,8 @@ public:
 	ShadowSceneLight();
 	~ShadowSceneLight();
 
-	float												unkDC;		// start opacity for shadows cast ?
-	float												unkE0;		// finish opacity ?
+	float												unkDC;		// time left before full fade-in opacity
+	float												unkE0;		// time elapsed during fade-in
 	NiTPointerList<NiPointer<NiTriBasedGeom>>			unkE4;		// light blocker geometry ?
 	UInt8												unkF4;		// shadow map rendered flag?
 	UInt8												unkF5;
@@ -98,37 +150,36 @@ public:
 	NiVector3											unk108;		// unk100->m_worldTranslate
 	BSRenderedTexture*									unk114;		// shadow map texture
 	UInt16												unk118;
+	UInt16												unk11A;
+	UInt32												unk11C;
+	UInt32												unk120;
 	NiPointer<BSCubeMapCamera>							unk124;		// light camera?
+	UInt32												unk128;
+	UInt8												unk12C;		// debug shader toggle
+	UInt8												unk12CPad[3];
 	BSFadeNode*											unk130;		// node being lighted/shadowed
 	NiTPointerList<NiPointer<NiAVObject>>				unk134;
-	void*												unk144;		// similar to unkE8 ?
+	void*												unk144;		// 
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
 	NiCamera*											unk14C;		// ?
 	UInt32												unk1B0;		
 };
+STATIC_ASSERT(offsetof(ShadowSceneLight, unk130) == 0x130);
 
-template<typename Type> struct GenericNode
+// ?
+class BSTreeNode : public NiNode
 {
-	Type				* data;
-	GenericNode<Type>	* next;
+public:
+	
 };
 
+namespace Utilities
+{
+	float				GetDistanceFromPlayer(NiNode* Node);
+	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
+	NiProperty*			GetNiPropertyByName(NiAVObject* Source, const char* Name);
+	void				UpdateBounds(NiNode* Node);
+	void*				NiRTTI_Cast(const NiRTTI* TypeDescriptor, NiRefObject* NiObject);
+}
 
-extern const void* RTTI_BSBound;
-extern const NiRTTI* NiRTTI_BSTreeNode;
-
-class BSTreeNode;
-
-void TraverseNiNodeChildren(NiNode* RootNode, UInt32* CurrentShadowCount, UInt32* MaxShadowCount, float* CellWaterHeight);
-
-void ShadowManagerFadeNodeEnumeratorHook(void);
-void DeferredShadowsHook(void);
-
-
-void PatchShadowSceneLightInitialization();
-void PatchShadowRenderConstants();
-void PatchShadowMapRenderConstants();
-void DeferShadowRendering();
-
-
-
+#define NI_CAST(obj, to)		(to##*)Utilities::NiRTTI_Cast(NiRTTI_##to, obj)

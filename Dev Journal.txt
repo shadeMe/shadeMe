@@ -1,6 +1,5 @@
 To Do
 =====
-> Conditionally allow actors to be given more priority over other refs
-> Fix the back-face projection issue
-> Fix the additive blending of shadows
-> Fix fog blending
+> LOS checks for casters and the light source (is that necessary?)
+> LOS checks for casters above the player
+> Exclude casters that are fully inside the bounds of another

@@ -1,4 +1,3 @@
-#include "ShadowWrapper.h"
 #include "BoundsCalculator.h"
 
 static long double FLOAT_MIN_VAL = -3.4028235e38;
@@ -710,5 +709,5 @@ void __declspec(naked) CalculateBoundsForNiNode(void *Arg1, void *Arg2, void *Ar
 		pop     esi
 		add     esp, 64h
 		retn
-    }
+	}
 }
