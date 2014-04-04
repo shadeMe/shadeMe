@@ -1,5 +1,5 @@
 To Do
 =====
-> LOS checks for casters and the light source (is that necessary?)
-> LOS checks for casters above the player
-> Exclude casters that are fully inside the bounds of another
+> Reduce shadow distance depending upon fog
+> Exclude submerged casters (rocks in particular)
+> Add BSX flags support

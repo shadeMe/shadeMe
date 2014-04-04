@@ -56,14 +56,27 @@ namespace Settings
 	extern SME::INI::INISetting				kCasterMaxDistance;
 	extern SME::INI::INISetting				kEnableDebugShader;
 
-	extern SME::INI::INISetting				kRenderBackfacesInterior;
-	extern SME::INI::INISetting				kRenderBackfacesExterior;
+	extern SME::INI::INISetting				kLargeObjectHigherPriority;
+	extern SME::INI::INISetting				kLargeObjectBoundRadius;
+	extern SME::INI::INISetting				kLargeObjectExcludedPath;
 
-	extern SME::INI::INISetting				kExcludedTypesInterior;
-	extern SME::INI::INISetting				kExcludedTypesExterior;
+	extern SME::INI::INISetting				kRenderBackfacesIncludePath;
 
-	extern SME::INI::INISetting				kExcludedPathInterior;
-	extern SME::INI::INISetting				kExcludedPathExterior;
+	extern SME::INI::INISetting				kMainExcludedTypesInterior;
+	extern SME::INI::INISetting				kMainExcludedTypesExterior;
+
+	extern SME::INI::INISetting				kMainExcludedPathInterior;
+	extern SME::INI::INISetting				kMainExcludedPathExterior;
+
+	extern SME::INI::INISetting				kLOSCheckInterior;
+	extern SME::INI::INISetting				kLOSCheckExterior;
+	extern SME::INI::INISetting				kLOSCheckMaxDistance;
+
+	extern SME::INI::INISetting				kSelfExcludedTypesInterior;
+	extern SME::INI::INISetting				kSelfExcludedTypesExterior;
+
+	extern SME::INI::INISetting				kSelfExcludedPathInterior;
+	extern SME::INI::INISetting				kSelfExcludedPathExterior;
 }
 
 class BSRenderedTexture;
@@ -144,27 +157,28 @@ public:
 	float												unkF8;
 	UInt8												unkFC;
 	UInt8												unkFCPad[3];
-	NiPointLight*										unk100;		// parent light
-	UInt8												unk104;
+	NiPointLight*										sourceLight;		// parent light
+	UInt8												unk104;	
 	UInt8												unk104Pad[3];
-	NiVector3											unk108;		// unk100->m_worldTranslate
-	BSRenderedTexture*									unk114;		// shadow map texture
-	UInt16												unk118;
+	NiVector3											unk108;		// sourceLight->m_worldTranslate
+	BSRenderedTexture*									shadowMap;	// shadow map texture
+	UInt16												unk118;		// when 0xFF, light source is culled
 	UInt16												unk11A;
 	UInt32												unk11C;
 	UInt32												unk120;
 	NiPointer<BSCubeMapCamera>							unk124;		// light camera?
 	UInt32												unk128;
-	UInt8												unk12C;		// debug shader toggle
+	UInt8												showDebug;	// debug shader toggle
 	UInt8												unk12CPad[3];
-	BSFadeNode*											unk130;		// node being lighted/shadowed
+	BSFadeNode*											sourceNode;	// node being lighted/shadowed
 	NiTPointerList<NiPointer<NiAVObject>>				unk134;
 	void*												unk144;		// 
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
-	NiCamera*											unk14C;		// ?
+	NiCamera*											unk14C;		
 	UInt32												unk1B0;		
 };
-STATIC_ASSERT(offsetof(ShadowSceneLight, unk130) == 0x130);
+STATIC_ASSERT(offsetof(ShadowSceneLight, sourceLight) == 0x100);
+STATIC_ASSERT(offsetof(ShadowSceneLight, sourceNode) == 0x130);
 
 // ?
 class BSTreeNode : public NiNode
@@ -176,10 +190,101 @@ public:
 namespace Utilities
 {
 	float				GetDistanceFromPlayer(NiNode* Node);
+	bool				GetPlayerHasLOS(TESObjectREFR* Target);						// slooooooooowwwwww!
+	
+	bool				GetLightLOS(NiAVObject* Light, TESObjectREFR* Target);
+
+	bool				GetAbovePlayer(TESObjectREFR* Ref, float Threshold);
+	bool				GetBelowPlayer(TESObjectREFR* Ref, float Threshold);
+
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
 	NiProperty*			GetNiPropertyByName(NiAVObject* Source, const char* Name);
+
 	void				UpdateBounds(NiNode* Node);
+	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);
+
 	void*				NiRTTI_Cast(const NiRTTI* TypeDescriptor, NiRefObject* NiObject);
+
+	template <typename T>
+	class DelimitedINIStringList
+	{
+	public:
+		typedef std::vector<T>		ParameterListT;
+	protected:
+
+		ParameterListT				Params;
+		std::string					Delimiter;
+
+		void Clear(void)
+		{
+			Params.clear();
+		}
+
+		void Parse(const INI::INISetting* Setting)
+		{
+			SME::StringHelpers::Tokenizer Parser(Setting->GetData().s, Delimiter.c_str());
+			std::string CurrentArg = "";
+
+			while (Parser.NextToken(CurrentArg) != -1)
+			{
+				if (CurrentArg.length())
+				{
+					HandleParam(CurrentArg.c_str());
+				}
+			}
+		}
+
+		virtual void HandleParam(const char* Param) = 0;		// called for each parsed token
+	public:
+		DelimitedINIStringList(const char* Delimiters) :
+			Params(),
+			Delimiter(Delimiters)
+		{
+			SME_ASSERT(Delimiter.length());
+		}
+
+		virtual ~DelimitedINIStringList()
+		{
+			Clear();
+		}
+
+		void Refresh(const INI::INISetting* Source)				// loads params into the data store
+		{
+			SME_ASSERT(Source && Source->GetType() == INI::INISetting::kType_String);
+
+			Clear();
+			Parse(Source);
+		}
+
+		const ParameterListT& operator()(void) const
+		{
+			return Params;
+		}
+
+		virtual void Dump(void) const = 0;
+	};
+
+	class IntegerINIParamList : public DelimitedINIStringList<int>
+	{
+	protected:
+		virtual void			HandleParam(const char* Param);
+	public:
+		IntegerINIParamList(const char* Delimiters = " ,");
+		virtual ~IntegerINIParamList();
+		
+		virtual void			Dump(void) const;
+	};
+
+	class FilePathINIParamList : public DelimitedINIStringList<std::string>
+	{
+	protected:
+		virtual void			HandleParam(const char* Param);
+	public:
+		FilePathINIParamList(const char* Delimiters = ",");
+		virtual ~FilePathINIParamList();
+		
+		virtual void			Dump(void) const;
+	};
 }
 
 #define NI_CAST(obj, to)		(to##*)Utilities::NiRTTI_Cast(NiRTTI_##to, obj)

@@ -42,7 +42,11 @@ extern "C"
 
 		if (obse->isEditor)
 		{
-			return false;
+			if (obse->editorVersion != CS_VERSION_1_2)
+			{
+				_MESSAGE("Unsupported editor version %08X", obse->oblivionVersion);
+				return false;
+			}
 		}
 		else
 		{
@@ -83,22 +87,32 @@ extern "C"
 
 	bool OBSEPlugin_Load(const OBSEInterface * obse)
 	{
-		_MESSAGE("Initializing INI Manager");
-		shadeMeINIManager::Instance.Initialize("Data\\OBSE\\Plugins\\shadeMe.ini", NULL);
+		if (obse->isEditor)
+		{
+			EditorSupport::Patch();
 
-		Interfaces::kOBSESerialization->SetSaveCallback(Interfaces::kOBSEPluginHandle, SaveCallbackHandler);
-		Interfaces::kOBSESerialization->SetLoadCallback(Interfaces::kOBSEPluginHandle, LoadCallbackHandler);
-		Interfaces::kOBSESerialization->SetNewGameCallback(Interfaces::kOBSEPluginHandle, NewGameCallbackHandler);
-		Interfaces::kOBSEMessaging->RegisterListener(Interfaces::kOBSEPluginHandle, "OBSE", OBSEMessageHandler);
+			_MESSAGE("Editor support, ho!");
+		}
+		else
+		{
+			_MESSAGE("Initializing INI Manager");
+			shadeMeINIManager::Instance.Initialize("Data\\OBSE\\Plugins\\shadeMe.ini", NULL);
 
-		ShadowFacts::Patch();
-		ShadowFacts::Initialize();
-		ShadowFigures::Patch();
-		ShadowFigures::Initialize();
+			Interfaces::kOBSESerialization->SetSaveCallback(Interfaces::kOBSEPluginHandle, SaveCallbackHandler);
+			Interfaces::kOBSESerialization->SetLoadCallback(Interfaces::kOBSEPluginHandle, LoadCallbackHandler);
+			Interfaces::kOBSESerialization->SetNewGameCallback(Interfaces::kOBSEPluginHandle, NewGameCallbackHandler);
+			Interfaces::kOBSEMessaging->RegisterListener(Interfaces::kOBSEPluginHandle, "OBSE", OBSEMessageHandler);
 
-		_MESSAGE("Imitating camels...\n\n");
+			ShadowFacts::Patch();
+			ShadowFacts::Initialize();
+			ShadowFigures::Patch();
+			ShadowFigures::Initialize();
+			SundrySloblock::Patch();
+
+			_MESSAGE("Imitating camels...\n\n");
+		}
+		
 		gLog.Indent();
-
 		return true;
 	}
 
