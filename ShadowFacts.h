@@ -33,10 +33,21 @@ namespace ShadowFacts
 	{
 		typedef std::vector<ShadowCaster>		CasterListT;
 
+		class ShadowCasterEnumerator : public Utilities::NiNodeChildVisitor
+		{
+		protected:
+			CasterListT*			Casters;
+		public:
+			ShadowCasterEnumerator(CasterListT* OutList);
+			virtual ~ShadowCasterEnumerator();
+
+			virtual bool			AcceptBranch(NiNode* Node);
+			virtual void			AcceptLeaf(NiAVObject* Object);
+		};
+
 		CasterListT						Casters;
 		ShadowSceneNode*				Root;
 
-		void							Prepass(NiNode* Source);
 		void							DebugDump(void) const;
 	public:
 		ShadowSceneProc(ShadowSceneNode* Root);
@@ -112,6 +123,12 @@ namespace ShadowFacts
 		kNiAVObjectSpecialFlag_DontCastExteriorShadow		= 1 << 14,
 	};
 
+	// same as above but for BSXFlags
+	enum
+	{
+		kBSXFlagsSpecialFlag_DontCastShadow					= 1 << 31,
+	};
+
 	class MainShadowExParams : public ShadowExclusionParameters
 	{
 	protected:
@@ -157,6 +174,9 @@ namespace ShadowFacts
 		static void	__stdcall						HandleShadowMapRenderingProlog(BSFadeNode* Node, ShadowSceneLight* Source);
 		static void	__stdcall						HandleShadowMapRenderingEpilog(BSFadeNode* Node, ShadowSceneLight* Source);
 
+		static void	__stdcall						HandleShadowLightUpdateReceiverProlog(ShadowSceneLight* Source);
+		static void	__stdcall						HandleShadowLightUpdateReceiverEpilog(ShadowSceneLight* Source);
+
 		static void __stdcall						QueueShadowOccluders(UInt32 MaxShadowCount);
 		static bool	__stdcall						HandleSelfShadowing(ShadowSceneLight* Caster);		// return true to allow
 		static void __stdcall						HandleModelLoad(BSFadeNode* Node);
@@ -165,105 +185,19 @@ namespace ShadowFacts
 		static bool	__stdcall						GetHasLightLOS(ShadowSceneLight* Source);
 	};
 
+	
+
 
 	_DeclareMemHdlr(EnumerateFadeNodes, "render unto Oblivion...");
 	_DeclareMemHdlr(RenderShadowsProlog, "");
 	_DeclareMemHdlr(RenderShadowsEpilog, "");
 	_DeclareMemHdlr(QueueModel3D, "");
-	_DeclareMemHdlr(UpdateGeometryLighting, "selective self-shadowing support");
+	_DeclareMemHdlr(UpdateGeometryLighting, "prevents non-actor casters from self occluding regardless of the self shadow setting");
+	_DeclareMemHdlr(UpdateGeometryLightingSelf, "selective self-shadowing support");
 	_DeclareMemHdlr(RenderShadowMap, "");
 	_DeclareMemHdlr(CheckSourceLightLOS, "");
 
 
 	void Patch(void);
 	void Initialize(void);
-}
-
-namespace ShadowFigures
-{
-	class ShadowRenderConstantRegistry;
-
-	class ShadowRenderConstant
-	{
-		friend class ShadowRenderConstantRegistry;
-
-		typedef std::vector<ShadowRenderConstant*>			ConstantDatabaseT;
-		typedef std::vector<UInt32>							PatchLocationListT;
-
-		union DataT
-		{
-			float							f;
-			long double						d;
-		};
-
-		DataT								Data;
-		DataT								Default;
-		bool								Wide;				// when set, use Data.d. Data.f otherwise
-		PatchLocationListT					PatchLocations;
-		std::string							Name;
-
-		void								ApplyPatch(void) const;
-	public:
-		ShadowRenderConstant(const char* Name, bool Wide, long double DefaultValue, UInt32 PrimaryPatchLocation);
-		~ShadowRenderConstant();
-
-		void								AddPatchLocation(UInt32 Location);
-
-		void								SetValue(long double NewValue);
-		long double							GetValue(void) const;
-		void								ResetDefault(void);
-	};
-
-	extern ShadowRenderConstant				SMRC_A38618;
-
-	class ShadowRenderConstantRegistry
-	{
-		struct ValuePair
-		{
-			long double						Interior;
-			long double						Exterior;
-		};
-
-		typedef std::map<ShadowRenderConstant*, ValuePair>		ConstantValueTableT;
-
-		static const char*					kINIPath;
-
-		ConstantValueTableT					DataStore;
-
-		ShadowRenderConstantRegistry();
-
-		void									Save(void);					// saves the values to the INI file
-	public:
-		~ShadowRenderConstantRegistry();
-
-		static ShadowRenderConstantRegistry*	GetSingleton(void);
-		
-		void									Initialize(void);
-		void									Load(void);					// loads the values for the INI file
-
-		void									Register(ShadowRenderConstant* Constant);
-		void									UpdateConstants(void);		// switches b'ween the two sets of values depending upon the cell type
-	};
-
-	void									Patch(void);
-	void									Initialize(void);
-}
-
-#define STRINGIZE2(s) #s
-#define STRINGIZE(s) STRINGIZE2(s)
-#define DEF_SRC(name, ...)					ShadowRenderConstant name(STRINGIZE2(name), ##__VA_ARGS__##)
-
-namespace EditorSupport
-{
-	_DeclareMemHdlr(EnableCastsShadowsFlag, "allows the flag to be set on non-light refs");
-
-	void Patch(void);
-}
-
-namespace SundrySloblock
-{
-	_DeclareMemHdlr(ConsoleDebugSelectionA, "provides more detail about the console debug selection");
-	_DeclareMemHdlr(ConsoleDebugSelectionB, "");
-
-	void Patch(void);
 }

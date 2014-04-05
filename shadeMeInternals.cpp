@@ -7,7 +7,6 @@ namespace Interfaces
 {
 	PluginHandle					kOBSEPluginHandle = kPluginHandle_Invalid;
 
-	OBSESerializationInterface*		kOBSESerialization = NULL;
 	OBSEMessagingInterface*			kOBSEMessaging = NULL;
 }
 
@@ -45,7 +44,6 @@ namespace Settings
 
 	SME::INI::INISetting			kLOSCheckInterior("Interior", "Shadows::LOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kLOSCheckExterior("Exterior", "Shadows::LOSCheck", "Check player LOS with caster", (SInt32)1);
-	SME::INI::INISetting			kLOSCheckMaxDistance("MaxDistance", "Shadows::LOSCheck", "Casters farther than this distance are skipped", (float)2000);
 
 
 	SME::INI::INISetting			kSelfExcludedTypesInterior("Interior", "SelfShadows::ExcludedTypes", "Form types that can't cast shadows", "");
@@ -80,7 +78,6 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 
 	RegisterSetting(&Settings::kLOSCheckInterior);
 	RegisterSetting(&Settings::kLOSCheckExterior);
-	RegisterSetting(&Settings::kLOSCheckMaxDistance);
 
 	RegisterSetting(&Settings::kSelfExcludedTypesInterior);
 	RegisterSetting(&Settings::kSelfExcludedTypesExterior);
@@ -141,16 +138,11 @@ namespace Utilities
 		static NiMatrix33	kIdentityMatrix = { { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 } };
 		static float		kUnity = 1.0;
 
-		if (GetNiPropertyByName(Node, "BBX") == NULL)
+		if (GetNiExtraDataByName(Node, "BBX") == NULL)
 		{
 			BSBound* Bounds = (BSBound*)FormHeap_Allocate(0x24);
 			thisCall<void>(0x006FB8B0, Bounds);
 			CalculateBoundsForNiNode(Node, &Bounds->center, &Bounds->extents, &kZeroVec3, &kIdentityMatrix, &kUnity);
-#if 0
-			Bounds->extents.x *= 0.5f;
-			Bounds->extents.y *= 0.5f;
-			Bounds->extents.z *= 0.5f;
-#endif
 			thisCall<void>(0x006FF8A0, Node, Bounds);
 
 #if 0
@@ -165,11 +157,11 @@ namespace Utilities
 		}
 	}
 
-	NiProperty* GetNiPropertyByName( NiAVObject* Source, const char* Name )
+	NiExtraData* GetNiExtraDataByName( NiAVObject* Source, const char* Name )
 	{
 		SME_ASSERT(Source && Name);
 
-		return thisCall<NiProperty*>(0x006FF9C0, Source, Name);
+		return thisCall<NiExtraData*>(0x006FF9C0, Source, Name);
 	}
 
 	void* NiRTTI_Cast( const NiRTTI* TypeDescriptor, NiRefObject* NiObject )
@@ -322,15 +314,21 @@ namespace Utilities
 		// so we trick the engine into thinking otherwise when we do our checks
 		// this obviously affects performance, but it's for a good cause...
 		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;		
-		UInt8 FlagBuffer = *HavokGamePausedFlag;
+		UInt8 PauseGameBuffer = *HavokGamePausedFlag;
+
+		// prevent console spam
+		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;		
+		UInt8 ConsoleTextBuffer = *ShowConsoleTextFlag;
 
 		_MemHdlr(SkipActorCheckA).WriteJump();
 		_MemHdlr(SkipActorCheckB).WriteJump();
 		_MemHdlr(CatchFallthrough).WriteJump();
 		
 		*HavokGamePausedFlag = 1;
+		*ShowConsoleTextFlag = 0;
 		cdeclCall<void>(0x004F9120, (*g_thePlayer), Target, 0, &Result);
-		*HavokGamePausedFlag = FlagBuffer;
+		*HavokGamePausedFlag = PauseGameBuffer;
+		*ShowConsoleTextFlag = ConsoleTextBuffer;
 
 		_MemHdlr(SkipActorCheckA).WriteBuffer();
 		_MemHdlr(SkipActorCheckB).WriteBuffer();
@@ -340,4 +338,105 @@ namespace Utilities
 
 		return Result != 0.f;
 	}
+
+	NiProperty* GetNiPropertyByID( NiAVObject* Source, UInt8 ID )
+	{
+		SME_ASSERT(Source);
+
+		return thisCall<NiProperty*>(0x00707530, Source, ID);
+	}
+
+	UInt32 GetNodeActiveLights( NiNode* Source, ShadowLightListT* OutList )
+	{
+		SME_ASSERT(Source && OutList);
+
+		NiNodeChildrenWalker Walker(Source);
+		OutList->clear();
+		Walker.Walk(&ActiveShadowSceneLightEnumerator(OutList));
+
+		return OutList->size();
+	}
+
+	void NiNodeChildrenWalker::Traverse( NiNode* Branch )
+	{
+		SME_ASSERT(Visitor && Branch);
+
+		for (int i = 0; i < Branch->m_children.numObjs; i++)
+		{
+			NiAVObject* AVObject = Branch->m_children.data[i];
+
+			if (AVObject)
+			{
+				NiNode* Node = NI_CAST(AVObject, NiNode);
+
+				if (Node)
+				{
+					if (Visitor->AcceptBranch(Node))
+						Traverse(Node);
+				}
+				else
+					Visitor->AcceptLeaf(AVObject);
+			}
+		}
+	}
+
+	NiNodeChildrenWalker::NiNodeChildrenWalker( NiNode* Source ) :
+		Root(Source),
+		Visitor(NULL)
+	{
+		SME_ASSERT(Root);
+	}
+
+	NiNodeChildrenWalker::~NiNodeChildrenWalker()
+	{
+		;//
+	}
+
+	void NiNodeChildrenWalker::Walk( NiNodeChildVisitor* Visitor )
+	{
+		SME_ASSERT(Visitor);
+
+		this->Visitor = Visitor;
+		Traverse(Root);
+	}
+
+
+	ActiveShadowSceneLightEnumerator::ActiveShadowSceneLightEnumerator( ShadowLightListT* OutList ) :
+		ActiveLights(OutList)
+	{
+		SME_ASSERT(OutList);
+	}
+
+	ActiveShadowSceneLightEnumerator::~ActiveShadowSceneLightEnumerator()
+	{
+		;//
+	}
+
+	bool ActiveShadowSceneLightEnumerator::AcceptBranch( NiNode* Node )
+	{
+		return true;
+	}
+
+	void ActiveShadowSceneLightEnumerator::AcceptLeaf( NiAVObject* Object )
+	{
+		NiGeometry* Geometry = NI_CAST(Object, NiGeometry);
+		if (Geometry)
+		{
+			BSShaderLightingProperty* LightingProperty = NI_CAST(Utilities::GetNiPropertyByID(Object, 0x4), BSShaderLightingProperty);
+			if (LightingProperty && LightingProperty->lights.numItems)
+			{
+				for (NiTPointerList<ShadowSceneLight>::Node* Itr = LightingProperty->lights.start; Itr; Itr = Itr->next)
+				{
+					ShadowSceneLight* Current = Itr->data;
+					if (Current && Current->unk118 != 0xFF)
+					{
+						if (std::find(ActiveLights->begin(), ActiveLights->end(), Current) == ActiveLights->end())
+							ActiveLights->push_back(Current);
+					}
+				}
+			}
+		}
+	}
+
+	
 }

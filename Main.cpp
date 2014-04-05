@@ -1,23 +1,10 @@
 #include "shadeMeInternals.h"
-#include "Shadow.h"
+#include "ShadowFacts.h"
+#include "ShadowFigures.h"
+#include "ShadowSundries.h"
 #include "VersionInfo.h"
 
 IDebugLog	gLog("shadeMe.log");
-
-static void LoadCallbackHandler(void * reserved)
-{
-	;//
-}
-
-static void SaveCallbackHandler(void * reserved)
-{
-	;//
-}
-
-static void NewGameCallbackHandler(void * reserved)
-{
-	;//
-}
 
 void OBSEMessageHandler(OBSEMessagingInterface::Message* Msg)
 {
@@ -61,19 +48,6 @@ extern "C"
 				return false;
 			}
 
-			Interfaces::kOBSESerialization = (OBSESerializationInterface *)obse->QueryInterface(kInterface_Serialization);
-			if (!Interfaces::kOBSESerialization)
-			{
-				_MESSAGE("serialization interface not found");
-				return false;
-			}
-
-			if (Interfaces::kOBSESerialization->version < OBSESerializationInterface::kVersion)
-			{
-				_MESSAGE("incorrect serialization version found (got %08X need %08X)", Interfaces::kOBSESerialization->version, OBSESerializationInterface::kVersion);
-				return false;
-			}
-
 			Interfaces::kOBSEMessaging = (OBSEMessagingInterface*)obse->QueryInterface(kInterface_Messaging);
 			if (!Interfaces::kOBSEMessaging)
 			{
@@ -87,10 +61,10 @@ extern "C"
 
 	bool OBSEPlugin_Load(const OBSEInterface * obse)
 	{
+		ShadowSundries::Patch(obse->isEditor);
+
 		if (obse->isEditor)
 		{
-			EditorSupport::Patch();
-
 			_MESSAGE("Editor support, ho!");
 		}
 		else
@@ -98,16 +72,12 @@ extern "C"
 			_MESSAGE("Initializing INI Manager");
 			shadeMeINIManager::Instance.Initialize("Data\\OBSE\\Plugins\\shadeMe.ini", NULL);
 
-			Interfaces::kOBSESerialization->SetSaveCallback(Interfaces::kOBSEPluginHandle, SaveCallbackHandler);
-			Interfaces::kOBSESerialization->SetLoadCallback(Interfaces::kOBSEPluginHandle, LoadCallbackHandler);
-			Interfaces::kOBSESerialization->SetNewGameCallback(Interfaces::kOBSEPluginHandle, NewGameCallbackHandler);
 			Interfaces::kOBSEMessaging->RegisterListener(Interfaces::kOBSEPluginHandle, "OBSE", OBSEMessageHandler);
 
 			ShadowFacts::Patch();
 			ShadowFacts::Initialize();
 			ShadowFigures::Patch();
 			ShadowFigures::Initialize();
-			SundrySloblock::Patch();
 
 			_MESSAGE("Imitating camels...\n\n");
 		}

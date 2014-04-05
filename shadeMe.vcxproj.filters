@@ -90,7 +90,9 @@
     </ClCompile>
     <ClCompile Include="shadeMeInternals.cpp" />
     <ClCompile Include="BoundsCalculator.cpp" />
-    <ClCompile Include="Shadow.cpp" />
+    <ClCompile Include="ShadowFigures.cpp" />
+    <ClCompile Include="ShadowSundries.cpp" />
+    <ClCompile Include="ShadowFacts.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\obse\obse\GameActorValues.h">
@@ -182,7 +184,9 @@
     </ClInclude>
     <ClInclude Include="shadeMeInternals.h" />
     <ClInclude Include="BoundsCalculator.h" />
-    <ClInclude Include="Shadow.h" />
+    <ClInclude Include="ShadowFigures.h" />
+    <ClInclude Include="ShadowSundries.h" />
+    <ClInclude Include="ShadowFacts.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\obse\obse\GameRTTI_1_1.inl">

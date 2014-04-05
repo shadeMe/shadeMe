@@ -1,4 +1,5 @@
-#include "Shadow.h"
+#include "ShadowFacts.h"
+#include "ShadowFigures.h"
 
 #pragma warning(disable: 4005 4748)
 
@@ -82,22 +83,13 @@ namespace ShadowFacts
 			if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior.GetData().i) ||
 				(Object->parentCell->IsInterior() == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kLOSCheckExterior.GetData().i))
 			{
-				if (Distance < Settings::kLOSCheckMaxDistance.GetData().f)
+				if (Utilities::GetAbovePlayer(Object, 10) && Utilities::GetPlayerHasLOS(Object) == false)
 				{
-					if (Utilities::GetAbovePlayer(Object, 10) && Utilities::GetPlayerHasLOS(Object) == false)
-					{
-#if 0
-						_MESSAGE("Object %s(%f) above player and outta sight - Culled", Node->m_pcName, Object->posZ);
-#endif
-						Result = false;
-					}
-					else if (Utilities::GetBelowPlayer(Object, 35) && Utilities::GetPlayerHasLOS(Object) == false)
-					{
-#if 0
-						_MESSAGE("Object %s(%f) below player and outta sight - Culled", Node->m_pcName, Object->posZ);
-#endif
-						Result = false;
-					}
+					Result = false;
+				}
+				else if (Utilities::GetBelowPlayer(Object, 35) && Utilities::GetPlayerHasLOS(Object) == false)
+				{
+					Result = false;
 				}
 			}
 		}
@@ -126,6 +118,63 @@ namespace ShadowFacts
 		return LHS.BoundRadius > RHS.BoundRadius;
 	}
 
+	ShadowSceneProc::ShadowCasterEnumerator::ShadowCasterEnumerator( ShadowSceneProc::CasterListT* OutList ):
+		Casters(OutList)
+	{
+		SME_ASSERT(OutList);
+	}
+
+	ShadowSceneProc::ShadowCasterEnumerator::~ShadowCasterEnumerator()
+	{
+		;//
+	}
+
+	bool ShadowSceneProc::ShadowCasterEnumerator::AcceptBranch( NiNode* Node )
+	{
+		bool Result = true;
+
+		if ((Node->m_flags & NiNode::kFlag_AppCulled) == false)
+		{
+			BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
+			BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
+
+			if (TreeNode)
+				Result = false;
+			else if (FadeNode)
+			{
+				Result = false;
+
+				if (FadeNode->m_kWorldBound.radius > 0.f)
+				{
+					TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(FadeNode, "REF");
+					if (xRef)
+					{	
+						TESObjectREFR* ObjRef = xRef->refr;
+						if (ObjRef && ObjRef->baseForm && ObjRef != (*g_thePlayer))
+						{
+							// we've flipped the logic, remember?
+							if ((ObjRef->flags & TESForm::kFormFlags_CastShadows) == false)
+							{
+								BSXFlags* xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(FadeNode, "BSX");
+
+								if (xFlags == NULL || (xFlags->m_iValue & kBSXFlagsSpecialFlag_DontCastShadow) == false)
+									Casters->push_back(ShadowCaster(FadeNode, ObjRef));
+							}
+						}
+					}
+				}						
+			}
+		}
+		else
+			Result = false;
+
+		return Result;
+	}
+
+	void ShadowSceneProc::ShadowCasterEnumerator::AcceptLeaf( NiAVObject* Object )
+	{
+		;//
+	}
 
 	ShadowSceneProc::ShadowSceneProc( ShadowSceneNode* Root ) :
 		Casters(),
@@ -138,54 +187,7 @@ namespace ShadowFacts
 	{
 		Casters.clear();
 	}
-
-	void ShadowSceneProc::Prepass( NiNode* Source )
-	{
-		if (Source == NULL)
-			return;
-
-		for (int i = 0; i < Source->m_children.numObjs; i++)
-		{
-			NiAVObject* AVObject = Source->m_children.data[i];
-
-			if (AVObject)
-			{
-				NiNode* Node = NI_CAST(AVObject, NiNode);
-
-				if (Node && (Node->m_flags & NiNode::kFlag_AppCulled) == 0)
-				{
-					BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
-					BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
-
-					if (TreeNode)
-						continue;
-
-					if (FadeNode)
-					{
-						if (FadeNode->m_kWorldBound.radius > 0.f)
-						{
-							TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiPropertyByName(FadeNode, "REF");
-							if (xRef)
-							{
-								TESObjectREFR* ObjRef = xRef->refr;
-								if (ObjRef && ObjRef->baseForm && ObjRef != (*g_thePlayer))
-								{
-									if ((ObjRef->flags & TESForm::kFormFlags_CastShadows) == false)
-									{
-										// we've flipped the logic, remember?
-										Casters.push_back(ShadowCaster(FadeNode, ObjRef));
-									}
-								}
-							}
-						}						
-					}
-					else
-						Prepass(Node);
-				}
-			}
-		}
-	}
-
+	
 	void ShadowSceneProc::TraverseAndQueue( UInt32 MaxShadowCount )
 	{
 		UInt32 ShadowCount = 0;
@@ -199,7 +201,8 @@ namespace ShadowFacts
 #endif
 		gLog.Indent();
 
-		Prepass((NiNode*)Root->m_children.data[3]);			// traverse ObjectLODRoot node
+		Utilities::NiNodeChildrenWalker Walker((NiNode*)Root->m_children.data[3]);			// traverse ObjectLODRoot node
+		Walker.Walk(&ShadowCasterEnumerator(&Casters));
 
 		if (Settings::kLargeObjectHigherPriority.GetData().i)
 		{
@@ -554,7 +557,7 @@ namespace ShadowFacts
 		SME_ASSERT(Caster);
 
 		BSFadeNode* Node = Caster->sourceNode;
-		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiPropertyByName(Node, "REF");
+		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Node, "REF");
 
 		if (xRef && xRef->refr)
 			return SelfShadowExParams::Instance.GetAllowed(Node, xRef->refr);
@@ -620,9 +623,9 @@ namespace ShadowFacts
 
 		bool Result = true;
 
-		if (Source->sourceLight && Source->sourceNode)
+		if (Source->sourceLight && Source->sourceNode && InterfaceManager::GetSingleton()->IsGameMode())
 		{
-			TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiPropertyByName(Source->sourceNode, "REF");
+			TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source->sourceNode, "REF");
 			if (xRef && xRef->refr)			
 			{
 				TESObjectREFR* Object = xRef->refr;
@@ -630,7 +633,7 @@ namespace ShadowFacts
 				if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior.GetData().i) ||
 					(Object->parentCell->IsInterior() == false && Settings::kLOSCheckExterior.GetData().i))
 				{
-					if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kLOSCheckMaxDistance.GetData().f)
+					if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance.GetData().f)
 					{
 						bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
 #if 0
@@ -658,10 +661,7 @@ namespace ShadowFacts
 #endif
 						if (LOSCheck == false)
 						{
-							Result = false;		
-#if 0
-							_MESSAGE("Caster %s culled due to lack of LOS with source light", Source->sourceNode->m_pcName);
-#endif
+							Result = false;
 						}
 					}
 				}
@@ -671,6 +671,25 @@ namespace ShadowFacts
 		return Result;
 	}
 
+	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateReceiverProlog( ShadowSceneLight* Source )
+	{
+		SME_ASSERT(Source);
+
+		if (Source->sourceNode)
+		{
+			Source->sourceNode->m_flags |= NiAVObject::kFlag_AppCulled;
+		}
+	}
+
+	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateReceiverEpilog( ShadowSceneLight* Source )
+	{
+		SME_ASSERT(Source);
+
+		if (Source->sourceNode)
+		{
+			Source->sourceNode->m_flags &= ~NiAVObject::kFlag_AppCulled;
+		}
+	}
 
 
 
@@ -678,7 +697,8 @@ namespace ShadowFacts
 	_DefineHookHdlr(RenderShadowsProlog, 0x004073E4);
 	_DefineHookHdlr(RenderShadowsEpilog, 0x00407AD3);
 	_DefineHookHdlr(QueueModel3D, 0x00434BB2);
-	_DefineHookHdlr(UpdateGeometryLighting, 0x0040795C);
+	_DefineHookHdlr(UpdateGeometryLighting, 0x00407945);
+	_DefineHookHdlr(UpdateGeometryLightingSelf, 0x0040795C);
 	_DefineHookHdlr(RenderShadowMap, 0x007D4E89);
 	_DefineHookHdlr(CheckSourceLightLOS, 0x00407901);
 
@@ -748,6 +768,29 @@ namespace ShadowFacts
 	}
 
 	#define _hhName	UpdateGeometryLighting
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x0040794A);
+		_hhSetVar(Call, 0x007D6900);
+		__asm
+		{	
+			pushad
+			push	esi
+			call	ShadowRenderTasks::HandleShadowLightUpdateReceiverProlog
+			popad
+
+			call	_hhGetVar(Call)
+
+			pushad
+			push	esi
+			call	ShadowRenderTasks::HandleShadowLightUpdateReceiverEpilog
+			popad
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	#define _hhName	UpdateGeometryLightingSelf
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x00407961);
@@ -824,45 +867,21 @@ namespace ShadowFacts
 		}
 	}
 
-	static bool ToggleShadowVolumes_Execute(COMMAND_ARGS)
-	{
-		*result = 0;
-
-		_MESSAGE("Refreshing shadeMe params...");
-		gLog.Indent();
-		ShadowFigures::ShadowRenderConstantRegistry::GetSingleton()->Load();
-
-		shadeMeINIManager::Instance.Load();
-		MainShadowExParams::Instance.RefreshParameters();
-		SelfShadowExParams::Instance.RefreshParameters();
-		ShadowRenderTasks::RefreshMiscPathLists();
-		gLog.Outdent();
-
-		return true;
-	}
+	
 
 
 #if 0
 	_DeclareMemHdlr(TestHook, "");
-	_DefineHookHdlr(TestHook, 0x00407901);
+	_DefineHookHdlr(TestHook, 0x00407945);
 
-	void __stdcall DoTestHook(ShadowSceneLight* Light)
+	void __stdcall DoTestHook(ShadowSceneLight* Light, bool State)
 	{
-		if (Light->sourceLight && Light->sourceNode)
+		if (Light->sourceNode)
 		{
-			TESObjectREFR* Ref = InterfaceManager::GetSingleton()->debugSelection;
-
-			if (Ref && Ref->niNode == Light->sourceNode)
-			{
-				_MESSAGE("Caster %s source light %s @ %f, %f, %f | Dist = %f", Light->sourceNode->m_pcName, Light->sourceLight->m_pcName,
-						Light->sourceLight->m_worldTranslate.x,
-						Light->sourceLight->m_worldTranslate.y,
-						Light->sourceLight->m_worldTranslate.z,
-						Utilities::GetDistance(Ref->niNode, Light->sourceLight));
-
-				bool Fallthrough = false;
-				_MESSAGE("Caster Light LOS = %d, Fallthru = %d", Utilities::GetLightLOS(Light->sourceLight, Ref, Fallthrough), Fallthrough);
-			}
+			if (State == false)
+				Light->sourceNode->m_flags |= NiAVObject::kFlag_AppCulled;
+			else
+				Light->sourceNode->m_flags &= ~NiAVObject::kFlag_AppCulled;
 		}
 	}
 
@@ -870,16 +889,24 @@ namespace ShadowFacts
 	#define _hhName	TestHook
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x00407906);
-		_hhSetVar(Call, 0x007D2280);
+		_hhSetVar(Retn, 0x0040794A);
+		_hhSetVar(Call, 0x007D6900);
 		__asm
 		{	
 			pushad
+			push	0
 			push	esi
 			call	DoTestHook
 			popad
 
 			call	_hhGetVar(Call)
+
+			pushad
+			push	1
+			push	esi
+			call	DoTestHook
+			popad
+
 			jmp		_hhGetVar(Retn)
 		}
 	}
@@ -894,13 +921,9 @@ namespace ShadowFacts
 		_MemHdlr(RenderShadowsEpilog).WriteJump();
 		_MemHdlr(QueueModel3D).WriteJump();
 		_MemHdlr(UpdateGeometryLighting).WriteJump();
+		_MemHdlr(UpdateGeometryLightingSelf).WriteJump();
 		_MemHdlr(RenderShadowMap).WriteJump();
 		_MemHdlr(CheckSourceLightLOS).WriteJump();
-
-		CommandInfo* ToggleShadowVolumes = (CommandInfo*)0x00B0B9C0;
-		ToggleShadowVolumes->longName = "RefreshShadeMeParams";
-		ToggleShadowVolumes->shortName = "rsc";
-		ToggleShadowVolumes->execute = ToggleShadowVolumes_Execute;
 	}
 
 	void Initialize( void )
@@ -908,347 +931,5 @@ namespace ShadowFacts
 		MainShadowExParams::Instance.Initialize();
 		SelfShadowExParams::Instance.Initialize();
 		ShadowRenderTasks::Initialize();
-	}
-}
-
-namespace ShadowFigures
-{
-	DEF_SRC(SRC_A30068, true, 0.05, 0x007D4740 + 2);	
-	DEF_SRC(SRC_B258E8, false, 0, 0x007D4811 + 2);
-	DEF_SRC(SRC_B258EC, false, 0, 0x007D4823 + 2);
-	DEF_SRC(SRC_B258F0, false, 1.0, 0x007D4833 + 2);
-	DEF_SRC(SRC_A3D8E8, true, 0.01, 0x007D4860 + 2);	
-
-	DEF_SRC(SRC_A91278, true, 0.01745327934622765, 0x007D49F2 + 2);
-	DEF_SRC(SRC_A91280, true, 110.0, 0x007D49D8 + 2);
-	DEF_SRC(SRC_A91288, true, -0.01, 0x007D4877 + 2);
-
-	DEF_SRC(SRC_B258D0, false, 1.0, 0x007D48B2 + 1);
-	DEF_SRC(SRC_B258D4, false, 0, 0x007D48B7 + 2);
-	DEF_SRC(SRC_B258D8, false, 0, 0x007D48BD + 2);
-
-	DEF_SRC(SRC_A2FAA0, true, 0.5, 0x007D49EC + 2);			// umbra related?
-	DEF_SRC(SRC_A3F3E8, true, 10.0, 0x007D4BA6 + 2);
-	DEF_SRC(SRC_A6BEA0, true, 400.0, 0x007D4CF7 + 2);
-
-	DEF_SRC(SRC_B25AD0, false, 0.0, 0x007D4D3E + 1);
-	DEF_SRC(SRC_B25AD4, false, 0.0, 0x007D4D43 + 2);
-	DEF_SRC(SRC_B25AD8, false, 0.0, 0x007D4D49 + 2);
-	DEF_SRC(SRC_B25ADC, false, 1.0, 0x007D4D56 + 1);
-
-	DEF_SRC(SRC_A3D0C0, true, 2.0, 0x007D511A + 2);
-
-	DEF_SRC(SMRC_A2FC68, true, 0.0, 0x007D24E5 + 2);
-	DEF_SRC(SMRC_A2FC70, true, 1000.0, 0x007D28D2 + 2);
-	DEF_SRC(SMRC_A31C70, true, 0.75, 0x007D2CB4 + 2);		// distortion mul?
-	DEF_SRC(SMRC_A3B1B8, true, 256.0, 0x007D2CEC + 2);		// some kinda resolution?
-	DEF_SRC(SMRC_A38618, true, 2.5, 0x007D2D01 + 2);		// light source dist mul
-	DEF_SRC(SMRC_A3F3A0, true, 6.0, 0x007D2D94 + 2);
-	DEF_SRC(SMRC_A91270, true, 0.4, 0x007D2DB2 + 2);
-	DEF_SRC(SMRC_A91268, true, 0.8, 0x007D2DC8 + 2);		// shadow darkness?
-
-
-	ShadowRenderConstant::ShadowRenderConstant( const char* Name, bool Wide, long double DefaultValue, UInt32 PrimaryPatchLocation ) :
-		Wide(Wide),
-		PatchLocations(),
-		Name(Name)
-	{
-		SME_ASSERT(Name);
-
-		Data.d = 0.0f;
-		Default.d = 0.0f;
-
-		if (Wide)
-		{
-			Data.d = DefaultValue;
-			Default.d = DefaultValue;
-		}
-		else
-		{
-			Data.f = DefaultValue;
-			Default.f = DefaultValue;
-		}
-
-		SME_ASSERT(PrimaryPatchLocation);
-		PatchLocations.push_back(PrimaryPatchLocation);
-
-		ShadowRenderConstantRegistry::GetSingleton()->Register(this);
-	}
-
-	ShadowRenderConstant::~ShadowRenderConstant()
-	{
-		PatchLocations.clear();
-	}
-
-	void ShadowRenderConstant::AddPatchLocation( UInt32 Location )
-	{
-		SME_ASSERT(Location);
-
-		PatchLocations.push_back(Location);
-	}
-
-	void ShadowRenderConstant::ApplyPatch( void ) const
-	{
-		for (PatchLocationListT::const_iterator Itr = PatchLocations.begin(); Itr != PatchLocations.end(); Itr++)
-		{
-			if (Wide)
-				SME::MemoryHandler::SafeWrite32(*Itr, (UInt32)&Data.d);
-			else
-				SME::MemoryHandler::SafeWrite32(*Itr, (UInt32)&Data.f);
-		}
-	}
-
-	void ShadowRenderConstant::SetValue( long double NewValue )
-	{
-		if (Wide)
-			Data.d = NewValue;
-		else
-			Data.f = NewValue;
-	}
-
-	void ShadowRenderConstant::ResetDefault( void )
-	{
-		if (Wide)
-			Data.d = Default.d;
-		else
-			Data.f = Default.f;
-	}
-
-	long double ShadowRenderConstant::GetValue( void ) const
-	{
-		if (Wide)
-			return Data.d;
-		else
-			return Data.f;
-	}
-
-
-	const char* ShadowRenderConstantRegistry::kINIPath = "Data\\OBSE\\Plugins\\ShadowRenderConstants.ini";
-
-	ShadowRenderConstantRegistry::ShadowRenderConstantRegistry() :
-		DataStore()
-	{
-		;//
-	}
-
-	ShadowRenderConstantRegistry::~ShadowRenderConstantRegistry()
-	{
-		DataStore.clear();
-	}
-
-	void ShadowRenderConstantRegistry::Save( void )
-	{
-		_MESSAGE("Saving shadow render constants to %s...", kINIPath);
-
-		char IntBuffer[0x200] = {0}, ExtBuffer[0x200] = {0};
-		for (ConstantValueTableT::const_iterator Itr = DataStore.begin(); Itr != DataStore.end(); Itr++)
-		{
-			FORMAT_STR(IntBuffer, "%f", (float)Itr->second.Interior);
-			FORMAT_STR(ExtBuffer, "%f", (float)Itr->second.Exterior);
-
-			WritePrivateProfileStringA("Interior", Itr->first->Name.c_str(), IntBuffer, kINIPath);
-			WritePrivateProfileStringA("Exterior", Itr->first->Name.c_str(), ExtBuffer, kINIPath);
-		}
-	}
-
-	ShadowRenderConstantRegistry* ShadowRenderConstantRegistry::GetSingleton( void )
-	{
-		static ShadowRenderConstantRegistry Singleton;
-
-		return &Singleton;
-	}
-
-	void ShadowRenderConstantRegistry::Initialize( void )
-	{
-		for (ConstantValueTableT::const_iterator Itr = DataStore.begin(); Itr != DataStore.end(); Itr++)
-		{
-			Itr->first->ApplyPatch();
-		}
-
-		std::fstream INIFile(kINIPath, std::fstream::in);
-		if (INIFile.fail())
-		{
-			// set the optimal values before dumping to INI
-			DataStore[&SRC_A6BEA0].Exterior = 16384;
-			DataStore[&SMRC_A3B1B8].Exterior = 4096;
-			DataStore[&SMRC_A38618].Exterior = 28.5;
-			DataStore[&SMRC_A3F3A0].Exterior = 5;
-
-			Save();
-		}
-	}
-
-	void ShadowRenderConstantRegistry::Load( void )
-	{
-		_MESSAGE("Loading shadow render constants from %s...", kINIPath);
-
-		char IntBuffer[0x200] = {0}, ExtBuffer[0x200] = {0};
-		char Default[0x10] = {0};
-
-		for (ConstantValueTableT::iterator Itr = DataStore.begin(); Itr != DataStore.end(); Itr++)
-		{
-			FORMAT_STR(Default, "%f", (float)Itr->second.Interior);
-			GetPrivateProfileStringA("Interior", Itr->first->Name.c_str(), Default, IntBuffer, sizeof(IntBuffer), kINIPath);
-			Itr->second.Interior = atof(IntBuffer);
-
-			FORMAT_STR(Default, "%f", (float)Itr->second.Exterior);
-			GetPrivateProfileStringA("Exterior", Itr->first->Name.c_str(), Default, ExtBuffer, sizeof(ExtBuffer), kINIPath);
-			Itr->second.Exterior = atof(ExtBuffer);
-		}
-	}
-
-	void ShadowRenderConstantRegistry::UpdateConstants( void )
-	{
-		for (ConstantValueTableT::iterator Itr = DataStore.begin(); Itr != DataStore.end(); Itr++)
-		{
-			if (TES::GetSingleton()->currentInteriorCell)
-				Itr->first->SetValue(Itr->second.Interior);
-			else
-				Itr->first->SetValue(Itr->second.Exterior);
-		}
-	}
-
-	void ShadowRenderConstantRegistry::Register( ShadowRenderConstant* Constant )
-	{
-		SME_ASSERT(Constant);
-
-		if (DataStore.count(Constant) == 0)
-		{
-			DataStore.insert(std::make_pair(Constant, ValuePair()));
-			DataStore[Constant].Interior = Constant->GetValue();
-			DataStore[Constant].Exterior = Constant->GetValue();
-		}
-	}
-	
-
-	void Patch( void )
-	{
-		SRC_B258E8.AddPatchLocation(0x007D4BA0 + 2);
-		SRC_B258EC.AddPatchLocation(0x007D4BB4 + 2);
-		SRC_B258F0.AddPatchLocation(0x007D4BC0 + 2);
-		SRC_A3D0C0.AddPatchLocation(0x007D5161 + 2);			
-		
-		ShadowRenderConstantRegistry::GetSingleton()->Initialize();
-	}
-
-	void Initialize( void )
-	{
-		ShadowRenderConstantRegistry::GetSingleton()->Load();
-	}
-}
-
-namespace EditorSupport
-{
-	_DefineHookHdlr(EnableCastsShadowsFlag, 0x005498DD);
-
-	void __stdcall FixupReferenceEditDialog(HWND Dialog, TESForm* BaseForm)
-	{
-		if (Dialog && BaseForm)
-		{
-			if (BaseForm->typeID != kFormType_Light)
-			{
-				// not a light reference, perform switcheroo
-				// all refs cast shadows by default, so we'll use reverse-logic to evaluate the bit
-				// ergo, when the cast shadows flag is set, don't cast shadows
-				SetDlgItemText(Dialog, 1687, "Doesn't Cast Shadow");
-				SetWindowPos(GetDlgItem(Dialog, 1687), HWND_BOTTOM, 0, 0, 120, 15, SWP_NOMOVE|SWP_NOZORDER);
-			}
-		}
-	}
-
-	#define _hhName	EnableCastsShadowsFlag
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x005498E3);
-		__asm
-		{	
-			pushad
-			push	eax
-			push	edi
-			call	FixupReferenceEditDialog
-			popad
-
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	void Patch( void )
-	{
-		// no other changes - the vanilla code handles the rest
-		_MemHdlr(EnableCastsShadowsFlag).WriteJump();
-	}
-}
-
-namespace SundrySloblock
-{
-	_DefineHookHdlr(ConsoleDebugSelectionA, 0x0058290B);
-	_DefineHookHdlr(ConsoleDebugSelectionB, 0x0057CA43);
-
-	void __stdcall UpdateDebugSelectionDesc(BSStringT* OutString, TESObjectREFR* DebugSel)
-	{
-		if (DebugSel)
-		{
-			NiNode* Node = DebugSel->niNode;
-
-			char SpecialFlags[0x100] = {0};
-			if (Node)
-			{
-				FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s",
-					((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_CannotBeLargeObject) ? "NoLO" : "-"),
-					((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap) ? "BkFc" : "-"),
-					((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorShadow) ? "NoInt" : "-"),
-					((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorShadow) ? "NoExt" : "-"),
-					((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow) ? "NoInt(S)" : "-"),
-					((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow) ? " NoExt(S)" : "-"));
-			}
-			
-			char Buffer[0x200] = {0};
-			FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%f]\n\nShadow flags[%s]",
-					thisCall<const char*>(0x004DA2A0, DebugSel),
-					DebugSel->refID,
-					(Node && Node->m_pcName ? Node->m_pcName : ""),
-					(Node ? Node->m_kWorldBound.radius : 0.f),
-					SpecialFlags);
-
-			OutString->Set(Buffer);
-		}
-	}
-
-	#define _hhName	ConsoleDebugSelectionA
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x00582910);
-		__asm
-		{	
-			pushad
-			push	edi
-			push	eax
-			call	UpdateDebugSelectionDesc
-			popad
-
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	#define _hhName	ConsoleDebugSelectionB
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x0057CA48);
-		__asm
-		{	
-			pushad
-			push	esi
-			push	eax
-			call	UpdateDebugSelectionDesc
-			popad
-
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	void Patch( void )
-	{
-		_MemHdlr(ConsoleDebugSelectionA).WriteJump();
-		_MemHdlr(ConsoleDebugSelectionB).WriteJump();
 	}
 }

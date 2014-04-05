@@ -107,7 +107,8 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ForcedIncludeFiles>obse_common/obse_prefix.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
       <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
@@ -136,7 +137,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\obse\obse\GameActorValues.cpp" />
+    <ClCompile Include="..\obse\obse\GameActorValues.cpp">
+      <DebugInformationFormat Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </DebugInformationFormat>
+    </ClCompile>
     <ClCompile Include="..\obse\obse\GameAPI.cpp" />
     <ClCompile Include="..\obse\obse\GameBSExtraData.cpp" />
     <ClCompile Include="..\obse\obse\GameData.cpp" />
@@ -165,7 +169,9 @@
     <ClCompile Include="BoundsCalculator.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="shadeMeInternals.cpp" />
-    <ClCompile Include="Shadow.cpp" />
+    <ClCompile Include="ShadowFacts.cpp" />
+    <ClCompile Include="ShadowFigures.cpp" />
+    <ClCompile Include="ShadowSundries.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\obse\obse\GameActorValues.h" />
@@ -198,7 +204,9 @@
     <ClInclude Include="..\obse\obse\Utilities.h" />
     <ClInclude Include="BoundsCalculator.h" />
     <ClInclude Include="shadeMeInternals.h" />
-    <ClInclude Include="Shadow.h" />
+    <ClInclude Include="ShadowFacts.h" />
+    <ClInclude Include="ShadowFigures.h" />
+    <ClInclude Include="ShadowSundries.h" />
     <ClInclude Include="VersionInfo.h" />
   </ItemGroup>
   <ItemGroup>

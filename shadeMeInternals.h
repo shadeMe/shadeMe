@@ -37,7 +37,6 @@ namespace Interfaces
 {
 	extern PluginHandle						kOBSEPluginHandle;
 
-	extern OBSESerializationInterface*		kOBSESerialization;
 	extern OBSEMessagingInterface*			kOBSEMessaging;
 }
 
@@ -70,7 +69,6 @@ namespace Settings
 
 	extern SME::INI::INISetting				kLOSCheckInterior;
 	extern SME::INI::INISetting				kLOSCheckExterior;
-	extern SME::INI::INISetting				kLOSCheckMaxDistance;
 
 	extern SME::INI::INISetting				kSelfExcludedTypesInterior;
 	extern SME::INI::INISetting				kSelfExcludedTypesExterior;
@@ -157,28 +155,30 @@ public:
 	float												unkF8;
 	UInt8												unkFC;
 	UInt8												unkFCPad[3];
-	NiPointLight*										sourceLight;		// parent light
+	NiPointLight*										sourceLight;	// 100 - parent light
 	UInt8												unk104;	
 	UInt8												unk104Pad[3];
 	NiVector3											unk108;		// sourceLight->m_worldTranslate
-	BSRenderedTexture*									shadowMap;	// shadow map texture
-	UInt16												unk118;		// when 0xFF, light source is culled
+	BSRenderedTexture*									shadowMap;	// 114 - shadow map texture
+	UInt16												unk118;		// when 0xFF, light source is culled (not active)
 	UInt16												unk11A;
 	UInt32												unk11C;
 	UInt32												unk120;
 	NiPointer<BSCubeMapCamera>							unk124;		// light camera?
 	UInt32												unk128;
-	UInt8												showDebug;	// debug shader toggle
+	UInt8												showDebug;	// 12C - debug shader toggle
 	UInt8												unk12CPad[3];
-	BSFadeNode*											sourceNode;	// node being lighted/shadowed
+	BSFadeNode*											sourceNode;	// 130 - node being lighted/shadowed
 	NiTPointerList<NiPointer<NiAVObject>>				unk134;
-	void*												unk144;		// 
+	void*												unk144;
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
 	NiCamera*											unk14C;		
 	UInt32												unk1B0;		
 };
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceLight) == 0x100);
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceNode) == 0x130);
+
+typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
 
 // ?
 class BSTreeNode : public NiNode
@@ -198,7 +198,9 @@ namespace Utilities
 	bool				GetBelowPlayer(TESObjectREFR* Ref, float Threshold);
 
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
-	NiProperty*			GetNiPropertyByName(NiAVObject* Source, const char* Name);
+	NiExtraData*		GetNiExtraDataByName(NiAVObject* Source, const char* Name);
+	NiProperty*			GetNiPropertyByID(NiAVObject* Source, UInt8 ID);
+	UInt32				GetNodeActiveLights(NiNode* Source, ShadowLightListT* OutList);
 
 	void				UpdateBounds(NiNode* Node);
 	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);
@@ -284,6 +286,43 @@ namespace Utilities
 		virtual ~FilePathINIParamList();
 		
 		virtual void			Dump(void) const;
+	};
+
+	class NiNodeChildVisitor
+	{
+	public:
+		virtual ~NiNodeChildVisitor() = 0
+		{
+			;//
+		}
+
+		virtual bool			AcceptBranch(NiNode* Node) = 0;					// for each child NiNode, return false to skip traversal
+		virtual void			AcceptLeaf(NiAVObject* Object) = 0;				// for each child NiAVObject that isn't a NiNode
+	};
+
+	class NiNodeChildrenWalker
+	{
+		NiNode*					Root;
+		NiNodeChildVisitor*		Visitor;
+
+		void					Traverse(NiNode* Branch);
+	public:
+		NiNodeChildrenWalker(NiNode* Source);
+		~NiNodeChildrenWalker();
+
+		void					Walk(NiNodeChildVisitor* Visitor);
+	};
+
+	class ActiveShadowSceneLightEnumerator : public Utilities::NiNodeChildVisitor
+	{
+	protected:
+		ShadowLightListT*		ActiveLights;
+	public:
+		ActiveShadowSceneLightEnumerator(ShadowLightListT* OutList);
+		virtual ~ActiveShadowSceneLightEnumerator();
+
+		virtual bool			AcceptBranch(NiNode* Node);
+		virtual void			AcceptLeaf(NiAVObject* Object);
 	};
 }
 

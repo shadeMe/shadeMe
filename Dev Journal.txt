@@ -2,4 +2,6 @@ To Do
 =====
 > Reduce shadow distance depending upon fog
 > Exclude submerged casters (rocks in particular)
-> Add BSX flags support
+> Prevent shadows from being culled when outside the camera frustum
+	>> only when they are close to the player
+> Look into the dark shadow issue - precision or LOD?
