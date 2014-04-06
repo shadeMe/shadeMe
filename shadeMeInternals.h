@@ -58,6 +58,7 @@ namespace Settings
 	extern SME::INI::INISetting				kLargeObjectHigherPriority;
 	extern SME::INI::INISetting				kLargeObjectBoundRadius;
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;
+	extern SME::INI::INISetting				kLargeObjectSunShadowsOnly;
 
 	extern SME::INI::INISetting				kRenderBackfacesIncludePath;
 
@@ -69,6 +70,8 @@ namespace Settings
 
 	extern SME::INI::INISetting				kLOSCheckInterior;
 	extern SME::INI::INISetting				kLOSCheckExterior;
+	extern SME::INI::INISetting				kLOSSkipLargeObjects;
+	extern SME::INI::INISetting				kLOSExcludedPath;
 
 	extern SME::INI::INISetting				kSelfExcludedTypesInterior;
 	extern SME::INI::INISetting				kSelfExcludedTypesExterior;
@@ -146,10 +149,10 @@ public:
 	ShadowSceneLight();
 	~ShadowSceneLight();
 
-	float												unkDC;		// time left before full fade-in opacity
-	float												unkE0;		// time elapsed during fade-in
+	float												unkDC;		// time left before full fade-in opacity?
+	float												unkE0;		// time elapsed during fade-in?
 	NiTPointerList<NiPointer<NiTriBasedGeom>>			unkE4;		// light blocker geometry ?
-	UInt8												unkF4;		// shadow map rendered flag?
+	UInt8												unkF4;		// shadow map rendered/casts shadow flag?
 	UInt8												unkF5;
 	UInt8												unkF5Pad[2];
 	float												unkF8;
@@ -172,7 +175,7 @@ public:
 	NiTPointerList<NiPointer<NiAVObject>>				unk134;
 	void*												unk144;
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
-	NiCamera*											unk14C;		
+	NiCamera*											unk14C;		// used when performing LOC checks/frustum culling
 	UInt32												unk1B0;		
 };
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceLight) == 0x100);
@@ -192,8 +195,8 @@ namespace Utilities
 	float				GetDistanceFromPlayer(NiNode* Node);
 	bool				GetPlayerHasLOS(TESObjectREFR* Target);						// slooooooooowwwwww!
 	
-	bool				GetLightLOS(NiAVObject* Light, TESObjectREFR* Target);
-
+	bool				GetLightLOS(NiAVObject* Light, TESObjectREFR* Target);		// slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwwwwwweeeerrrrrrrr!
+																					// also, haaaaaaaaaaaaccccckkkkkyyyyy!
 	bool				GetAbovePlayer(TESObjectREFR* Ref, float Threshold);
 	bool				GetBelowPlayer(TESObjectREFR* Ref, float Threshold);
 
@@ -224,7 +227,7 @@ namespace Utilities
 
 		void Parse(const INI::INISetting* Setting)
 		{
-			SME::StringHelpers::Tokenizer Parser(Setting->GetData().s, Delimiter.c_str());
+			SME::StringHelpers::Tokenizer Parser((*Setting)().s, Delimiter.c_str());
 			std::string CurrentArg = "";
 
 			while (Parser.NextToken(CurrentArg) != -1)

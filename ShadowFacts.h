@@ -17,6 +17,7 @@ namespace ShadowFacts
 		bool							IsUnderWater;
 
 		void							CreateShadowSceneLight(ShadowSceneNode* Root);
+		bool							GetIsLargeObject(void) const;
 
 		static bool						SortComparatorDistance(ShadowCaster& LHS, ShadowCaster& RHS);
 		static bool						SortComparatorBoundRadius(ShadowCaster& LHS, ShadowCaster& RHS);
@@ -121,6 +122,7 @@ namespace ShadowFacts
 		kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow	= 1 << 12,
 		kNiAVObjectSpecialFlag_DontCastInteriorShadow		= 1 << 13,
 		kNiAVObjectSpecialFlag_DontCastExteriorShadow		= 1 << 14,
+		kNiAVObjectSpecialFlag_DontPerformLOSCheck			= 1 << 15,
 	};
 
 	// same as above but for BSXFlags
@@ -161,6 +163,7 @@ namespace ShadowFacts
 	{
 		static PathSubstringListT					BackFaceIncludePaths;
 		static PathSubstringListT					LargeObjectExcludePaths;
+		static PathSubstringListT					LOSCheckExcludePaths;
 
 		static void									ToggleBackFaceCulling(bool State);
 		static void									PerformModelLoadTask(BSFadeNode* Node);
@@ -182,7 +185,9 @@ namespace ShadowFacts
 		static void __stdcall						HandleModelLoad(BSFadeNode* Node);
 
 		static bool									GetCanBeLargeObject(BSFadeNode* Node);
+		static bool									GetIsLargeObject(BSFadeNode* Node);
 		static bool	__stdcall						GetHasLightLOS(ShadowSceneLight* Source);
+		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
 	};
 
 	
@@ -196,6 +201,7 @@ namespace ShadowFacts
 	_DeclareMemHdlr(UpdateGeometryLightingSelf, "selective self-shadowing support");
 	_DeclareMemHdlr(RenderShadowMap, "");
 	_DeclareMemHdlr(CheckSourceLightLOS, "");
+	_DeclareMemHdlr(CheckLargeObjectLightSource, "prevents large objects from being affected by small light sources (z.B magic projectiles, torches, etc)");
 
 
 	void Patch(void);

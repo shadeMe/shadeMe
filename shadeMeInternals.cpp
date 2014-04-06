@@ -25,6 +25,8 @@ namespace Settings
 	SME::INI::INISetting			kLargeObjectBoundRadius("MinBoundRadius", "Shadows::LargeObjects",
 															"Minimum bound radii for large objects", (float)750.0f);
 	SME::INI::INISetting			kLargeObjectExcludedPath("ExcludePaths", "Shadows::LargeObjects", "Large object blacklist", "rocks\\");
+	SME::INI::INISetting			kLargeObjectSunShadowsOnly("OnlyCastSunShadows", "Shadows::LargeObjects",
+															"Large objects will not react to small light sources", (SInt32)1);
 
 
 	SME::INI::INISetting			kRenderBackfacesIncludePath("IncludePaths", "Shadows::BackfaceRendering", "Backface rendering whitelist", "");
@@ -44,6 +46,8 @@ namespace Settings
 
 	SME::INI::INISetting			kLOSCheckInterior("Interior", "Shadows::LOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kLOSCheckExterior("Exterior", "Shadows::LOSCheck", "Check player LOS with caster", (SInt32)1);
+	SME::INI::INISetting			kLOSSkipLargeObjects("SkipLargeObjects", "Shadows::LOSCheck", "Don't perform checks on large objects", (SInt32)1);
+	SME::INI::INISetting			kLOSExcludedPath("ExcludePaths", "Shadows::LOSCheck", "LOS blacklist", "");
 
 
 	SME::INI::INISetting			kSelfExcludedTypesInterior("Interior", "SelfShadows::ExcludedTypes", "Form types that can't cast shadows", "");
@@ -67,6 +71,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kLargeObjectHigherPriority);
 	RegisterSetting(&Settings::kLargeObjectBoundRadius);
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
+	RegisterSetting(&Settings::kLargeObjectSunShadowsOnly);
 
 	RegisterSetting(&Settings::kRenderBackfacesIncludePath);
 
@@ -78,6 +83,8 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 
 	RegisterSetting(&Settings::kLOSCheckInterior);
 	RegisterSetting(&Settings::kLOSCheckExterior);
+	RegisterSetting(&Settings::kLOSSkipLargeObjects);
+	RegisterSetting(&Settings::kLOSExcludedPath);
 
 	RegisterSetting(&Settings::kSelfExcludedTypesInterior);
 	RegisterSetting(&Settings::kSelfExcludedTypesExterior);

@@ -51,7 +51,7 @@ namespace ShadowFacts
 	{
 		bool Result = false;
 		
-		if (Distance < Settings::kCasterMaxDistance.GetData().f)
+		if (Distance < Settings::kCasterMaxDistance().f)
 		{
 			if (IsUnderWater == false)
 			{
@@ -80,8 +80,8 @@ namespace ShadowFacts
 
 		if (Result)
 		{
-			if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior.GetData().i) ||
-				(Object->parentCell->IsInterior() == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kLOSCheckExterior.GetData().i))
+			if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior().i) ||
+				(Object->parentCell->IsInterior() == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kLOSCheckExterior().i))
 			{
 				if (Utilities::GetAbovePlayer(Object, 10) && Utilities::GetPlayerHasLOS(Object) == false)
 				{
@@ -106,6 +106,11 @@ namespace ShadowFacts
 	{
 		Utilities::UpdateBounds(Node);
 		thisCall<void>(0x007C6C30, Root, Node);
+	}
+
+	bool ShadowCaster::GetIsLargeObject( void ) const
+	{
+		return ShadowRenderTasks::GetIsLargeObject(Node);
 	}
 
 	bool ShadowCaster::SortComparatorDistance( ShadowCaster& LHS, ShadowCaster& RHS )
@@ -204,13 +209,13 @@ namespace ShadowFacts
 		Utilities::NiNodeChildrenWalker Walker((NiNode*)Root->m_children.data[3]);			// traverse ObjectLODRoot node
 		Walker.Walk(&ShadowCasterEnumerator(&Casters));
 
-		if (Settings::kLargeObjectHigherPriority.GetData().i)
+		if (Settings::kLargeObjectHigherPriority().i)
 		{
 			// sort by bound radius first
 			std::sort(Casters.begin(), Casters.end(), ShadowCaster::SortComparatorBoundRadius);
 			for (CasterListT::iterator Itr = Casters.begin(); Itr != Casters.end();)
 			{
-				if (Itr->BoundRadius < Settings::kLargeObjectBoundRadius.GetData().f)
+				if (Itr->GetIsLargeObject() == false)
 					break;
 
 				if (ShadowRenderTasks::GetCanBeLargeObject(Itr->Node))
@@ -469,6 +474,7 @@ namespace ShadowFacts
 
 	PathSubstringListT ShadowRenderTasks::BackFaceIncludePaths;
 	PathSubstringListT ShadowRenderTasks::LargeObjectExcludePaths;
+	PathSubstringListT ShadowRenderTasks::LOSCheckExcludePaths;
 
 	void ShadowRenderTasks::ToggleBackFaceCulling(bool State)
 	{
@@ -490,14 +496,12 @@ namespace ShadowFacts
 			{
 				Node->m_flags &= ~kNiAVObjectSpecialFlag_CannotBeLargeObject;
 				Node->m_flags &= ~kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap;
+				Node->m_flags &= ~kNiAVObjectSpecialFlag_DontPerformLOSCheck;
 
 				for (PathSubstringListT::ParameterListT::const_iterator Itr = BackFaceIncludePaths().begin(); Itr != BackFaceIncludePaths().end(); Itr++)
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
-#if 0
-						_MESSAGE("%s flagged for backfaces", NodeName.c_str());
-#endif
 						Node->m_flags |= kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap;
 						break;
 					}
@@ -507,10 +511,16 @@ namespace ShadowFacts
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
-#if 0
-						_MESSAGE("%s flagged for non-large object", NodeName.c_str());
-#endif
 						Node->m_flags |= kNiAVObjectSpecialFlag_CannotBeLargeObject;
+						break;
+					}
+				}
+
+				for (PathSubstringListT::ParameterListT::const_iterator Itr = LOSCheckExcludePaths().begin(); Itr != LOSCheckExcludePaths().end(); Itr++)
+				{
+					if (NodeName.find(*Itr) != std::string::npos)
+					{
+						Node->m_flags |= kNiAVObjectSpecialFlag_DontPerformLOSCheck;
 						break;
 					}
 				}
@@ -587,7 +597,7 @@ namespace ShadowFacts
 			ToggleBackFaceCulling(true);
 		}
 
-		if (Settings::kEnableDebugShader.GetData().i)
+		if (Settings::kEnableDebugShader().i)
 			Source->showDebug = 1;
 		else
 			Source->showDebug = 0;
@@ -600,6 +610,16 @@ namespace ShadowFacts
 		return !(Node->m_flags & kNiAVObjectSpecialFlag_CannotBeLargeObject);
 	}
 
+	bool ShadowRenderTasks::GetIsLargeObject( BSFadeNode* Node )
+	{
+		SME_ASSERT(Node);
+
+		if (Node->m_kWorldBound.radius >= Settings::kLargeObjectBoundRadius().f)
+			return true;
+		else
+			return false;
+	}
+
 	void ShadowRenderTasks::Initialize( void )
 	{
 		_MESSAGE("Loading backface rendering whitelist...");
@@ -609,12 +629,17 @@ namespace ShadowFacts
 		_MESSAGE("Loading large object blacklist...");
 		LargeObjectExcludePaths.Refresh(&Settings::kLargeObjectExcludedPath);
 		LargeObjectExcludePaths.Dump();
+
+		_MESSAGE("Loading LOS check blacklist...");
+		LOSCheckExcludePaths.Refresh(&Settings::kLOSExcludedPath);
+		LOSCheckExcludePaths.Dump();
 	}
 
 	void ShadowRenderTasks::RefreshMiscPathLists( void )
 	{
 		BackFaceIncludePaths.Refresh(&Settings::kRenderBackfacesIncludePath);
 		LargeObjectExcludePaths.Refresh(&Settings::kLargeObjectExcludedPath);
+		LOSCheckExcludePaths.Refresh(&Settings::kLOSExcludedPath);
 	}
 
 	bool __stdcall ShadowRenderTasks::GetHasLightLOS( ShadowSceneLight* Source )
@@ -625,43 +650,46 @@ namespace ShadowFacts
 
 		if (Source->sourceLight && Source->sourceNode && InterfaceManager::GetSingleton()->IsGameMode())
 		{
-			TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source->sourceNode, "REF");
-			if (xRef && xRef->refr)			
+			if ((Source->sourceNode->m_flags & kNiAVObjectSpecialFlag_DontPerformLOSCheck) == false)
 			{
-				TESObjectREFR* Object = xRef->refr;
-
-				if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior.GetData().i) ||
-					(Object->parentCell->IsInterior() == false && Settings::kLOSCheckExterior.GetData().i))
+				if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLOSSkipLargeObjects().i == 0)
 				{
-					if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance.GetData().f)
+					TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source->sourceNode, "REF");
+					if (xRef && xRef->refr)			
 					{
-						bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
+						TESObjectREFR* Object = xRef->refr;
+
+						if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior().i) ||
+							(Object->parentCell->IsInterior() == false && Settings::kLOSCheckExterior().i))
+						{
+							if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
+							{
+								bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
 #if 0
-						static TESObjectREFR* Buffer = NULL;
-						TESObjectREFR* Ref = InterfaceManager::GetSingleton()->debugSelection;
-						if (Buffer != Ref && Ref)
-						{
-							Buffer = Ref;					
-						}
-						else if (Ref == NULL)
-							Ref = Buffer;
+								static TESObjectREFR* Buffer = NULL;
+								TESObjectREFR* Ref = InterfaceManager::GetSingleton()->debugSelection;
+								if (Buffer != Ref && Ref)
+								{
+									Buffer = Ref;					
+								}
+								else if (Ref == NULL)
+									Ref = Buffer;
 
-						if (xRef->refr == Ref)
-						{
-							if (IsDebuggerPresent())
-								DebugBreak();
-
-							_MESSAGE("Caster %s Light @ %f, %f, %f | Dist = %f ==> LOS[%d]", Source->sourceNode->m_pcName,
-								Source->sourceLight->m_worldTranslate.x,
-								Source->sourceLight->m_worldTranslate.y,
-								Source->sourceLight->m_worldTranslate.z,
-								Utilities::GetDistance(Source->sourceNode, Source->sourceLight),
-								LOSCheck);
-						}
+								if (xRef->refr == Ref)
+								{
+									_MESSAGE("Caster %s Light @ %f, %f, %f | Dist = %f ==> LOS[%d]", Source->sourceNode->m_pcName,
+										Source->sourceLight->m_worldTranslate.x,
+										Source->sourceLight->m_worldTranslate.y,
+										Source->sourceLight->m_worldTranslate.z,
+										Utilities::GetDistance(Source->sourceNode, Source->sourceLight),
+										LOSCheck);
+								}
 #endif
-						if (LOSCheck == false)
-						{
-							Result = false;
+								if (LOSCheck == false)
+								{
+									Result = false;
+								}
+							}
 						}
 					}
 				}
@@ -691,6 +719,17 @@ namespace ShadowFacts
 		}
 	}
 
+	bool __stdcall ShadowRenderTasks::GetReactsToSmallLights( ShadowSceneLight* Source )
+	{
+		SME_ASSERT(Source);
+
+		if (TES::GetSingleton()->currentInteriorCell == NULL && GetIsLargeObject(Source->sourceNode) && Settings::kLargeObjectSunShadowsOnly().i)
+			return false;
+		else
+			return true;
+	}
+
+
 
 
 	_DefineHookHdlr(EnumerateFadeNodes, 0x004075CE);
@@ -701,6 +740,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(UpdateGeometryLightingSelf, 0x0040795C);
 	_DefineHookHdlr(RenderShadowMap, 0x007D4E89);
 	_DefineHookHdlr(CheckSourceLightLOS, 0x00407901);
+	_DefineHookHdlr(CheckLargeObjectLightSource, 0x007D23F7);
 
 
 	#define _hhName	EnumerateFadeNodes
@@ -867,21 +907,45 @@ namespace ShadowFacts
 		}
 	}
 
-	
+	#define _hhName	CheckLargeObjectLightSource
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D2401);
+		_hhSetVar(Jump, 0x007D272D);
+		__asm
+		{	
+			mov		eax, [esp + 0x8]
+			mov		[esp + 0x1C], ebx
+
+			pushad
+			push	eax
+			call	ShadowRenderTasks::GetReactsToSmallLights
+			test	al, al
+			jz		SKIP
+
+			popad
+			jle		AWAY
+
+			jmp		_hhGetVar(Retn)
+	SKIP:
+			popad
+	AWAY:
+			jmp		_hhGetVar(Jump)
+		}
+	}
 
 
 #if 0
 	_DeclareMemHdlr(TestHook, "");
-	_DefineHookHdlr(TestHook, 0x00407945);
+	_DefineHookHdlr(TestHook, 0x007D23F7);
 
-	void __stdcall DoTestHook(ShadowSceneLight* Light, bool State)
+	bool __stdcall DoTestHook(ShadowSceneLight* Source)
 	{
-		if (Light->sourceNode)
+		if (Source->sourceNode->m_kWorldBound.radius >= Settings::kLargeObjectBoundRadius().f)
+			return false;
+		else
 		{
-			if (State == false)
-				Light->sourceNode->m_flags |= NiAVObject::kFlag_AppCulled;
-			else
-				Light->sourceNode->m_flags &= ~NiAVObject::kFlag_AppCulled;
+			return true;
 		}
 	}
 
@@ -889,25 +953,27 @@ namespace ShadowFacts
 	#define _hhName	TestHook
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x0040794A);
-		_hhSetVar(Call, 0x007D6900);
+		_hhSetVar(Retn, 0x007D2401);
+		_hhSetVar(Call, 0x007C6DE0);
+		_hhSetVar(Jump, 0x007D272D);
 		__asm
 		{	
-			pushad
-			push	0
-			push	esi
-			call	DoTestHook
-			popad
-
-			call	_hhGetVar(Call)
+			mov		eax, [esp + 0x8]
+			mov		[esp + 0x1c], ebx
 
 			pushad
-			push	1
-			push	esi
+			push	eax
 			call	DoTestHook
-			popad
+			test	al, al
+			jz		SKIP
 
+			popad
+			jle		AWAY
 			jmp		_hhGetVar(Retn)
+SKIP:
+			popad
+AWAY:
+			jmp		_hhGetVar(Jump)
 		}
 	}
 #endif
@@ -924,6 +990,7 @@ namespace ShadowFacts
 		_MemHdlr(UpdateGeometryLightingSelf).WriteJump();
 		_MemHdlr(RenderShadowMap).WriteJump();
 		_MemHdlr(CheckSourceLightLOS).WriteJump();
+		_MemHdlr(CheckLargeObjectLightSource).WriteJump();
 	}
 
 	void Initialize( void )
