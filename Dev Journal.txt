@@ -1,7 +1,7 @@
 To Do
 =====
-> Reduce shadow distance depending upon fog
-> Exclude submerged casters (rocks in particular)
+> Interior shadows flicker when Light LOS checks are turned on
+	>> Occurs when the light source is set to flicker (z.B a candle) and the projection translation momentarily kills LOS
 > Prevent shadows from being culled when outside the camera frustum
 	>> only when they are close to the player
 > Look into the dark shadow issue - precision or LOD?

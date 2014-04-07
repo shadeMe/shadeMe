@@ -17,7 +17,11 @@ namespace Settings
 {
 	SME::INI::INISetting			kCasterMaxDistance("CasterMaxDistance", "Shadows::General",
 													"Threshold distance b'ween the player and the shadow caster", (float)10000.0f);
+	SME::INI::INISetting			kCasterMinBoundRadius("CasterMinBoundRadius", "Shadows::General",
+													"Objects smaller than this value will not cast shadows", (float)7.0f);
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
+	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General", 
+													"Toggle the expanded console debug selection description", (SInt32)1);
 
 
 	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
@@ -38,16 +42,20 @@ namespace Settings
 													"24,26,41");
 
 
-	SME::INI::INISetting			kMainExcludedPathInterior("Interior", "Shadows::ExcludedPaths", "Meshes with these substrings in their file paths won't case shadows",
+	SME::INI::INISetting			kMainExcludedPathInterior("Interior", "Shadows::ExcludedPaths", "Meshes with these substrings in their file paths won't cast shadows",
 													"");
-	SME::INI::INISetting			kMainExcludedPathExterior("Exterior", "Shadows::ExcludedPaths", "Meshes with these substrings in their file paths won't case shadows",
+	SME::INI::INISetting			kMainExcludedPathExterior("Exterior", "Shadows::ExcludedPaths", "Meshes with these substrings in their file paths won't cast shadows",
 													"");
 
 
-	SME::INI::INISetting			kLOSCheckInterior("Interior", "Shadows::LOSCheck", "Check player LOS with caster", (SInt32)1);
-	SME::INI::INISetting			kLOSCheckExterior("Exterior", "Shadows::LOSCheck", "Check player LOS with caster", (SInt32)1);
-	SME::INI::INISetting			kLOSSkipLargeObjects("SkipLargeObjects", "Shadows::LOSCheck", "Don't perform checks on large objects", (SInt32)1);
-	SME::INI::INISetting			kLOSExcludedPath("ExcludePaths", "Shadows::LOSCheck", "LOS blacklist", "");
+	SME::INI::INISetting			kLightLOSCheckInterior("Interior", "Shadows::LightLOSCheck", "Check source light LOS with caster", (SInt32)1);
+	SME::INI::INISetting			kLightLOSCheckExterior("Exterior", "Shadows::LightLOSCheck", "Check source light with caster", (SInt32)1);
+	SME::INI::INISetting			kLightLOSSkipLargeObjects("SkipLargeObjects", "Shadows::LightLOSCheck", "Don't perform checks on large objects", (SInt32)1);
+	SME::INI::INISetting			kLightLOSExcludedPath("ExcludePaths", "Shadows::LightLOSCheck", "Light LOS blacklist", "");
+
+
+	SME::INI::INISetting			kPlayerLOSCheckInterior("Interior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
+	SME::INI::INISetting			kPlayerLOSCheckExterior("Exterior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 
 
 	SME::INI::INISetting			kSelfExcludedTypesInterior("Interior", "SelfShadows::ExcludedTypes", "Form types that can't cast shadows", "");
@@ -55,9 +63,23 @@ namespace Settings
 
 
 	SME::INI::INISetting			kSelfExcludedPathInterior("Interior", "SelfShadows::ExcludedPaths",
-															"Meshes with these substrings in their file paths won't case shadows", "");
+															"Meshes with these substrings in their file paths won't cast shadows", "");
 	SME::INI::INISetting			kSelfExcludedPathExterior("Exterior", "SelfShadows::ExcludedPaths", 
-															"Meshes with these substrings in their file paths won't case shadows", "");
+															"Meshes with these substrings in their file paths won't cast shadows", "");
+
+	SME::INI::INISetting			kSelfPerformFogCheck("PerformFogCheck", "SelfShadows::General", "Toggle self-shadowing depending upon fog distance", (SInt32)1);
+
+
+	SME::INI::INISetting			kReceiverExcludedTypesInterior("Interior", "ShadowReceiver::ExcludedTypes", "Form types that can't receive shadows", "");
+	SME::INI::INISetting			kReceiverExcludedTypesExterior("Exterior", "ShadowReceiver::ExcludedTypes", "Form types that can't receive shadows", "");
+
+
+	SME::INI::INISetting			kReceiverExcludedPathInterior("Interior", "ShadowReceiver::ExcludedPaths",
+															"Meshes with these substrings in their file paths won't receive shadows", "");
+	SME::INI::INISetting			kReceiverExcludedPathExterior("Exterior", "ShadowReceiver::ExcludedPaths", 
+															"Meshes with these substrings in their file paths won't receive shadows", "");
+
+	SME::INI::INISetting			kReceiverEnableExclusionParams("EnableExclusionParams", "ShadowReceiver::General", "Turn on exclusion params", (SInt32)0);
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -66,7 +88,9 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	_MESSAGE("INI Path: %s", INIPath);
 
 	RegisterSetting(&Settings::kCasterMaxDistance);
+	RegisterSetting(&Settings::kCasterMinBoundRadius);
 	RegisterSetting(&Settings::kEnableDebugShader);
+	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
 
 	RegisterSetting(&Settings::kLargeObjectHigherPriority);
 	RegisterSetting(&Settings::kLargeObjectBoundRadius);
@@ -81,16 +105,30 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMainExcludedPathInterior);
 	RegisterSetting(&Settings::kMainExcludedPathExterior);
 
-	RegisterSetting(&Settings::kLOSCheckInterior);
-	RegisterSetting(&Settings::kLOSCheckExterior);
-	RegisterSetting(&Settings::kLOSSkipLargeObjects);
-	RegisterSetting(&Settings::kLOSExcludedPath);
+	RegisterSetting(&Settings::kLightLOSCheckInterior);
+	RegisterSetting(&Settings::kLightLOSCheckExterior);
+	RegisterSetting(&Settings::kLightLOSSkipLargeObjects);
+	RegisterSetting(&Settings::kLightLOSExcludedPath);
+
+	RegisterSetting(&Settings::kPlayerLOSCheckInterior);
+	RegisterSetting(&Settings::kPlayerLOSCheckExterior);
+
 
 	RegisterSetting(&Settings::kSelfExcludedTypesInterior);
 	RegisterSetting(&Settings::kSelfExcludedTypesExterior);
 
 	RegisterSetting(&Settings::kSelfExcludedPathInterior);
 	RegisterSetting(&Settings::kSelfExcludedPathExterior);
+	
+	RegisterSetting(&Settings::kSelfPerformFogCheck);
+
+	RegisterSetting(&Settings::kReceiverExcludedTypesInterior);
+	RegisterSetting(&Settings::kReceiverExcludedTypesExterior);
+
+	RegisterSetting(&Settings::kReceiverExcludedPathInterior);
+	RegisterSetting(&Settings::kReceiverExcludedPathExterior);
+
+	RegisterSetting(&Settings::kReceiverEnableExclusionParams);
 
 	Save();
 }
@@ -176,92 +214,7 @@ namespace Utilities
 		return cdeclCall<void*>(0x00560920, TypeDescriptor, NiObject);
 	}
 
-	bool GetPlayerHasLOS( TESObjectREFR* Target )
-	{
-		SME_ASSERT(Target);
-
-		double Result =  0;
-		cdeclCall<void>(0x004F9120, (*g_thePlayer), Target, 0, &Result);
-		return Result != 0.f;
-	}
-
-	float GetDistance( NiAVObject* Source, NiAVObject* Destination )
-	{
-		SME_ASSERT(Source && Destination);
-
-		Vector3* WorldTranslateDest = (Vector3*)&Destination->m_worldTranslate;
-		Vector3* WorldTranslateSource = (Vector3*)&Source->m_worldTranslate;
-
-		Vector3 Buffer;
-		Buffer.x = WorldTranslateDest->x - WorldTranslateSource->x;
-		Buffer.y= WorldTranslateDest->y - WorldTranslateSource->y;
-		Buffer.z = WorldTranslateDest->z - WorldTranslateSource->z;
-
-		return sqrt((Buffer.x * Buffer.x) + (Buffer.y * Buffer.y) + (Buffer.z * Buffer.z));
-	}
-
-
-	void IntegerINIParamList::HandleParam( const char* Param )
-	{
-		int Arg = atoi(Param);
-		Params.push_back(Arg);
-	}
-
-	IntegerINIParamList::IntegerINIParamList( const char* Delimiters /*= ","*/ ) :
-		DelimitedINIStringList(Delimiters)
-	{
-		;//
-	}
-
-	IntegerINIParamList::~IntegerINIParamList()
-	{
-		;//
-	}
-
-	void IntegerINIParamList::Dump( void ) const
-	{
-		gLog.Indent();
-
-		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
-		{
-			_MESSAGE("%d", *Itr);
-		}
-
-		gLog.Outdent();
-	}
-
-
-	void FilePathINIParamList::HandleParam( const char* Param )
-	{
-		std::string Arg(Param);
-		SME::StringHelpers::MakeLower(Arg);
-		Params.push_back(Arg);
-	}
-
-	FilePathINIParamList::FilePathINIParamList( const char* Delimiters /*= ","*/ ) :
-		DelimitedINIStringList(Delimiters)
-	{
-		;//
-	}
-
-	FilePathINIParamList::~FilePathINIParamList()
-	{
-		;//
-	}
-
-	void FilePathINIParamList::Dump( void ) const
-	{
-		gLog.Indent();
-
-		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
-		{
-			_MESSAGE("%s", Itr->c_str());
-		}
-
-		gLog.Outdent();
-	}
-
-	_DeclareMemHdlr(SkipActorCheckA, "");
+		_DeclareMemHdlr(SkipActorCheckA, "");
 	_DeclareMemHdlr(SkipActorCheckB, "");
 	_DeclareMemHdlr(CatchFallthrough, "");
 
@@ -344,6 +297,112 @@ namespace Utilities
 		RayCastSource = NULL;
 
 		return Result != 0.f;
+	}
+
+
+	bool GetPlayerHasLOS( TESObjectREFR* Target, bool HighAccuracy )
+	{
+		SME_ASSERT(Target);
+
+		double Result =  0;
+
+		// as before, muck about with flags to improve picking accuracy
+		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;		
+		UInt8 PauseGameBuffer = *HavokGamePausedFlag;
+		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;		
+		UInt8 ConsoleTextBuffer = *ShowConsoleTextFlag;
+
+		if (HighAccuracy)
+		{
+			*HavokGamePausedFlag = 1;
+			*ShowConsoleTextFlag = 0;
+		}
+
+		cdeclCall<void>(0x004F9120, (*g_thePlayer), Target, 0, &Result);
+
+		if (HighAccuracy)
+		{
+			*HavokGamePausedFlag = PauseGameBuffer;
+			*ShowConsoleTextFlag = ConsoleTextBuffer;
+		}
+
+		return Result != 0.f;
+	}
+
+	float GetDistance( NiAVObject* Source, NiAVObject* Destination )
+	{
+		SME_ASSERT(Source && Destination);
+
+		Vector3* WorldTranslateDest = (Vector3*)&Destination->m_worldTranslate;
+		Vector3* WorldTranslateSource = (Vector3*)&Source->m_worldTranslate;
+
+		Vector3 Buffer;
+		Buffer.x = WorldTranslateDest->x - WorldTranslateSource->x;
+		Buffer.y= WorldTranslateDest->y - WorldTranslateSource->y;
+		Buffer.z = WorldTranslateDest->z - WorldTranslateSource->z;
+
+		return sqrt((Buffer.x * Buffer.x) + (Buffer.y * Buffer.y) + (Buffer.z * Buffer.z));
+	}
+
+
+	void IntegerINIParamList::HandleParam( const char* Param )
+	{
+		int Arg = atoi(Param);
+		Params.push_back(Arg);
+	}
+
+	IntegerINIParamList::IntegerINIParamList( const char* Delimiters /*= ","*/ ) :
+		DelimitedINIStringList(Delimiters)
+	{
+		;//
+	}
+
+	IntegerINIParamList::~IntegerINIParamList()
+	{
+		;//
+	}
+
+	void IntegerINIParamList::Dump( void ) const
+	{
+		gLog.Indent();
+
+		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
+		{
+			_MESSAGE("%d", *Itr);
+		}
+
+		gLog.Outdent();
+	}
+
+
+	void FilePathINIParamList::HandleParam( const char* Param )
+	{
+		std::string Arg(Param);
+		SME::StringHelpers::MakeLower(Arg);
+		Params.push_back(Arg);
+	}
+
+	FilePathINIParamList::FilePathINIParamList( const char* Delimiters /*= ","*/ ) :
+		DelimitedINIStringList(Delimiters)
+	{
+		;//
+	}
+
+	FilePathINIParamList::~FilePathINIParamList()
+	{
+		;//
+	}
+
+	void FilePathINIParamList::Dump( void ) const
+	{
+		gLog.Indent();
+
+		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
+		{
+			_MESSAGE("%s", Itr->c_str());
+		}
+
+		gLog.Outdent();
 	}
 
 	NiProperty* GetNiPropertyByID( NiAVObject* Source, UInt8 ID )
@@ -443,6 +502,20 @@ namespace Utilities
 				}
 			}
 		}
+	}
+
+	ShadowSceneLight* GetShadowCasterLight( NiNode* Caster )
+	{
+		ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+		SME_ASSERT(RootNode && Caster);
+
+		for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->shadowCasters.start; Itr && Itr->data; Itr = Itr->next)
+		{
+			if (Itr->data->sourceNode == Caster)
+				return Itr->data;
+		}
+
+		return NULL;
 	}
 
 	

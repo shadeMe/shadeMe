@@ -57,27 +57,39 @@ namespace ShadowSundries
 		{
 			if (DebugSel)
 			{
-				NiNode* Node = DebugSel->niNode;
-
-				char SpecialFlags[0x100] = {0};
-				if (Node)
-				{
-					FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s",
-						((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_CannotBeLargeObject) ? "NoLO" : "-"),
-						((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap) ? "BkFc" : "-"),
-						((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorShadow) ? "NoInt" : "-"),
-						((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorShadow) ? "NoExt" : "-"),
-						((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow) ? "NoInt(S)" : "-"),
-						((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow) ? " NoExt(S)" : "-"));
-				}
-			
 				char Buffer[0x200] = {0};
-				FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%f]\n\nShadow flags[%s]",
+
+				if (Settings::kEnableDetailedDebugSelection().i)
+				{
+					NiNode* Node = DebugSel->niNode;
+
+					char SpecialFlags[0x100] = {0};
+					if (Node)
+					{
+						FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s",
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_CannotBeLargeObject) ? "NoLO" : "-"),
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap) ? "BkFc" : "-"),
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorShadow) ? "NoInt" : "-"),
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorShadow) ? "NoExt" : "-"),
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow) ? "NoInt(S)" : "-"),
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow) ? " NoExt(S)" : "-"),
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontReceiveInteriorShadow) ? "NoInt(R)" : "-"),
+							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontReceiveExteriorShadow) ? "NoExt(R)" : "-"));
+					}
+
+					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%f]\n\nShadow flags[%s]",
 						thisCall<const char*>(0x004DA2A0, DebugSel),
 						DebugSel->refID,
 						(Node && Node->m_pcName ? Node->m_pcName : ""),
 						(Node ? Node->m_kWorldBound.radius : 0.f),
 						SpecialFlags);
+				}
+				else
+				{
+					FORMAT_STR(Buffer, "\"%s\" (%08X)",
+							thisCall<const char*>(0x004DA2A0, DebugSel),
+							DebugSel->refID);
+				}
 
 				OutString->Set(Buffer);
 			}
@@ -133,6 +145,7 @@ namespace ShadowSundries
 		shadeMeINIManager::Instance.Load();
 		ShadowFacts::MainShadowExParams::Instance.RefreshParameters();
 		ShadowFacts::SelfShadowExParams::Instance.RefreshParameters();
+		ShadowFacts::ShadowReceiverExParams::Instance.RefreshParameters();
 		ShadowFacts::ShadowRenderTasks::RefreshMiscPathLists();
 		gLog.Outdent();
 
@@ -159,15 +172,27 @@ namespace ShadowSundries
 						ShadowSceneLight* Source = *Itr;
 						bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Ref);
 
-						Console_Print("Light @ %f, %f, %f ==> LOS[%d]",
+						Console_Print("Light%s@ %f, %f, %f ==> DIST[%f] LOS[%d]", (Source->sourceLight->IsCulled() ? " (Culled) " : " "),
 									Source->sourceLight->m_worldTranslate.x,
 									Source->sourceLight->m_worldTranslate.y,
 									Source->sourceLight->m_worldTranslate.z,
+									Utilities::GetDistance(Source->sourceLight, Node),
 									LOSCheck);
 					}
 				}
 				else
 					Console_Print("No active lights");
+			}
+
+			Console_Print("Scene lights:");
+			ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+			for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->lights.start; Itr && Itr->data; Itr = Itr->next)
+			{
+				ShadowSceneLight* ShadowLight = Itr->data;
+				Console_Print("Light @ %f, %f, %f",
+					ShadowLight->sourceLight->m_worldTranslate.x,
+					ShadowLight->sourceLight->m_worldTranslate.y,
+					ShadowLight->sourceLight->m_worldTranslate.z);
 			}
 		}
 

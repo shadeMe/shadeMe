@@ -68,10 +68,10 @@ namespace ShadowFigures
 		void									UpdateConstants(void);		// switches b'ween the two sets of values depending upon the cell type
 	};
 
+	_DeclareMemHdlr(ProjectShadowLightProlog, "hotswap support for the projection distance multiplier");
+	_DeclareMemHdlr(ProjectShadowLightEpilog, "");
+
 	void									Patch(void);
 	void									Initialize(void);
 }
 
-#define STRINGIZE2(s) #s
-#define STRINGIZE(s) STRINGIZE2(s)
-#define DEF_SRC(name, ...)					ShadowRenderConstant name(STRINGIZE2(name), ##__VA_ARGS__##)

@@ -99,8 +99,8 @@ namespace ShadowFacts
 
 		void										LoadParameters(UInt8 ParamType, SME::INI::INISetting* ExcludedTypes, SME::INI::INISetting* ExcludedPaths);
 
-		virtual UInt16								GetInteriorDontCastFlag(void) const = 0;
-		virtual UInt16								GetExteriorDontCastFlag(void) const = 0;
+		virtual UInt16								GetInteriorFlag(void) const = 0;
+		virtual UInt16								GetExteriorFlag(void) const = 0;
 		virtual const char*							GetDescription(void) const = 0;
 	public:
 		virtual ~ShadowExclusionParameters();
@@ -116,6 +116,8 @@ namespace ShadowFacts
 	// AFAIK, these bits are unused
 	enum
 	{
+		kNiAVObjectSpecialFlag_DontReceiveInteriorShadow	= 1 << 7,
+		kNiAVObjectSpecialFlag_DontReceiveExteriorShadow	= 1 << 8,
 		kNiAVObjectSpecialFlag_CannotBeLargeObject			= 1 << 9,
 		kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap	= 1 << 10,
 		kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow	= 1 << 11,
@@ -128,14 +130,15 @@ namespace ShadowFacts
 	// same as above but for BSXFlags
 	enum
 	{
+		kBSXFlagsSpecialFlag_DontReceiveShadow				= 1 << 30,
 		kBSXFlagsSpecialFlag_DontCastShadow					= 1 << 31,
 	};
 
 	class MainShadowExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual UInt16								GetInteriorDontCastFlag(void) const;
-		virtual UInt16								GetExteriorDontCastFlag(void) const;
+		virtual UInt16								GetInteriorFlag(void) const;
+		virtual UInt16								GetExteriorFlag(void) const;
 		virtual const char*							GetDescription(void) const;		
 	public:
 		virtual ~MainShadowExParams();
@@ -148,8 +151,8 @@ namespace ShadowFacts
 	class SelfShadowExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual UInt16								GetInteriorDontCastFlag(void) const;
-		virtual UInt16								GetExteriorDontCastFlag(void) const;
+		virtual UInt16								GetInteriorFlag(void) const;
+		virtual UInt16								GetExteriorFlag(void) const;
 		virtual const char*							GetDescription(void) const;
 	public:
 		virtual ~SelfShadowExParams();
@@ -159,11 +162,38 @@ namespace ShadowFacts
 		static SelfShadowExParams					Instance;
 	};
 
+	class ShadowReceiverExParams : public ShadowExclusionParameters
+	{
+	protected:
+		virtual UInt16								GetInteriorFlag(void) const;
+		virtual UInt16								GetExteriorFlag(void) const;
+		virtual const char*							GetDescription(void) const;
+	public:
+		virtual ~ShadowReceiverExParams();
+
+		virtual void								Initialize(void);
+
+		static ShadowReceiverExParams				Instance;
+	};
+
+	class ShadowReceiverValidator : public Utilities::NiNodeChildVisitor
+	{
+	protected:
+		FadeNodeListT*			NonReceivers;
+	public:
+		ShadowReceiverValidator(FadeNodeListT* OutList);
+		virtual ~ShadowReceiverValidator();
+
+		virtual bool			AcceptBranch(NiNode* Node);
+		virtual void			AcceptLeaf(NiAVObject* Object);
+	};
+
 	class ShadowRenderTasks
 	{
 		static PathSubstringListT					BackFaceIncludePaths;
 		static PathSubstringListT					LargeObjectExcludePaths;
-		static PathSubstringListT					LOSCheckExcludePaths;
+		static PathSubstringListT					LightLOSCheckExcludePaths;
+		static long double							LightProjectionMultiplierBuffer;
 
 		static void									ToggleBackFaceCulling(bool State);
 		static void									PerformModelLoadTask(BSFadeNode* Node);
@@ -180,14 +210,20 @@ namespace ShadowFacts
 		static void	__stdcall						HandleShadowLightUpdateReceiverProlog(ShadowSceneLight* Source);
 		static void	__stdcall						HandleShadowLightUpdateReceiverEpilog(ShadowSceneLight* Source);
 
+		static void __stdcall						HandleShadowLightUpdateProjectionProlog(ShadowSceneLight* Source);
+		static void __stdcall						HandleShadowLightUpdateProjectionEpilog(ShadowSceneLight* Source);
+
 		static void __stdcall						QueueShadowOccluders(UInt32 MaxShadowCount);
 		static bool	__stdcall						HandleSelfShadowing(ShadowSceneLight* Caster);		// return true to allow
 		static void __stdcall						HandleModelLoad(BSFadeNode* Node);
+		static void __stdcall						HandleShadowReceiverLightingPropertyUpdate(ShadowSceneLight* Source, NiNode* Receiver);
 
 		static bool									GetCanBeLargeObject(BSFadeNode* Node);
 		static bool									GetIsLargeObject(BSFadeNode* Node);
 		static bool	__stdcall						GetHasLightLOS(ShadowSceneLight* Source);
+		static bool									GetHasPlayerLOS(TESObjectREFR* Object, BSFadeNode* Node);
 		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
+		static bool									GetCanReceiveShadow(BSFadeNode* Node);
 	};
 
 	
@@ -202,6 +238,7 @@ namespace ShadowFacts
 	_DeclareMemHdlr(RenderShadowMap, "");
 	_DeclareMemHdlr(CheckSourceLightLOS, "");
 	_DeclareMemHdlr(CheckLargeObjectLightSource, "prevents large objects from being affected by small light sources (z.B magic projectiles, torches, etc)");
+	_DeclareMemHdlr(CheckShadowReceiver, "");
 
 
 	void Patch(void);

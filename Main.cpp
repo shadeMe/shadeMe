@@ -79,7 +79,7 @@ extern "C"
 			ShadowFigures::Patch();
 			ShadowFigures::Initialize();
 
-			_MESSAGE("Imitating camels...\n\n");
+			_MESSAGE("You get a shadow! He gets a shadow! EVERYBDY GETZ SHADOZZZ!!\n\n");
 		}
 		
 		gLog.Indent();

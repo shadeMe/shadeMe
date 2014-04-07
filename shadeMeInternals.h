@@ -53,7 +53,9 @@ public:
 namespace Settings
 {
 	extern SME::INI::INISetting				kCasterMaxDistance;
+	extern SME::INI::INISetting				kCasterMinBoundRadius;
 	extern SME::INI::INISetting				kEnableDebugShader;
+	extern SME::INI::INISetting				kEnableDetailedDebugSelection;
 
 	extern SME::INI::INISetting				kLargeObjectHigherPriority;
 	extern SME::INI::INISetting				kLargeObjectBoundRadius;
@@ -68,16 +70,29 @@ namespace Settings
 	extern SME::INI::INISetting				kMainExcludedPathInterior;
 	extern SME::INI::INISetting				kMainExcludedPathExterior;
 
-	extern SME::INI::INISetting				kLOSCheckInterior;
-	extern SME::INI::INISetting				kLOSCheckExterior;
-	extern SME::INI::INISetting				kLOSSkipLargeObjects;
-	extern SME::INI::INISetting				kLOSExcludedPath;
+	extern SME::INI::INISetting				kLightLOSCheckInterior;
+	extern SME::INI::INISetting				kLightLOSCheckExterior;
+	extern SME::INI::INISetting				kLightLOSSkipLargeObjects;
+	extern SME::INI::INISetting				kLightLOSExcludedPath;
+
+	extern SME::INI::INISetting				kPlayerLOSCheckInterior;
+	extern SME::INI::INISetting				kPlayerLOSCheckExterior;
 
 	extern SME::INI::INISetting				kSelfExcludedTypesInterior;
 	extern SME::INI::INISetting				kSelfExcludedTypesExterior;
 
 	extern SME::INI::INISetting				kSelfExcludedPathInterior;
 	extern SME::INI::INISetting				kSelfExcludedPathExterior;
+
+	extern SME::INI::INISetting				kSelfPerformFogCheck;
+
+	extern SME::INI::INISetting				kReceiverExcludedTypesInterior;
+	extern SME::INI::INISetting				kReceiverExcludedTypesExterior;
+
+	extern SME::INI::INISetting				kReceiverExcludedPathInterior;
+	extern SME::INI::INISetting				kReceiverExcludedPathExterior;
+
+	extern SME::INI::INISetting				kReceiverEnableExclusionParams;
 }
 
 class BSRenderedTexture;
@@ -182,6 +197,7 @@ STATIC_ASSERT(offsetof(ShadowSceneLight, sourceLight) == 0x100);
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceNode) == 0x130);
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
+typedef std::vector<BSFadeNode*>				FadeNodeListT;
 
 // ?
 class BSTreeNode : public NiNode
@@ -193,10 +209,9 @@ public:
 namespace Utilities
 {
 	float				GetDistanceFromPlayer(NiNode* Node);
-	bool				GetPlayerHasLOS(TESObjectREFR* Target);						// slooooooooowwwwww!
-	
-	bool				GetLightLOS(NiAVObject* Light, TESObjectREFR* Target);		// slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwwwwwweeeerrrrrrrr!
-																					// also, haaaaaaaaaaaaccccckkkkkyyyyy!
+	bool				GetPlayerHasLOS(TESObjectREFR* Target, bool HighAccuracy = false);	// slooooooooowwwwww!
+	bool				GetLightLOS(NiAVObject* Light, TESObjectREFR* Target);				// slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwwwwwweeeerrrrrrrr!
+																							// also, haaaaaaaaaaaaccccckkkkkyyyyy!
 	bool				GetAbovePlayer(TESObjectREFR* Ref, float Threshold);
 	bool				GetBelowPlayer(TESObjectREFR* Ref, float Threshold);
 
@@ -207,6 +222,8 @@ namespace Utilities
 
 	void				UpdateBounds(NiNode* Node);
 	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);
+	ShadowSceneLight*	GetShadowCasterLight(NiNode* Caster);
+
 
 	void*				NiRTTI_Cast(const NiRTTI* TypeDescriptor, NiRefObject* NiObject);
 

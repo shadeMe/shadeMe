@@ -20,7 +20,6 @@ namespace ShadowFacts
 
 		if (Object->parentCell && (Object->parentCell->flags0 & TESObjectCELL::kFlags0_HasWater))
 		{
-			// not pretty
 			ExtraWaterHeight* xWaterHeight = (ExtraWaterHeight*)Object->parentCell->extraData.GetByType(kExtraData_WaterHeight);
 			if (xWaterHeight)
 			{
@@ -53,45 +52,43 @@ namespace ShadowFacts
 		
 		if (Distance < Settings::kCasterMaxDistance().f)
 		{
-			if (IsUnderWater == false)
+			if (BoundRadius >= Settings::kCasterMinBoundRadius().f)
 			{
-				if (IsActor)
+				if (IsUnderWater == false)
 				{
-					TESObjectREFR* Horse = thisVirtualCall<TESObjectREFR*>(0x380, Object);
-					UInt32 Refraction = thisCall<UInt32>(0x005E9670, Object);
-					UInt32 Invisibility = thisVirtualCall<UInt32>(0x284, Object, kActorVal_Invisibility);
-					UInt32 SleepingState = thisVirtualCall<UInt32>(0x18C, Object);
+					BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
 
-					if (Horse == NULL &&		// when not on horseback
-						Refraction == 0 &&		// zero refraction
-						Invisibility == 0 &&	// zero invisibility
-						SleepingState != 4)		
+					// don't queue if hidden by fog
+					if (Fog == NULL || Distance < Fog->fogEnd)
 					{
-						Result = true;
+						if (IsActor)
+						{
+							TESObjectREFR* Horse = thisVirtualCall<TESObjectREFR*>(0x380, Object);
+							UInt32 Refraction = thisCall<UInt32>(0x005E9670, Object);
+							UInt32 Invisibility = thisVirtualCall<UInt32>(0x284, Object, kActorVal_Invisibility);
+							UInt32 SleepingState = thisVirtualCall<UInt32>(0x18C, Object);
+
+							if (Horse == NULL &&		// when not on horseback
+								Refraction == 0 &&		// zero refraction
+								Invisibility == 0 &&	// zero invisibility
+								SleepingState != 4)		
+							{
+								Result = true;
+							}
+						}
+						else
+						{
+							if (MainShadowExParams::Instance.GetAllowed(Node, Object))
+								Result = true;
+						}
 					}
-				}
-				else
-				{
-					if (MainShadowExParams::Instance.GetAllowed(Node, Object))
-						Result = true;
 				}
 			}
 		}
 
 		if (Result)
 		{
-			if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior().i) ||
-				(Object->parentCell->IsInterior() == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kLOSCheckExterior().i))
-			{
-				if (Utilities::GetAbovePlayer(Object, 10) && Utilities::GetPlayerHasLOS(Object) == false)
-				{
-					Result = false;
-				}
-				else if (Utilities::GetBelowPlayer(Object, 35) && Utilities::GetPlayerHasLOS(Object) == false)
-				{
-					Result = false;
-				}
-			}
+			Result = ShadowRenderTasks::GetHasPlayerLOS(Object, Node);
 		}
 
 		if (Result)
@@ -325,9 +322,9 @@ namespace ShadowFacts
 		TESObjectCELL* ParentCell = Object->parentCell;
 		SME_ASSERT(ParentCell);
 
-		if (ParentCell->IsInterior() == true && (Node->m_flags & GetInteriorDontCastFlag()))
+		if (ParentCell->IsInterior() == true && (Node->m_flags & GetInteriorFlag()))
 			Result = false;
-		else if (ParentCell->IsInterior() == false && (Node->m_flags & GetExteriorDontCastFlag()))
+		else if (ParentCell->IsInterior() == false && (Node->m_flags & GetExteriorFlag()))
 			Result = false;
 
 		if (Result)
@@ -361,8 +358,8 @@ namespace ShadowFacts
 #endif
 				gLog.Indent();
 
-				Node->m_flags &= ~GetInteriorDontCastFlag();
-				Node->m_flags &= ~GetExteriorDontCastFlag();
+				Node->m_flags &= ~GetInteriorFlag();
+				Node->m_flags &= ~GetExteriorFlag();
 
 				for (PathSubstringListT::ParameterListT::const_iterator Itr = Parameters[kParamType_Interior].PathSubstrings().begin();
 					Itr != Parameters[kParamType_Interior].PathSubstrings().end();
@@ -373,7 +370,7 @@ namespace ShadowFacts
 #if 0
 						_MESSAGE("Flagged mesh for interior shadow caster culling");
 #endif
-						Node->m_flags |= GetInteriorDontCastFlag();
+						Node->m_flags |= GetInteriorFlag();
 						break;
 					}
 				}
@@ -387,7 +384,7 @@ namespace ShadowFacts
 #if 0
 						_MESSAGE("Flagged mesh for exterior shadow caster culling");
 #endif
-						Node->m_flags |= GetExteriorDontCastFlag();
+						Node->m_flags |= GetExteriorFlag();
 						break;
 					}
 				}
@@ -406,12 +403,12 @@ namespace ShadowFacts
 
 	MainShadowExParams		MainShadowExParams::Instance;
 
-	UInt16 MainShadowExParams::GetInteriorDontCastFlag( void ) const
+	UInt16 MainShadowExParams::GetInteriorFlag( void ) const
 	{
 		return kNiAVObjectSpecialFlag_DontCastInteriorShadow;
 	}
 
-	UInt16 MainShadowExParams::GetExteriorDontCastFlag( void ) const
+	UInt16 MainShadowExParams::GetExteriorFlag( void ) const
 	{
 		return kNiAVObjectSpecialFlag_DontCastExteriorShadow;
 	}
@@ -440,12 +437,12 @@ namespace ShadowFacts
 
 	SelfShadowExParams			SelfShadowExParams::Instance;
 
-	UInt16 SelfShadowExParams::GetInteriorDontCastFlag( void ) const
+	UInt16 SelfShadowExParams::GetInteriorFlag( void ) const
 	{
 		return kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow;
 	}
 
-	UInt16 SelfShadowExParams::GetExteriorDontCastFlag( void ) const
+	UInt16 SelfShadowExParams::GetExteriorFlag( void ) const
 	{
 		return kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow;
 	}
@@ -472,9 +469,76 @@ namespace ShadowFacts
 	}
 
 
+	ShadowReceiverExParams			ShadowReceiverExParams::Instance;
+
+	UInt16 ShadowReceiverExParams::GetInteriorFlag( void ) const
+	{
+		return kNiAVObjectSpecialFlag_DontReceiveInteriorShadow;
+	}
+
+	UInt16 ShadowReceiverExParams::GetExteriorFlag( void ) const
+	{
+		return kNiAVObjectSpecialFlag_DontReceiveExteriorShadow;
+	}
+
+	const char* ShadowReceiverExParams::GetDescription( void ) const
+	{
+		return "ShadowReceiver";
+	}
+
+	ShadowReceiverExParams::~ShadowReceiverExParams()
+	{
+		;//
+	}
+
+	void ShadowReceiverExParams::Initialize( void )
+	{
+		_MESSAGE("Loading %s exclusion params...", GetDescription());
+		gLog.Indent();
+
+		LoadParameters(kParamType_Interior, &Settings::kReceiverExcludedTypesInterior, &Settings::kReceiverExcludedPathInterior);
+		LoadParameters(kParamType_Exterior, &Settings::kReceiverExcludedTypesExterior, &Settings::kReceiverExcludedPathExterior);
+
+		gLog.Outdent();
+	}
+
+
+	ShadowReceiverValidator::ShadowReceiverValidator( FadeNodeListT* OutList ) :
+		NonReceivers(OutList)
+	{
+		SME_ASSERT(OutList);
+	}
+
+	ShadowReceiverValidator::~ShadowReceiverValidator()
+	{
+		;//
+	}
+
+	bool ShadowReceiverValidator::AcceptBranch( NiNode* Node )
+	{
+		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
+		if (FadeNode && FadeNode->IsCulled() == false)
+		{
+			if (ShadowRenderTasks::GetCanReceiveShadow(FadeNode) == false)
+			{
+				NonReceivers->push_back(FadeNode);
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	void ShadowReceiverValidator::AcceptLeaf( NiAVObject* Object )
+	{
+		;//
+	}
+
+
 	PathSubstringListT ShadowRenderTasks::BackFaceIncludePaths;
 	PathSubstringListT ShadowRenderTasks::LargeObjectExcludePaths;
-	PathSubstringListT ShadowRenderTasks::LOSCheckExcludePaths;
+	PathSubstringListT ShadowRenderTasks::LightLOSCheckExcludePaths;
+	long double ShadowRenderTasks::LightProjectionMultiplierBuffer;
 
 	void ShadowRenderTasks::ToggleBackFaceCulling(bool State)
 	{
@@ -516,7 +580,7 @@ namespace ShadowFacts
 					}
 				}
 
-				for (PathSubstringListT::ParameterListT::const_iterator Itr = LOSCheckExcludePaths().begin(); Itr != LOSCheckExcludePaths().end(); Itr++)
+				for (PathSubstringListT::ParameterListT::const_iterator Itr = LightLOSCheckExcludePaths().begin(); Itr != LightLOSCheckExcludePaths().end(); Itr++)
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
@@ -531,22 +595,11 @@ namespace ShadowFacts
 	void ShadowRenderTasks::HandleMainProlog( void )
 	{
 		ShadowFigures::ShadowRenderConstantRegistry::GetSingleton()->UpdateConstants();
-
-		if (TES::GetSingleton()->currentInteriorCell == NULL)
-		{
-			BSFogProperty* ExteriorFog = TES::GetSingleton()->fogProperty;
-			if (ExteriorFog)
-				;//	_MESSAGE("Fog (%f, %f)", ExteriorFog->fogStart, ExteriorFog->fogEnd);
-		}
 	}
 
 	void ShadowRenderTasks::HandleMainEpilog( void )
 	{
-		if (TES::GetSingleton()->currentInteriorCell == NULL)
-		{
-			NiFogProperty* ExteriorFog = TES::GetSingleton()->fogProperty;
-
-		}
+		;//
 	}
 
 	void __stdcall ShadowRenderTasks::QueueShadowOccluders(UInt32 MaxShadowCount)
@@ -568,17 +621,40 @@ namespace ShadowFacts
 
 		BSFadeNode* Node = Caster->sourceNode;
 		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Node, "REF");
+		bool Result = false;
 
 		if (xRef && xRef->refr)
-			return SelfShadowExParams::Instance.GetAllowed(Node, xRef->refr);
+		{
+			if (SelfShadowExParams::Instance.GetAllowed(Node, xRef->refr))
+			{
+				BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
+				if (Fog && Settings::kSelfPerformFogCheck().i)
+				{
+					float Distance = Utilities::GetDistanceFromPlayer(Node);
+					float FogStart = Fog->fogStart;
+					float FogEnd = Fog->fogEnd;
+					float Delta = FogEnd - FogStart;
+				//	if (FogStart < 0)
+				//		Delta = FogEnd + FogStart;
+
+					if (Distance < Delta)
+						Result = true;
+				}
+				else
+					Result = true;
+			}
+		}
 		else
-			return true;			// projectiles are an exception
+			Result = true;		// projectiles are an exception
+
+		return Result;			
 	}
 
 	void __stdcall ShadowRenderTasks::HandleModelLoad( BSFadeNode* Node )
 	{
 		MainShadowExParams::Instance.HandleModelLoad(Node);
 		SelfShadowExParams::Instance.HandleModelLoad(Node);
+		ShadowReceiverExParams::Instance.HandleModelLoad(Node);
 		PerformModelLoadTask(Node);
 	}
 
@@ -631,15 +707,15 @@ namespace ShadowFacts
 		LargeObjectExcludePaths.Dump();
 
 		_MESSAGE("Loading LOS check blacklist...");
-		LOSCheckExcludePaths.Refresh(&Settings::kLOSExcludedPath);
-		LOSCheckExcludePaths.Dump();
+		LightLOSCheckExcludePaths.Refresh(&Settings::kLightLOSExcludedPath);
+		LightLOSCheckExcludePaths.Dump();
 	}
 
 	void ShadowRenderTasks::RefreshMiscPathLists( void )
 	{
 		BackFaceIncludePaths.Refresh(&Settings::kRenderBackfacesIncludePath);
 		LargeObjectExcludePaths.Refresh(&Settings::kLargeObjectExcludedPath);
-		LOSCheckExcludePaths.Refresh(&Settings::kLOSExcludedPath);
+		LightLOSCheckExcludePaths.Refresh(&Settings::kLightLOSExcludedPath);
 	}
 
 	bool __stdcall ShadowRenderTasks::GetHasLightLOS( ShadowSceneLight* Source )
@@ -652,39 +728,19 @@ namespace ShadowFacts
 		{
 			if ((Source->sourceNode->m_flags & kNiAVObjectSpecialFlag_DontPerformLOSCheck) == false)
 			{
-				if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLOSSkipLargeObjects().i == 0)
+				if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
 				{
 					TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source->sourceNode, "REF");
 					if (xRef && xRef->refr)			
 					{
 						TESObjectREFR* Object = xRef->refr;
+						bool Interior = Object->parentCell->IsInterior();
 
-						if ((Object->parentCell->IsInterior() && Settings::kLOSCheckInterior().i) ||
-							(Object->parentCell->IsInterior() == false && Settings::kLOSCheckExterior().i))
+						if ((Interior && Settings::kLightLOSCheckInterior().i) || (Interior == false && Settings::kLightLOSCheckExterior().i))
 						{
 							if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
 							{
 								bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
-#if 0
-								static TESObjectREFR* Buffer = NULL;
-								TESObjectREFR* Ref = InterfaceManager::GetSingleton()->debugSelection;
-								if (Buffer != Ref && Ref)
-								{
-									Buffer = Ref;					
-								}
-								else if (Ref == NULL)
-									Ref = Buffer;
-
-								if (xRef->refr == Ref)
-								{
-									_MESSAGE("Caster %s Light @ %f, %f, %f | Dist = %f ==> LOS[%d]", Source->sourceNode->m_pcName,
-										Source->sourceLight->m_worldTranslate.x,
-										Source->sourceLight->m_worldTranslate.y,
-										Source->sourceLight->m_worldTranslate.z,
-										Utilities::GetDistance(Source->sourceNode, Source->sourceLight),
-										LOSCheck);
-								}
-#endif
 								if (LOSCheck == false)
 								{
 									Result = false;
@@ -729,6 +785,116 @@ namespace ShadowFacts
 			return true;
 	}
 
+	bool ShadowRenderTasks::GetHasPlayerLOS( TESObjectREFR* Object, BSFadeNode* Node )
+	{
+		SME_ASSERT(Object && Node);
+
+		if ((Object->parentCell->IsInterior() && Settings::kPlayerLOSCheckInterior().i) ||
+			(Object->parentCell->IsInterior() == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kPlayerLOSCheckExterior().i))
+		{
+			// only for small objects
+			if (ShadowRenderTasks::GetIsLargeObject(Node) == false)
+			{
+				if (Utilities::GetAbovePlayer(Object, 10) && Utilities::GetPlayerHasLOS(Object, true) == false)
+					return false;
+				else if (Utilities::GetBelowPlayer(Object, 35) && Utilities::GetPlayerHasLOS(Object, true) == false)
+					return false;
+			}
+		}
+
+		return true;
+	}
+
+	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateProjectionProlog( ShadowSceneLight* Source )
+	{
+		SME_ASSERT(Source);
+
+		LightProjectionMultiplierBuffer = ShadowFigures::SMRC_A38618.GetValue();
+
+		BSFadeNode* Node = Source->sourceNode;
+		if (Node)
+		{
+			float Bound = Node->m_kWorldBound.radius;
+			float NewValue = 0.f;
+
+			if (Bound <= 15)
+				NewValue = 2.2f;
+			else if (Bound > 15 && Bound <= 20)
+				NewValue = 2.5;
+			else if (Bound > 20 && Bound <= 25)
+				NewValue = 2.6;
+			else if (Bound > 25 && Bound <= 30)
+				NewValue = 2.7;
+
+			if (NewValue)
+			{
+				ShadowFigures::SMRC_A38618.SetValue(NewValue);
+			}
+		}
+	}
+
+	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateProjectionEpilog( ShadowSceneLight* Source )
+	{
+		ShadowFigures::SMRC_A38618.SetValue(LightProjectionMultiplierBuffer);
+	}
+
+	void __stdcall ShadowRenderTasks::HandleShadowReceiverLightingPropertyUpdate( ShadowSceneLight* Source, NiNode* Receiver )
+	{
+		SME_ASSERT(Source && Receiver);
+
+		// this one comes with a ton of overhead when walking the scenegraph
+		// so disabled by default
+		if (Settings::kReceiverEnableExclusionParams().i == 0)
+			thisCall<void>(0x007D59E0, Source, Receiver);
+		else
+		{
+			BSFadeNode* FadeNode = NI_CAST(Receiver, BSFadeNode);
+			if (FadeNode && FadeNode->IsCulled() == false)
+			{
+				if (GetCanReceiveShadow(FadeNode))
+					thisCall<void>(0x007D59E0, Source, Receiver);
+			}
+			else
+			{
+				FadeNodeListT NonReceivers;
+				Utilities::NiNodeChildrenWalker Walker(Receiver);
+
+				Walker.Walk(&ShadowReceiverValidator(&NonReceivers));
+
+				for (FadeNodeListT::iterator Itr = NonReceivers.begin(); Itr != NonReceivers.end(); Itr++)
+					(*Itr)->m_flags |= NiAVObject::kFlag_AppCulled;
+
+				thisCall<void>(0x007D59E0, Source, Receiver);
+
+				for (FadeNodeListT::iterator Itr = NonReceivers.begin(); Itr != NonReceivers.end(); Itr++)
+					(*Itr)->m_flags &= ~NiAVObject::kFlag_AppCulled;
+			}
+		}
+	}
+
+	bool ShadowRenderTasks::GetCanReceiveShadow( BSFadeNode* Node )
+	{
+		SME_ASSERT(Node);
+
+		bool Result = true;
+		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Node, "REF");
+		if (xRef && xRef->refr)
+		{
+			Result = ShadowReceiverExParams::Instance.GetAllowed(Node, xRef->refr);
+
+			if (Result)
+			{
+				BSXFlags* xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(Node, "BSX");
+				if (xFlags && (xFlags->m_iValue & kBSXFlagsSpecialFlag_DontReceiveShadow))
+				{
+					Result = false;
+				}
+			}
+		}
+
+		return Result;
+	}
+
 
 
 
@@ -741,6 +907,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(RenderShadowMap, 0x007D4E89);
 	_DefineHookHdlr(CheckSourceLightLOS, 0x00407901);
 	_DefineHookHdlr(CheckLargeObjectLightSource, 0x007D23F7);
+	_DefineHookHdlr(CheckShadowReceiver, 0x007D692D);
 
 
 	#define _hhName	EnumerateFadeNodes
@@ -934,6 +1101,21 @@ namespace ShadowFacts
 		}
 	}
 
+	#define _hhName	CheckShadowReceiver
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D6935);
+		__asm
+		{	
+			pushad
+			push	ecx
+			push	edi
+			call	ShadowRenderTasks::HandleShadowReceiverLightingPropertyUpdate
+			popad
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
 
 #if 0
 	_DeclareMemHdlr(TestHook, "");
@@ -991,12 +1173,14 @@ AWAY:
 		_MemHdlr(RenderShadowMap).WriteJump();
 		_MemHdlr(CheckSourceLightLOS).WriteJump();
 		_MemHdlr(CheckLargeObjectLightSource).WriteJump();
+		_MemHdlr(CheckShadowReceiver).WriteJump();
 	}
 
 	void Initialize( void )
 	{
 		MainShadowExParams::Instance.Initialize();
 		SelfShadowExParams::Instance.Initialize();
+		ShadowReceiverExParams::Instance.Initialize();
 		ShadowRenderTasks::Initialize();
 	}
 }
