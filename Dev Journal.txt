@@ -5,3 +5,4 @@ To Do
 > Prevent shadows from being culled when outside the camera frustum
 	>> only when they are close to the player
 > Look into the dark shadow issue - precision or LOD?
+> Do light LOS checks against the org position of the light source rather than the translated projection coords

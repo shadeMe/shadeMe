@@ -368,7 +368,7 @@ namespace ShadowFacts
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
 #if 0
-						_MESSAGE("Flagged mesh for interior shadow caster culling");
+						_MESSAGE("Flagged mesh with %08X", GetInteriorFlag());
 #endif
 						Node->m_flags |= GetInteriorFlag();
 						break;
@@ -382,7 +382,7 @@ namespace ShadowFacts
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
 #if 0
-						_MESSAGE("Flagged mesh for exterior shadow caster culling");
+						_MESSAGE("Flagged mesh with %08X", GetExteriorFlag());
 #endif
 						Node->m_flags |= GetExteriorFlag();
 						break;
@@ -535,6 +535,29 @@ namespace ShadowFacts
 	}
 
 
+	FadeNodeShadowFlagUpdater::~FadeNodeShadowFlagUpdater()
+	{
+		;//
+	}
+
+	bool FadeNodeShadowFlagUpdater::AcceptBranch( NiNode* Node )
+	{
+		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
+		if (FadeNode)
+		{
+			ShadowRenderTasks::HandleModelLoad(FadeNode);
+			return false;
+		}
+
+		return true;
+	}
+
+	void FadeNodeShadowFlagUpdater::AcceptLeaf( NiAVObject* Object )
+	{
+		;//
+	}
+
+
 	PathSubstringListT ShadowRenderTasks::BackFaceIncludePaths;
 	PathSubstringListT ShadowRenderTasks::LargeObjectExcludePaths;
 	PathSubstringListT ShadowRenderTasks::LightLOSCheckExcludePaths;
@@ -628,9 +651,10 @@ namespace ShadowFacts
 			if (SelfShadowExParams::Instance.GetAllowed(Node, xRef->refr))
 			{
 				BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
+				float Distance = Utilities::GetDistanceFromPlayer(Node);
+
 				if (Fog && Settings::kSelfPerformFogCheck().i)
 				{
-					float Distance = Utilities::GetDistanceFromPlayer(Node);
 					float FogStart = Fog->fogStart;
 					float FogEnd = Fog->fogEnd;
 					float Delta = FogEnd - FogStart;
@@ -642,6 +666,14 @@ namespace ShadowFacts
 				}
 				else
 					Result = true;
+
+				if (Result)
+				{
+					if (Settings::kSelfEnableDistanceToggle().i && Distance > Settings::kSelfMaxDistance().f)
+					{
+						Result = false;
+					}
+				}
 			}
 		}
 		else
@@ -1119,7 +1151,7 @@ namespace ShadowFacts
 
 #if 0
 	_DeclareMemHdlr(TestHook, "");
-	_DefineHookHdlr(TestHook, 0x007D23F7);
+	_DefineHookHdlr(TestHook, 0x007D63F1);
 
 	bool __stdcall DoTestHook(ShadowSceneLight* Source)
 	{
@@ -1137,24 +1169,10 @@ namespace ShadowFacts
 	{
 		_hhSetVar(Retn, 0x007D2401);
 		_hhSetVar(Call, 0x007C6DE0);
-		_hhSetVar(Jump, 0x007D272D);
+		_hhSetVar(Jump, 0x007D6539);
 		__asm
 		{	
-			mov		eax, [esp + 0x8]
-			mov		[esp + 0x1c], ebx
-
-			pushad
-			push	eax
-			call	DoTestHook
-			test	al, al
-			jz		SKIP
-
-			popad
-			jle		AWAY
-			jmp		_hhGetVar(Retn)
-SKIP:
-			popad
-AWAY:
+			
 			jmp		_hhGetVar(Jump)
 		}
 	}
@@ -1162,7 +1180,7 @@ AWAY:
 	void Patch(void)
 	{
 #if 0
-		_MemHdlr(TestHook).WriteJump();
+	//	_MemHdlr(TestHook).WriteJump();
 #endif
 		_MemHdlr(EnumerateFadeNodes).WriteJump();
 		_MemHdlr(RenderShadowsProlog).WriteJump();

@@ -163,7 +163,7 @@ namespace ShadowFigures
 			// set the optimal values before dumping to INI
 			DataStore[&SRC_A6BEA0].Exterior = 16384;
 			DataStore[&SMRC_A38618].Exterior = 30;
-			DataStore[&SMRC_A3F3A0].Exterior = 5;
+			DataStore[&SMRC_A38618].Interior = 30;
 
 			Save();
 		}

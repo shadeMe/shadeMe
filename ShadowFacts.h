@@ -188,6 +188,15 @@ namespace ShadowFacts
 		virtual void			AcceptLeaf(NiAVObject* Object);
 	};
 
+	class FadeNodeShadowFlagUpdater: public Utilities::NiNodeChildVisitor
+	{
+	public:
+		virtual ~FadeNodeShadowFlagUpdater();
+
+		virtual bool			AcceptBranch(NiNode* Node);
+		virtual void			AcceptLeaf(NiAVObject* Object);
+	};
+
 	class ShadowRenderTasks
 	{
 		static PathSubstringListT					BackFaceIncludePaths;

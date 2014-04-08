@@ -147,6 +147,10 @@ namespace ShadowSundries
 		ShadowFacts::SelfShadowExParams::Instance.RefreshParameters();
 		ShadowFacts::ShadowReceiverExParams::Instance.RefreshParameters();
 		ShadowFacts::ShadowRenderTasks::RefreshMiscPathLists();
+
+		ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+		Utilities::NiNodeChildrenWalker Walker((NiNode*)RootNode->m_children.data[3]);
+		Walker.Walk(&ShadowFacts::FadeNodeShadowFlagUpdater());
 		gLog.Outdent();
 
 		return true;
@@ -199,6 +203,15 @@ namespace ShadowSundries
 		return true;
 	}
 
+	static bool BeginTrace_Execute(COMMAND_ARGS)
+	{
+		*result = 0;
+
+		;//
+
+		return true;
+	}
+
 	void Patch( bool Editor )
 	{
 		if (Editor)
@@ -216,6 +229,13 @@ namespace ShadowSundries
 			WasteMemory->longName = "CheckShadowLightLOS";
 			WasteMemory->shortName = "csllos";
 			WasteMemory->execute = WasteMemory_Execute;
+			WasteMemory->numParams = ToggleShadowVolumes->numParams;
+			WasteMemory->params = ToggleShadowVolumes->params;
+
+			CommandInfo* BeginTrace = (CommandInfo*)0x00B0C618;
+			WasteMemory->longName = "Radiohead";
+			WasteMemory->shortName = "LetDown";
+			WasteMemory->execute = BeginTrace_Execute;
 			WasteMemory->numParams = ToggleShadowVolumes->numParams;
 			WasteMemory->params = ToggleShadowVolumes->params;
 		}

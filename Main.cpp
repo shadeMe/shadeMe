@@ -61,7 +61,7 @@ extern "C"
 
 	bool OBSEPlugin_Load(const OBSEInterface * obse)
 	{
-		ShadowSundries::Patch(obse->isEditor);
+		ShadowSundries::Patch(obse->isEditor == 1);
 
 		if (obse->isEditor)
 		{
