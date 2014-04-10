@@ -17,8 +17,6 @@ namespace Settings
 {
 	SME::INI::INISetting			kCasterMaxDistance("CasterMaxDistance", "Shadows::General",
 													"Threshold distance b'ween the player and the shadow caster", (float)10000.0f);
-	SME::INI::INISetting			kCasterMinBoundRadius("CasterMinBoundRadius", "Shadows::General",
-													"Objects smaller than this value will not cast shadows", (float)7.0f);
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
 	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General", 
 													"Toggle the expanded console debug selection description", (SInt32)1);
@@ -26,8 +24,6 @@ namespace Settings
 
 	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
 																"Large objects are rendered before smaller ones", (SInt32)1);
-	SME::INI::INISetting			kLargeObjectBoundRadius("MinBoundRadius", "Shadows::LargeObjects",
-															"Minimum bound radii for large objects", (float)750.0f);
 	SME::INI::INISetting			kLargeObjectExcludedPath("ExcludePaths", "Shadows::LargeObjects", "Large object blacklist", "rocks\\");
 	SME::INI::INISetting			kLargeObjectSunShadowsOnly("OnlyCastSunShadows", "Shadows::LargeObjects",
 															"Large objects will not react to small light sources", (SInt32)1);
@@ -82,6 +78,18 @@ namespace Settings
 															"Meshes with these substrings in their file paths won't receive shadows", "");
 
 	SME::INI::INISetting			kReceiverEnableExclusionParams("EnableExclusionParams", "ShadowReceiver::General", "Turn on exclusion params", (SInt32)0);
+
+	SME::INI::INISetting			kInteriorHeuristicsEnabled("Enable", "Shadows::InteriorHeuristics", "Turn on interior invalid caster detection", (SInt32)1);
+	SME::INI::INISetting			kInteriorHeuristicsIncludePath("IncludePaths", "Shadows::InteriorHeuristics", "Whitelist", "");
+	SME::INI::INISetting			kInteriorHeuristicsExcludePath("ExcludePaths", "Shadows::InteriorHeuristics", "Blacklist", "");
+
+	SME::INI::INISetting			kObjectTier1BoundRadius("Tier1", "BoundRadius::Tiers", "", (float)7.f);
+	SME::INI::INISetting			kObjectTier2BoundRadius("Tier2", "BoundRadius::Tiers", "", (float)15.f);
+	SME::INI::INISetting			kObjectTier3BoundRadius("Tier3", "BoundRadius::Tiers", "", (float)30.f);
+	SME::INI::INISetting			kObjectTier4BoundRadius("Tier4", "BoundRadius::Tiers", "", (float)100.f);
+	SME::INI::INISetting			kObjectTier5BoundRadius("Tier5", "BoundRadius::Tiers", "", (float)250.f);
+	SME::INI::INISetting			kObjectTier6BoundRadius("Tier6", "BoundRadius::Tiers", "", (float)700.f);
+
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -90,12 +98,10 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	_MESSAGE("INI Path: %s", INIPath);
 
 	RegisterSetting(&Settings::kCasterMaxDistance);
-	RegisterSetting(&Settings::kCasterMinBoundRadius);
 	RegisterSetting(&Settings::kEnableDebugShader);
 	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
 
 	RegisterSetting(&Settings::kLargeObjectHigherPriority);
-	RegisterSetting(&Settings::kLargeObjectBoundRadius);
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
 	RegisterSetting(&Settings::kLargeObjectSunShadowsOnly);
 
@@ -115,7 +121,6 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kPlayerLOSCheckInterior);
 	RegisterSetting(&Settings::kPlayerLOSCheckExterior);
 
-
 	RegisterSetting(&Settings::kSelfExcludedTypesInterior);
 	RegisterSetting(&Settings::kSelfExcludedTypesExterior);
 
@@ -133,6 +138,17 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kReceiverExcludedPathExterior);
 
 	RegisterSetting(&Settings::kReceiverEnableExclusionParams);
+
+	RegisterSetting(&Settings::kInteriorHeuristicsEnabled);
+	RegisterSetting(&Settings::kInteriorHeuristicsIncludePath);
+	RegisterSetting(&Settings::kInteriorHeuristicsExcludePath);
+
+	RegisterSetting(&Settings::kObjectTier1BoundRadius);
+	RegisterSetting(&Settings::kObjectTier2BoundRadius);
+	RegisterSetting(&Settings::kObjectTier3BoundRadius);
+	RegisterSetting(&Settings::kObjectTier4BoundRadius);
+	RegisterSetting(&Settings::kObjectTier5BoundRadius);
+	RegisterSetting(&Settings::kObjectTier6BoundRadius);
 
 	Save();
 }
@@ -218,7 +234,7 @@ namespace Utilities
 		return cdeclCall<void*>(0x00560920, TypeDescriptor, NiObject);
 	}
 
-		_DeclareMemHdlr(SkipActorCheckA, "");
+	_DeclareMemHdlr(SkipActorCheckA, "");
 	_DeclareMemHdlr(SkipActorCheckB, "");
 	_DeclareMemHdlr(CatchFallthrough, "");
 
@@ -522,5 +538,30 @@ namespace Utilities
 		return NULL;
 	}
 
-	
+	BSXFlags* GetBSXFlags( NiAVObject* Source, bool Allocate /*= false*/ )
+	{
+		BSXFlags* xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(Source, "BSX");
+		if (xFlags == NULL && Allocate)
+		{
+			xFlags = (BSXFlags*)FormHeap_Allocate(0x10);
+			thisCall<void>(0x006FA820, xFlags);
+			thisCall<void>(0x006FF8A0, Source, xFlags);
+		}
+
+		return xFlags;
+	}
+
+	bool GetConsoleOpen( void )
+	{
+		return *((UInt8*)0x00B33415);
+	}
+
+	TESObjectREFR* GetNodeObjectRef( NiAVObject* Source )
+	{
+		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source, "REF");
+		if (xRef)
+			return xRef->refr;
+		else
+			return NULL;
+	}
 }

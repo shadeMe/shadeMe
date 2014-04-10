@@ -4,6 +4,8 @@
 
 namespace ShadowSundries
 {
+	extern TESObjectREFR*		kDebugSelection;
+
 	namespace EditorSupport
 	{
 		_DeclareMemHdlr(EnableCastsShadowsFlag, "allows the flag to be set on non-light refs");
@@ -15,5 +17,9 @@ namespace ShadowSundries
 		_DeclareMemHdlr(ConsoleDebugSelectionB, "");
 	}
 
+	void WriteShadowDebug(const char* Format, ...);
+
 	void Patch(bool Editor);
 }
+
+#define SHADOW_DEBUG(ref, ...)		if (##ref == ShadowSundries::kDebugSelection) { ShadowSundries::WriteShadowDebug(##__VA_ARGS__); }

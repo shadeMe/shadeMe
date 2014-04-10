@@ -1,5 +1,6 @@
 #include "ShadowFacts.h"
 #include "ShadowFigures.h"
+#include "ShadowSundries.h"
 
 #pragma warning(disable: 4005 4748)
 
@@ -13,12 +14,12 @@ namespace ShadowFacts
 		IsActor(false),
 		IsUnderWater(false)
 	{
-		SME_ASSERT(Node && Object);
+		SME_ASSERT(Node && Object && Object->baseForm && Object->parentCell);
 		Distance = Utilities::GetDistanceFromPlayer(Node);
 		BoundRadius = Node->m_kWorldBound.radius;
 		IsActor = Node->cMultType == 3;
 
-		if (Object->parentCell && (Object->parentCell->flags0 & TESObjectCELL::kFlags0_HasWater))
+		if ((Object->parentCell->flags0 & TESObjectCELL::kFlags0_HasWater))
 		{
 			ExtraWaterHeight* xWaterHeight = (ExtraWaterHeight*)Object->parentCell->extraData.GetByType(kExtraData_WaterHeight);
 			if (xWaterHeight)
@@ -52,7 +53,7 @@ namespace ShadowFacts
 		
 		if (Distance < Settings::kCasterMaxDistance().f)
 		{
-			if (BoundRadius >= Settings::kCasterMinBoundRadius().f)
+			if (BoundRadius >= Settings::kObjectTier1BoundRadius().f)
 			{
 				if (IsUnderWater == false)
 				{
@@ -75,20 +76,35 @@ namespace ShadowFacts
 							{
 								Result = true;
 							}
+							else SHADOW_DEBUG(Object, "Failed Actor checks");
 						}
 						else
 						{
 							if (MainShadowExParams::Instance.GetAllowed(Node, Object))
 								Result = true;
+							else SHADOW_DEBUG(Object, "Failed MainShadowExParams check");
 						}
 					}
+					else SHADOW_DEBUG(Object, "Failed Fog check (%f > %f)", Distance, Fog->fogEnd);
 				}
+				else SHADOW_DEBUG(Object, "Failed Underwater check");
 			}
+			else SHADOW_DEBUG(Object, "Failed Bound Radius check (%f)", BoundRadius);
 		}
+		else SHADOW_DEBUG(Object, "Failed Distance check (%f)", Distance);
 
 		if (Result)
 		{
 			Result = ShadowRenderTasks::GetHasPlayerLOS(Object, Node);
+			if (Result == false)
+				SHADOW_DEBUG(Object, "Failed Player LOS check");
+		}
+
+		if (Result && Object->parentCell->IsInterior())
+		{
+			Result = ShadowRenderTasks::RunInteriorHeuristicGauntlet(Object, Node, BoundRadius);
+			if (Result == false)
+				SHADOW_DEBUG(Object, "Failed Interior Heuristic check");
 		}
 
 		if (Result)
@@ -154,14 +170,14 @@ namespace ShadowFacts
 						TESObjectREFR* ObjRef = xRef->refr;
 						if (ObjRef && ObjRef->baseForm && ObjRef != (*g_thePlayer))
 						{
-							// we've flipped the logic, remember?
-							if ((ObjRef->flags & TESForm::kFormFlags_CastShadows) == false)
+							if ((ObjRef->flags & kTESFormSpecialFlag_DoesntCastShadow) == false)
 							{
-								BSXFlags* xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(FadeNode, "BSX");
-
-								if (xFlags == NULL || (xFlags->m_iValue & kBSXFlagsSpecialFlag_DontCastShadow) == false)
+								// we allocate a BSXFlags extra data at instantiation
+								if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontCastShadow) == false)
 									Casters->push_back(ShadowCaster(FadeNode, ObjRef));
+								else SHADOW_DEBUG(ObjRef, "Failed BSXFlag DoesntCastShadow check");
 							}
+							else SHADOW_DEBUG(ObjRef, "Failed TESForm DoesntCastShadow check");
 						}
 					}
 				}						
@@ -238,10 +254,35 @@ namespace ShadowFacts
 
 		}
 
+		// sort by least distance next
+		std::sort(Casters.begin(), Casters.end(), ShadowCaster::SortComparatorDistance);
+
+		// now come the actors
 		if (ShadowCount < MaxShadowCount)
 		{
-			// sort by least distance and queue
-			std::sort(Casters.begin(), Casters.end(), ShadowCaster::SortComparatorDistance);
+			for (CasterListT::iterator Itr = Casters.begin(); Itr != Casters.end();)
+			{
+				if (Itr->IsActor && Itr->Queue(Root) == true)
+				{
+					ShadowCount++;
+#if 0
+					Itr->GetDescription(Buffer);
+					_MESSAGE("%s (Actor) queued", Buffer.c_str());
+#endif
+					Itr = Casters.erase(Itr);
+					continue;
+				}
+
+				if (ShadowCount == MaxShadowCount)
+					break;
+
+				Itr++;
+			}
+		}
+
+		// the rest follow
+		if (ShadowCount < MaxShadowCount)
+		{
 			for (CasterListT::iterator Itr = Casters.begin(); Itr != Casters.end(); Itr++)
 			{
 				if (Itr->Queue(Root) == true)
@@ -320,11 +361,12 @@ namespace ShadowFacts
 		SME_ASSERT(Node && Object);
 
 		TESObjectCELL* ParentCell = Object->parentCell;
-		SME_ASSERT(ParentCell);
+		BSXFlags* xFlags = Utilities::GetBSXFlags(Node);
+		SME_ASSERT(ParentCell && xFlags);
 
-		if (ParentCell->IsInterior() == true && (Node->m_flags & GetInteriorFlag()))
+		if (ParentCell->IsInterior() == true && GetAllowedInterior(Node, xFlags) == false)
 			Result = false;
-		else if (ParentCell->IsInterior() == false && (Node->m_flags & GetExteriorFlag()))
+		else if (ParentCell->IsInterior() == false && GetAllowedExterior(Node, xFlags) == false)
 			Result = false;
 
 		if (Result)
@@ -343,7 +385,7 @@ namespace ShadowFacts
 		return Result;
 	}
 
-	void ShadowExclusionParameters::HandleModelLoad( BSFadeNode* Node ) const
+	void ShadowExclusionParameters::HandleModelLoad( BSFadeNode* Node, BSXFlags* xFlags ) const
 	{
 		SME_ASSERT(Node);
 
@@ -353,13 +395,10 @@ namespace ShadowFacts
 			SME::StringHelpers::MakeLower(NodeName);
 			if (NodeName.find("base") == 0)
 			{
-#if 0
-				_MESSAGE("[%s] Handling BSFadeNode %s...", GetDescription(), NodeName.c_str());
-#endif
 				gLog.Indent();
 
-				Node->m_flags &= ~GetInteriorFlag();
-				Node->m_flags &= ~GetExteriorFlag();
+				SetInteriorFlag(false, Node, xFlags);
+				SetExteriorFlag(false, Node, xFlags);
 
 				for (PathSubstringListT::ParameterListT::const_iterator Itr = Parameters[kParamType_Interior].PathSubstrings().begin();
 					Itr != Parameters[kParamType_Interior].PathSubstrings().end();
@@ -367,10 +406,7 @@ namespace ShadowFacts
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
-#if 0
-						_MESSAGE("Flagged mesh with %08X", GetInteriorFlag());
-#endif
-						Node->m_flags |= GetInteriorFlag();
+						SetInteriorFlag(true, Node, xFlags);
 						break;
 					}
 				}
@@ -381,10 +417,7 @@ namespace ShadowFacts
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
-#if 0
-						_MESSAGE("Flagged mesh with %08X", GetExteriorFlag());
-#endif
-						Node->m_flags |= GetExteriorFlag();
+						SetExteriorFlag(true, Node, xFlags);
 						break;
 					}
 				}
@@ -403,16 +436,26 @@ namespace ShadowFacts
 
 	MainShadowExParams		MainShadowExParams::Instance;
 
-	UInt16 MainShadowExParams::GetInteriorFlag( void ) const
+	void MainShadowExParams::SetInteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
 	{
-		return kNiAVObjectSpecialFlag_DontCastInteriorShadow;
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorShadow, State);
 	}
 
-	UInt16 MainShadowExParams::GetExteriorFlag( void ) const
+	void MainShadowExParams::SetExteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
 	{
-		return kNiAVObjectSpecialFlag_DontCastExteriorShadow;
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorShadow, State);
 	}
 
+	bool MainShadowExParams::GetAllowedInterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	{
+		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorShadow) == false;
+	}
+
+	bool MainShadowExParams::GetAllowedExterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	{
+		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorShadow) == false;
+	}
+	
 	const char* MainShadowExParams::GetDescription( void ) const
 	{
 		return "MainShadow";
@@ -435,18 +478,30 @@ namespace ShadowFacts
 	}
 
 
+
+
 	SelfShadowExParams			SelfShadowExParams::Instance;
 
-	UInt16 SelfShadowExParams::GetInteriorFlag( void ) const
+	void SelfShadowExParams::SetInteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
 	{
-		return kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow;
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorSelfShadow, State);
 	}
 
-	UInt16 SelfShadowExParams::GetExteriorFlag( void ) const
+	void SelfShadowExParams::SetExteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
 	{
-		return kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow;
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorSelfShadow, State);
 	}
 
+	bool SelfShadowExParams::GetAllowedInterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	{
+		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorSelfShadow) == false;
+	}
+
+	bool SelfShadowExParams::GetAllowedExterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	{
+		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorSelfShadow) == false;
+	}
+	
 	const char* SelfShadowExParams::GetDescription( void ) const
 	{
 		return "SelfShadow";
@@ -471,14 +526,24 @@ namespace ShadowFacts
 
 	ShadowReceiverExParams			ShadowReceiverExParams::Instance;
 
-	UInt16 ShadowReceiverExParams::GetInteriorFlag( void ) const
+	void ShadowReceiverExParams::SetInteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
 	{
-		return kNiAVObjectSpecialFlag_DontReceiveInteriorShadow;
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveInteriorShadow, State);
 	}
 
-	UInt16 ShadowReceiverExParams::GetExteriorFlag( void ) const
+	void ShadowReceiverExParams::SetExteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
 	{
-		return kNiAVObjectSpecialFlag_DontReceiveExteriorShadow;
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow, State);
+	}
+
+	bool ShadowReceiverExParams::GetAllowedInterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	{
+		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveInteriorShadow) == false;
+	}
+
+	bool ShadowReceiverExParams::GetAllowedExterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	{
+		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow) == false;
 	}
 
 	const char* ShadowReceiverExParams::GetDescription( void ) const
@@ -545,7 +610,7 @@ namespace ShadowFacts
 		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
 		if (FadeNode)
 		{
-			ShadowRenderTasks::HandleModelLoad(FadeNode);
+			ShadowRenderTasks::HandleModelLoad(FadeNode, false);
 			return false;
 		}
 
@@ -557,11 +622,62 @@ namespace ShadowFacts
 		;//
 	}
 
+	bool NiAVObjectSpecialFlags::GetFlag( NiAVObject* Node, UInt16 Flag )
+	{
+		SME_ASSERT(Node && Flag > k__BEGININTERNAL);
+
+		return (Node->m_flags & Flag);
+	}
+
+	void NiAVObjectSpecialFlags::SetFlag( NiAVObject* Node, UInt16 Flag, bool State )
+	{
+		SME_ASSERT(Node && Flag > k__BEGININTERNAL);
+
+		if (State)
+			Node->m_flags |= Flag;
+		else
+			Node->m_flags &= ~Flag;
+	}
+
+
+	bool BSXFlagsSpecialFlags::GetFlag( BSXFlags* Store, UInt32 Flag )
+	{
+		SME_ASSERT(Store && Flag > k__BEGININTERNAL);
+
+		return (Store->m_iValue & Flag);
+	}
+
+	void BSXFlagsSpecialFlags::SetFlag( BSXFlags* Store, UInt32 Flag, bool State )
+	{
+		SME_ASSERT(Store && Flag > k__BEGININTERNAL && Flag < k__BEGINEXTERNAL);
+
+		// can only set internal flags
+		if (State)
+			Store->m_iValue |= Flag;
+		else
+			Store->m_iValue &= ~Flag;
+	}
+
+	bool BSXFlagsSpecialFlags::GetFlag( NiAVObject* Node, UInt32 Flag )
+	{
+		SME_ASSERT(Node);
+
+		return GetFlag(Utilities::GetBSXFlags(Node), Flag);
+	}
+
+	void BSXFlagsSpecialFlags::SetFlag( NiAVObject* Node, UInt32 Flag, bool State )
+	{
+		SME_ASSERT(Node);
+
+		return SetFlag(Utilities::GetBSXFlags(Node), Flag, State);
+	}
 
 	PathSubstringListT ShadowRenderTasks::BackFaceIncludePaths;
 	PathSubstringListT ShadowRenderTasks::LargeObjectExcludePaths;
 	PathSubstringListT ShadowRenderTasks::LightLOSCheckExcludePaths;
 	long double ShadowRenderTasks::LightProjectionMultiplierBuffer;
+	ShadowFacts::PathSubstringListT ShadowRenderTasks::InteriorHeuristicsIncludePaths;
+	ShadowFacts::PathSubstringListT ShadowRenderTasks::InteriorHeuristicsExcludePaths;
 
 	void ShadowRenderTasks::ToggleBackFaceCulling(bool State)
 	{
@@ -571,7 +687,7 @@ namespace ShadowFacts
 			(*g_renderer)->device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 	}
 
-	void ShadowRenderTasks::PerformModelLoadTask(BSFadeNode* Node)
+	void ShadowRenderTasks::PerformModelLoadTask(BSFadeNode* Node, BSXFlags* xFlags)
 	{
 		SME_ASSERT(Node);
 
@@ -581,15 +697,16 @@ namespace ShadowFacts
 			SME::StringHelpers::MakeLower(NodeName);
 			if (NodeName.find("base") == 0)
 			{
-				Node->m_flags &= ~kNiAVObjectSpecialFlag_CannotBeLargeObject;
-				Node->m_flags &= ~kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap;
-				Node->m_flags &= ~kNiAVObjectSpecialFlag_DontPerformLOSCheck;
+				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kCannotBeLargeObject, false);
+				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap, false);
+				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kDontPerformLOSCheck, false);
+				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics, false);
 
 				for (PathSubstringListT::ParameterListT::const_iterator Itr = BackFaceIncludePaths().begin(); Itr != BackFaceIncludePaths().end(); Itr++)
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
-						Node->m_flags |= kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap;
+						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap, true);
 						break;
 					}
 				}
@@ -598,7 +715,7 @@ namespace ShadowFacts
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
-						Node->m_flags |= kNiAVObjectSpecialFlag_CannotBeLargeObject;
+						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kCannotBeLargeObject, true);
 						break;
 					}
 				}
@@ -607,7 +724,32 @@ namespace ShadowFacts
 				{
 					if (NodeName.find(*Itr) != std::string::npos)
 					{
-						Node->m_flags |= kNiAVObjectSpecialFlag_DontPerformLOSCheck;
+						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kDontPerformLOSCheck, true);
+						break;
+					}
+				}
+
+				if (InteriorHeuristicsIncludePaths().size() == 0)
+					BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics, true);
+				else for (PathSubstringListT::ParameterListT::const_iterator Itr = InteriorHeuristicsIncludePaths().begin();
+																			Itr != InteriorHeuristicsIncludePaths().end();
+																			Itr++)
+				{
+					if (NodeName.find(*Itr) != std::string::npos)
+					{
+						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics, true);
+						break;
+					}
+				}
+
+				for (PathSubstringListT::ParameterListT::const_iterator Itr = InteriorHeuristicsExcludePaths().begin();
+																			Itr != InteriorHeuristicsExcludePaths().end();
+																			Itr++)
+				{
+					if (NodeName.find(*Itr) != std::string::npos)
+					{
+						// disallow
+						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics, false);
 						break;
 					}
 				}
@@ -648,7 +790,8 @@ namespace ShadowFacts
 
 		if (xRef && xRef->refr)
 		{
-			if (SelfShadowExParams::Instance.GetAllowed(Node, xRef->refr))
+			TESObjectREFR* Object = xRef->refr;
+			if (SelfShadowExParams::Instance.GetAllowed(Node, Object))
 			{
 				BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
 				float Distance = Utilities::GetDistanceFromPlayer(Node);
@@ -663,6 +806,7 @@ namespace ShadowFacts
 
 					if (Distance < Delta)
 						Result = true;
+					else SHADOW_DEBUG(Object, "Failed SelfShadow Fog check");
 				}
 				else
 					Result = true;
@@ -672,9 +816,11 @@ namespace ShadowFacts
 					if (Settings::kSelfEnableDistanceToggle().i && Distance > Settings::kSelfMaxDistance().f)
 					{
 						Result = false;
+						SHADOW_DEBUG(Object, "Failed SelfShadow Distance Toggle check");
 					}
 				}
 			}
+			else SHADOW_DEBUG(Object, "Failed SelfShadowExParams check");
 		}
 		else
 			Result = true;		// projectiles are an exception
@@ -682,17 +828,20 @@ namespace ShadowFacts
 		return Result;			
 	}
 
-	void __stdcall ShadowRenderTasks::HandleModelLoad( BSFadeNode* Node )
+	void __stdcall ShadowRenderTasks::HandleModelLoad( BSFadeNode* Node, bool Allocation )
 	{
-		MainShadowExParams::Instance.HandleModelLoad(Node);
-		SelfShadowExParams::Instance.HandleModelLoad(Node);
-		ShadowReceiverExParams::Instance.HandleModelLoad(Node);
-		PerformModelLoadTask(Node);
+		// add BSXFlags if necessary
+		BSXFlags* xFlags = Utilities::GetBSXFlags(Node, Allocation);
+
+		MainShadowExParams::Instance.HandleModelLoad(Node, xFlags);
+		SelfShadowExParams::Instance.HandleModelLoad(Node, xFlags);
+		ShadowReceiverExParams::Instance.HandleModelLoad(Node, xFlags);
+		PerformModelLoadTask(Node, xFlags);
 	}
 
 	void __stdcall ShadowRenderTasks::HandleShadowMapRenderingProlog( BSFadeNode* Node, ShadowSceneLight* Source )
 	{
-		if ((Node->m_flags & kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap))
+		if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap))
 		{
 			ToggleBackFaceCulling(false);
 		}
@@ -700,7 +849,7 @@ namespace ShadowFacts
 
 	void __stdcall ShadowRenderTasks::HandleShadowMapRenderingEpilog( BSFadeNode* Node, ShadowSceneLight* Source )
 	{
-		if ((Node->m_flags & kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap))
+		if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap))
 		{
 			ToggleBackFaceCulling(true);
 		}
@@ -715,14 +864,14 @@ namespace ShadowFacts
 	{
 		SME_ASSERT(Node);
 
-		return !(Node->m_flags & kNiAVObjectSpecialFlag_CannotBeLargeObject);
+		return BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kCannotBeLargeObject) == false;
 	}
 
 	bool ShadowRenderTasks::GetIsLargeObject( BSFadeNode* Node )
 	{
 		SME_ASSERT(Node);
 
-		if (Node->m_kWorldBound.radius >= Settings::kLargeObjectBoundRadius().f)
+		if (Node->m_kWorldBound.radius > Settings::kObjectTier6BoundRadius().f)
 			return true;
 		else
 			return false;
@@ -741,6 +890,14 @@ namespace ShadowFacts
 		_MESSAGE("Loading LOS check blacklist...");
 		LightLOSCheckExcludePaths.Refresh(&Settings::kLightLOSExcludedPath);
 		LightLOSCheckExcludePaths.Dump();
+
+		_MESSAGE("Loading interior heuristic whitelist...");
+		InteriorHeuristicsIncludePaths.Refresh(&Settings::kInteriorHeuristicsIncludePath);
+		InteriorHeuristicsIncludePaths.Dump();
+
+		_MESSAGE("Loading interior heuristic blacklist...");
+		InteriorHeuristicsExcludePaths.Refresh(&Settings::kInteriorHeuristicsExcludePath);
+		InteriorHeuristicsExcludePaths.Dump();
 	}
 
 	void ShadowRenderTasks::RefreshMiscPathLists( void )
@@ -748,6 +905,8 @@ namespace ShadowFacts
 		BackFaceIncludePaths.Refresh(&Settings::kRenderBackfacesIncludePath);
 		LargeObjectExcludePaths.Refresh(&Settings::kLargeObjectExcludedPath);
 		LightLOSCheckExcludePaths.Refresh(&Settings::kLightLOSExcludedPath);
+		InteriorHeuristicsIncludePaths.Refresh(&Settings::kInteriorHeuristicsIncludePath);
+		InteriorHeuristicsExcludePaths.Refresh(&Settings::kInteriorHeuristicsExcludePath);
 	}
 
 	bool __stdcall ShadowRenderTasks::GetHasLightLOS( ShadowSceneLight* Source )
@@ -756,19 +915,27 @@ namespace ShadowFacts
 
 		bool Result = true;
 
-		if (Source->sourceLight && Source->sourceNode && InterfaceManager::GetSingleton()->IsGameMode())
-		{
-			if ((Source->sourceNode->m_flags & kNiAVObjectSpecialFlag_DontPerformLOSCheck) == false)
-			{
-				if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
-				{
-					TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source->sourceNode, "REF");
-					if (xRef && xRef->refr)			
-					{
-						TESObjectREFR* Object = xRef->refr;
-						bool Interior = Object->parentCell->IsInterior();
+		BSFadeNode* Node = Source->sourceNode;
+		NiLight* Light = Source->sourceLight;
 
-						if ((Interior && Settings::kLightLOSCheckInterior().i) || (Interior == false && Settings::kLightLOSCheckExterior().i))
+		if (Light && Node && InterfaceManager::GetSingleton()->IsGameMode())
+		{
+			TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source->sourceNode, "REF");
+			if (xRef && xRef->refr)	
+			{
+				TESObjectREFR* Object = xRef->refr;
+				if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontPerformLOSCheck) == false)
+				{
+					if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
+					{
+						// light LOS checks don't really work well in interiors as they're performed on the projected translation coords of the source light
+						// only small objects, i.e, those that use a close-to-vanilla projection multiplier pass these checks in such cells
+						// so we'll limit it to them (just as well, as we're only concerned about them anyway)
+						bool CheckInterior = Object->parentCell->IsInterior() &&
+											Settings::kLightLOSCheckInterior().i &&
+											Node->m_kWorldBound.radius < Settings::kObjectTier2BoundRadius().f;
+
+						if (CheckInterior || (Object->parentCell->IsInterior() == false && Settings::kLightLOSCheckExterior().i))
 						{
 							if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
 							{
@@ -777,10 +944,19 @@ namespace ShadowFacts
 								{
 									Result = false;
 								}
+
+								SHADOW_DEBUG(Object, "Light LOS check (L[%f, %f, %f] ==> DIST[%f]) LOS[%d]",
+									Source->sourceLight->m_worldTranslate.x,
+									Source->sourceLight->m_worldTranslate.y,
+									Source->sourceLight->m_worldTranslate.z,
+									Utilities::GetDistance(Source->sourceLight, Node),
+									LOSCheck);
 							}
 						}
 					}
+					else SHADOW_DEBUG(Object, "Failed Light LOS Large Object check");
 				}
+				else SHADOW_DEBUG(Object, "Failed BSXFlags DontPerformLOS check");
 			}
 		}
 
@@ -821,16 +997,22 @@ namespace ShadowFacts
 	{
 		SME_ASSERT(Object && Node);
 
-		if ((Object->parentCell->IsInterior() && Settings::kPlayerLOSCheckInterior().i) ||
-			(Object->parentCell->IsInterior() == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kPlayerLOSCheckExterior().i))
+		bool Interior = Object->parentCell->IsInterior();
+
+		if ((Interior && Settings::kPlayerLOSCheckInterior().i) ||
+			(Interior == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kPlayerLOSCheckExterior().i))
 		{
-			// only for small objects
-			if (ShadowRenderTasks::GetIsLargeObject(Node) == false)
+			bool BoundsCheck = (Interior || Node->m_kWorldBound.radius < Settings::kObjectTier5BoundRadius().f);
+			if (BoundsCheck == true)
 			{
 				if (Utilities::GetAbovePlayer(Object, 10) && Utilities::GetPlayerHasLOS(Object, true) == false)
+				{
 					return false;
+				}
 				else if (Utilities::GetBelowPlayer(Object, 35) && Utilities::GetPlayerHasLOS(Object, true) == false)
+				{
 					return false;
+				}
 			}
 		}
 
@@ -848,19 +1030,27 @@ namespace ShadowFacts
 		{
 			float Bound = Node->m_kWorldBound.radius;
 			float NewValue = 0.f;
+			float BaseRadius = Settings::kObjectTier2BoundRadius().f;
+			float MaxRadius = Settings::kObjectTier3BoundRadius().f;
+			
+			float PerPart = (MaxRadius - BaseRadius) / 3.f;
+			float Part1 = BaseRadius + PerPart;
+			float Part2 = BaseRadius + PerPart * 2;
+			float Part3 = BaseRadius + PerPart * 3;
 
-			if (Bound <= 15)
-				NewValue = 2.2f;
-			else if (Bound > 15 && Bound <= 20)
-				NewValue = 2.5;
-			else if (Bound > 20 && Bound <= 25)
-				NewValue = 2.6;
-			else if (Bound > 25 && Bound <= 30)
-				NewValue = 2.7;
+			if (Bound < BaseRadius)
+				NewValue = 2.5f;
+			else if (Bound > BaseRadius && Bound < Part1)
+				NewValue = 2.6f;
+			else if (Bound > Part1 && Bound < Part2)
+				NewValue = 2.7f;
+			else if (Bound > Part2 && Bound < Part3)
+				NewValue = 2.8f;
 
 			if (NewValue)
 			{
 				ShadowFigures::SMRC_A38618.SetValue(NewValue);
+				SHADOW_DEBUG(Utilities::GetNodeObjectRef(Node), "Changed Projection Multiplier from %f to %f", LightProjectionMultiplierBuffer, NewValue);
 			}
 		}
 	}
@@ -916,8 +1106,30 @@ namespace ShadowFacts
 
 			if (Result)
 			{
-				BSXFlags* xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(Node, "BSX");
-				if (xFlags && (xFlags->m_iValue & kBSXFlagsSpecialFlag_DontReceiveShadow))
+				if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontReceiveShadow))
+				{
+					Result = false;
+					SHADOW_DEBUG(xRef->refr, "Failed BSXFlags DontReceiveShadow check");
+				}
+			}
+			else SHADOW_DEBUG(xRef->refr, "Failed ShadowReceiverExParams check");
+		}
+
+		return Result;
+	}
+
+	bool ShadowRenderTasks::RunInteriorHeuristicGauntlet( TESObjectREFR* Caster, BSFadeNode* Node, float BoundRadius )
+	{
+		bool Result = true;
+
+		SME_ASSERT(Caster && Node);
+
+		// only for static objects
+		if (Caster->baseForm->typeID == kFormType_Stat)
+		{
+			if (BoundRadius > Settings::kObjectTier4BoundRadius().f)
+			{
+				if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kAllowInteriorHeuristics))
 				{
 					Result = false;
 				}
@@ -926,6 +1138,7 @@ namespace ShadowFacts
 
 		return Result;
 	}
+
 
 
 
@@ -998,6 +1211,7 @@ namespace ShadowFacts
 			call	_hhGetVar(Call)
 
 			pushad
+			push	1
 			push	eax
 			call	ShadowRenderTasks::HandleModelLoad
 			popad
@@ -1151,15 +1365,31 @@ namespace ShadowFacts
 
 #if 0
 	_DeclareMemHdlr(TestHook, "");
-	_DefineHookHdlr(TestHook, 0x007D63F1);
+	_DefineHookHdlr(TestHook, 0x007D640B);
 
-	bool __stdcall DoTestHook(ShadowSceneLight* Source)
+	void __stdcall DoTestHook(ShadowSceneLight* Source, int  Stage, int result)
 	{
-		if (Source->sourceNode->m_kWorldBound.radius >= Settings::kLargeObjectBoundRadius().f)
-			return false;
-		else
+		if (Source->sourceNode == NULL)
+			return;
+
+		TESObjectREFR* Ref = Utilities::GetNodeObjectRef(Source->sourceNode);
+		if (Ref == NULL)
+			return;
+
+		switch (Stage)
 		{
-			return true;
+		case 1:
+			SHADOW_DEBUG(Ref, "0x007D34C0 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			break;
+		case 2:
+			SHADOW_DEBUG(Ref, "0x0047DA70 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			break;
+		case 3:
+			SHADOW_DEBUG(Ref, "0x007415E0 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			break;
+		case 4:
+			SHADOW_DEBUG(Ref, "0x007D5B20 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			break;
 		}
 	}
 
@@ -1167,20 +1397,96 @@ namespace ShadowFacts
 	#define _hhName	TestHook
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x007D2401);
-		_hhSetVar(Call, 0x007C6DE0);
-		_hhSetVar(Jump, 0x007D6539);
+		_hhSetVar(Retn, 0x007D6410);
+		_hhSetVar(Call, 0x007D34C0);
 		__asm
 		{	
-			
-			jmp		_hhGetVar(Jump)
+			call	_hhGetVar(Call)
+			pushad
+			movzx	eax, al
+			push eax
+			push 1
+			push ebp
+			call DoTestHook
+			popad
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	_DeclareMemHdlr(TestHook1, "");
+	_DefineHookHdlr(TestHook1, 0x007D647A);
+
+	
+	#define _hhName	TestHook1
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D647F);
+		_hhSetVar(Call, 0x0047DA70);
+		__asm
+		{	
+			call	_hhGetVar(Call)
+			pushad
+			push eax
+			push 2
+			push ebp
+			call DoTestHook
+			popad
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	_DeclareMemHdlr(TestHook2, "iffy");
+	_DefineHookHdlr(TestHook2, 0x007D6491);
+
+	
+	#define _hhName	TestHook2
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D6496);
+		_hhSetVar(Call, 0x007415E0);
+		__asm
+		{	
+			call	_hhGetVar(Call)
+				pushad
+				movzx	eax, al
+				push eax
+				push 3
+				push ebp
+				call DoTestHook
+				popad
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	_DeclareMemHdlr(TestHook3, "");
+	_DefineHookHdlr(TestHook3, 0x007D6517);
+
+	
+	#define _hhName	TestHook3
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D651C);
+		_hhSetVar(Call, 0x007D5B20);
+		__asm
+		{	
+			call	_hhGetVar(Call)
+				pushad
+				push eax
+				push 4
+				push ebp
+				call DoTestHook
+				popad
+			jmp		_hhGetVar(Retn)
 		}
 	}
 #endif
 	void Patch(void)
 	{
 #if 0
-	//	_MemHdlr(TestHook).WriteJump();
+		_MemHdlr(TestHook).WriteJump();
+		_MemHdlr(TestHook1).WriteJump();
+		_MemHdlr(TestHook2).WriteJump();
+		_MemHdlr(TestHook3).WriteJump();
 #endif
 		_MemHdlr(EnumerateFadeNodes).WriteJump();
 		_MemHdlr(RenderShadowsProlog).WriteJump();

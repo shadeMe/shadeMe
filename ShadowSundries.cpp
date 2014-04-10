@@ -4,6 +4,9 @@
 
 #pragma warning(disable: 4005 4748)
 
+using namespace ShadowFacts;
+using namespace ShadowFigures;
+
 namespace ShadowSundries
 {
 	namespace EditorSupport
@@ -64,23 +67,45 @@ namespace ShadowSundries
 					NiNode* Node = DebugSel->niNode;
 
 					char SpecialFlags[0x100] = {0};
+					char Bounds[0x100] = {0};
 					if (Node)
 					{
-						FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s",
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_CannotBeLargeObject) ? "NoLO" : "-"),
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap) ? "BkFc" : "-"),
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorShadow) ? "NoInt" : "-"),
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorShadow) ? "NoExt" : "-"),
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow) ? "NoInt(S)" : "-"),
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow) ? " NoExt(S)" : "-"),
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontReceiveInteriorShadow) ? "NoInt(R)" : "-"),
-							((Node->m_flags & ShadowFacts::kNiAVObjectSpecialFlag_DontReceiveExteriorShadow) ? "NoExt(R)" : "-"));
+						BSXFlags* xFlags = Utilities::GetBSXFlags(Node);
+
+						FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s %s %s",
+							((DebugSel->flags & ShadowFacts::kTESFormSpecialFlag_DoesntCastShadow) ? "NoShd(REF)" : "-"),
+							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kDontCastShadow) ? "NoShd(BSX)" : "-"),
+							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kDontReceiveShadow) ? "NoRcv(BSX)" : "-"),
+							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics) ? "IntHeu" : "-"),
+							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kCannotBeLargeObject) ? "NoLO" : "-"),
+							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap) ? "BkFc" : "-"),
+							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorShadow) ? "NoInt" : "-"),
+							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorShadow) ? "NoExt" : "-"),
+							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorSelfShadow) ? "NoInt(S)" : "-"),
+							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorSelfShadow) ? " NoExt(S)" : "-"),
+							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveInteriorShadow) ? "NoInt(R)" : "-"),
+							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow) ? "NoExt(R)" : "-"));
+
+						BSBound* xBounds = (BSBound*)Utilities::GetNiExtraDataByName(Node, "BBX");
+						if (xBounds)
+						{
+							FORMAT_STR(Bounds, "Bounds[ C[%f,%f,%f] E[%f,%f,%f] ]", 
+								xBounds->center.x, 
+								xBounds->center.y, 
+								xBounds->center.z, 
+								xBounds->extents.x, 
+								xBounds->extents.y, 
+								xBounds->extents.z);
+						}
 					}
 
-					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%f]\n\nShadow flags[%s]",
+					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] Pos[%.3f,%.3f,%.3f] BndRad[%f.3f]\n\nShadow flags[%s]",
 						thisCall<const char*>(0x004DA2A0, DebugSel),
 						DebugSel->refID,
 						(Node && Node->m_pcName ? Node->m_pcName : ""),
+						(Node ? Node->m_worldTranslate.x : 0.f),
+						(Node ? Node->m_worldTranslate.y : 0.f),
+						(Node ? Node->m_worldTranslate.z : 0.f),
 						(Node ? Node->m_kWorldBound.radius : 0.f),
 						SpecialFlags);
 				}
@@ -140,17 +165,17 @@ namespace ShadowSundries
 
 		_MESSAGE("Refreshing shadeMe params...");
 		gLog.Indent();
-		ShadowFigures::ShadowRenderConstantRegistry::GetSingleton()->Load();
+		ShadowRenderConstantRegistry::GetSingleton()->Load();
 
 		shadeMeINIManager::Instance.Load();
-		ShadowFacts::MainShadowExParams::Instance.RefreshParameters();
-		ShadowFacts::SelfShadowExParams::Instance.RefreshParameters();
-		ShadowFacts::ShadowReceiverExParams::Instance.RefreshParameters();
-		ShadowFacts::ShadowRenderTasks::RefreshMiscPathLists();
+		MainShadowExParams::Instance.RefreshParameters();
+		SelfShadowExParams::Instance.RefreshParameters();
+		ShadowReceiverExParams::Instance.RefreshParameters();
+		ShadowRenderTasks::RefreshMiscPathLists();
 
 		ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
 		Utilities::NiNodeChildrenWalker Walker((NiNode*)RootNode->m_children.data[3]);
-		Walker.Walk(&ShadowFacts::FadeNodeShadowFlagUpdater());
+		Walker.Walk(&FadeNodeShadowFlagUpdater());
 		gLog.Outdent();
 
 		return true;
@@ -203,11 +228,13 @@ namespace ShadowSundries
 		return true;
 	}
 
+	TESObjectREFR*			kDebugSelection = NULL;
+
 	static bool BeginTrace_Execute(COMMAND_ARGS)
 	{
 		*result = 0;
 
-		;//
+		kDebugSelection = InterfaceManager::GetSingleton()->debugSelection;
 
 		return true;
 	}
@@ -233,11 +260,27 @@ namespace ShadowSundries
 			WasteMemory->params = ToggleShadowVolumes->params;
 
 			CommandInfo* BeginTrace = (CommandInfo*)0x00B0C618;
-			WasteMemory->longName = "Radiohead";
-			WasteMemory->shortName = "LetDown";
-			WasteMemory->execute = BeginTrace_Execute;
-			WasteMemory->numParams = ToggleShadowVolumes->numParams;
-			WasteMemory->params = ToggleShadowVolumes->params;
+			BeginTrace->longName = "SetShadowDebugRef";
+			BeginTrace->shortName = "sdr";
+			BeginTrace->execute = BeginTrace_Execute;
+			BeginTrace->numParams = ToggleShadowVolumes->numParams;
+			BeginTrace->params = ToggleShadowVolumes->params;
 		}
+	}
+
+	void WriteShadowDebug( const char* Format, ... )
+	{
+		char Buffer[0x1000] = {0};
+
+		va_list Args;
+		va_start(Args, Format);
+		vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
+		va_end(Args);
+
+		SME_ASSERT(kDebugSelection);
+
+		_MESSAGE("ShadowDebugRef[%08X %s]: %s", kDebugSelection->refID,
+				(kDebugSelection->niNode ? kDebugSelection->niNode->m_pcName : "<null>"),
+				Buffer);
 	}
 }

@@ -99,46 +99,93 @@ namespace ShadowFacts
 
 		void										LoadParameters(UInt8 ParamType, SME::INI::INISetting* ExcludedTypes, SME::INI::INISetting* ExcludedPaths);
 
-		virtual UInt16								GetInteriorFlag(void) const = 0;
-		virtual UInt16								GetExteriorFlag(void) const = 0;
+		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const = 0;
+		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const = 0;
+		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const = 0;
+		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const = 0;
+
 		virtual const char*							GetDescription(void) const = 0;
 	public:
 		virtual ~ShadowExclusionParameters();
 
 		virtual void								Initialize(void) = 0;
 
-		void										HandleModelLoad(BSFadeNode* Node) const;
+		void										HandleModelLoad(BSFadeNode* Node, BSXFlags* xFlags) const;
 		bool										GetAllowed(BSFadeNode* Node, TESObjectREFR* Object) const;
 		void										RefreshParameters(void);
 	};
 
 	// hacky - stored directly in the NiAVObject to reduce render-time overhead
 	// AFAIK, these bits are unused
-	enum
+	// only used for string comparisons
+	class NiAVObjectSpecialFlags
 	{
-		kNiAVObjectSpecialFlag_DontReceiveInteriorShadow	= 1 << 7,
-		kNiAVObjectSpecialFlag_DontReceiveExteriorShadow	= 1 << 8,
-		kNiAVObjectSpecialFlag_CannotBeLargeObject			= 1 << 9,
-		kNiAVObjectSpecialFlag_RenderBackFacesToShadowMap	= 1 << 10,
-		kNiAVObjectSpecialFlag_DontCastInteriorSelfShadow	= 1 << 11,
-		kNiAVObjectSpecialFlag_DontCastExteriorSelfShadow	= 1 << 12,
-		kNiAVObjectSpecialFlag_DontCastInteriorShadow		= 1 << 13,
-		kNiAVObjectSpecialFlag_DontCastExteriorShadow		= 1 << 14,
-		kNiAVObjectSpecialFlag_DontPerformLOSCheck			= 1 << 15,
+	public:
+		enum
+		{
+			//===========================================================================
+			k__BEGININTERNAL				= NiAVObject::kFlag_Unk06,
+			//===========================================================================
+
+			// primarily used for exclusion params paths
+			kDontReceiveInteriorShadow		= 1 << 7,
+			kDontReceiveExteriorShadow		= 1 << 8,
+			kDontCastInteriorSelfShadow		= 1 << 9,
+			kDontCastExteriorSelfShadow		= 1 << 10,
+			kDontCastInteriorShadow			= 1 << 11,
+			kDontCastExteriorShadow			= 1 << 12,
+		};
+
+		static bool GetFlag(NiAVObject* Node, UInt16 Flag);
+		static void SetFlag(NiAVObject* Node, UInt16 Flag, bool State);
 	};
 
 	// same as above but for BSXFlags
+	class BSXFlagsSpecialFlags
+	{
+	public:
+		enum
+		{
+			//=========================================================================
+			k__BEGININTERNAL				= BSXFlags::kFlag_Unk05,
+			//=========================================================================
+
+			kCannotBeLargeObject			= 1 << 6,
+			kRenderBackFacesToShadowMap		= 1 << 7,
+			kDontPerformLOSCheck			= 1 << 8,
+			kAllowInteriorHeuristics		= 1 << 9,
+
+			//=========================================================================
+			k__BEGINEXTERNAL				= 1 << 29,
+			//=========================================================================
+
+			// can be baked into the model
+			kDontReceiveShadow				= 1 << 30,
+			kDontCastShadow					= 1 << 31,
+		};
+
+		static bool GetFlag(BSXFlags* Store, UInt32 Flag);
+		static void SetFlag(BSXFlags* Store, UInt32 Flag, bool State);
+
+		static bool GetFlag(NiAVObject* Node, UInt32 Flag);
+		static void SetFlag(NiAVObject* Node, UInt32 Flag, bool State);
+	};
+	
+
+	// the regular CastsShadows flag will be used on non-light refs to indicate the opposite
 	enum
 	{
-		kBSXFlagsSpecialFlag_DontReceiveShadow				= 1 << 30,
-		kBSXFlagsSpecialFlag_DontCastShadow					= 1 << 31,
+		kTESFormSpecialFlag_DoesntCastShadow	=	TESForm::kFormFlags_CastShadows,
 	};
 
 	class MainShadowExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual UInt16								GetInteriorFlag(void) const;
-		virtual UInt16								GetExteriorFlag(void) const;
+		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+
 		virtual const char*							GetDescription(void) const;		
 	public:
 		virtual ~MainShadowExParams();
@@ -151,8 +198,11 @@ namespace ShadowFacts
 	class SelfShadowExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual UInt16								GetInteriorFlag(void) const;
-		virtual UInt16								GetExteriorFlag(void) const;
+		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+
 		virtual const char*							GetDescription(void) const;
 	public:
 		virtual ~SelfShadowExParams();
@@ -165,8 +215,11 @@ namespace ShadowFacts
 	class ShadowReceiverExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual UInt16								GetInteriorFlag(void) const;
-		virtual UInt16								GetExteriorFlag(void) const;
+		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+
 		virtual const char*							GetDescription(void) const;
 	public:
 		virtual ~ShadowReceiverExParams();
@@ -203,9 +256,11 @@ namespace ShadowFacts
 		static PathSubstringListT					LargeObjectExcludePaths;
 		static PathSubstringListT					LightLOSCheckExcludePaths;
 		static long double							LightProjectionMultiplierBuffer;
+		static PathSubstringListT					InteriorHeuristicsIncludePaths;
+		static PathSubstringListT					InteriorHeuristicsExcludePaths;
 
 		static void									ToggleBackFaceCulling(bool State);
-		static void									PerformModelLoadTask(BSFadeNode* Node);
+		static void									PerformModelLoadTask(BSFadeNode* Node, BSXFlags* xFlags);
 	public:
 		static void									Initialize(void);
 		static void									RefreshMiscPathLists(void);
@@ -224,7 +279,7 @@ namespace ShadowFacts
 
 		static void __stdcall						QueueShadowOccluders(UInt32 MaxShadowCount);
 		static bool	__stdcall						HandleSelfShadowing(ShadowSceneLight* Caster);		// return true to allow
-		static void __stdcall						HandleModelLoad(BSFadeNode* Node);
+		static void __stdcall						HandleModelLoad(BSFadeNode* Node, bool Allocation);
 		static void __stdcall						HandleShadowReceiverLightingPropertyUpdate(ShadowSceneLight* Source, NiNode* Receiver);
 
 		static bool									GetCanBeLargeObject(BSFadeNode* Node);
@@ -233,6 +288,7 @@ namespace ShadowFacts
 		static bool									GetHasPlayerLOS(TESObjectREFR* Object, BSFadeNode* Node);
 		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
 		static bool									GetCanReceiveShadow(BSFadeNode* Node);
+		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, BSFadeNode* Node, float BoundRadius);		// return true to allow
 	};
 
 	

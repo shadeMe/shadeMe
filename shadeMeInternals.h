@@ -53,12 +53,10 @@ public:
 namespace Settings
 {
 	extern SME::INI::INISetting				kCasterMaxDistance;
-	extern SME::INI::INISetting				kCasterMinBoundRadius;
 	extern SME::INI::INISetting				kEnableDebugShader;
 	extern SME::INI::INISetting				kEnableDetailedDebugSelection;
 
 	extern SME::INI::INISetting				kLargeObjectHigherPriority;
-	extern SME::INI::INISetting				kLargeObjectBoundRadius;
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;
 	extern SME::INI::INISetting				kLargeObjectSunShadowsOnly;
 
@@ -95,6 +93,17 @@ namespace Settings
 	extern SME::INI::INISetting				kReceiverExcludedPathExterior;
 
 	extern SME::INI::INISetting				kReceiverEnableExclusionParams;
+
+	extern SME::INI::INISetting				kInteriorHeuristicsEnabled;
+	extern SME::INI::INISetting				kInteriorHeuristicsIncludePath;
+	extern SME::INI::INISetting				kInteriorHeuristicsExcludePath;
+
+	extern SME::INI::INISetting				kObjectTier1BoundRadius;		// anything smaller won't cast shadows
+	extern SME::INI::INISetting				kObjectTier2BoundRadius;		// interior light LOS checks are limited to tier 2 or lower
+	extern SME::INI::INISetting				kObjectTier3BoundRadius;		// casters b'ween tier 2 and 3 use different projection params
+	extern SME::INI::INISetting				kObjectTier4BoundRadius;		// minimum radius need to qualify for interior heuristics
+	extern SME::INI::INISetting				kObjectTier5BoundRadius;		// exterior player LOS checks are limited to tier 5 or lower
+	extern SME::INI::INISetting				kObjectTier6BoundRadius;		// large objects
 }
 
 class BSRenderedTexture;
@@ -168,7 +177,7 @@ public:
 
 	float												unkDC;		// time left before full fade-in opacity?
 	float												unkE0;		// time elapsed during fade-in?
-	NiTPointerList<NiPointer<NiTriBasedGeom>>			unkE4;		// light blocker geometry ?
+	NiTPointerList<NiTriBasedGeom>						unkE4;		// light blocker/receiver geometry ?
 	UInt8												unkF4;		// shadow map rendered/casts shadow flag?
 	UInt8												unkF5;
 	UInt8												unkF5Pad[2];
@@ -216,6 +225,7 @@ namespace Utilities
 																							// also, haaaaaaaaaaaaccccckkkkkyyyyy!
 	bool				GetAbovePlayer(TESObjectREFR* Ref, float Threshold);
 	bool				GetBelowPlayer(TESObjectREFR* Ref, float Threshold);
+	bool				GetConsoleOpen(void);
 
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
 	NiExtraData*		GetNiExtraDataByName(NiAVObject* Source, const char* Name);
@@ -225,7 +235,8 @@ namespace Utilities
 	void				UpdateBounds(NiNode* Node);
 	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);
 	ShadowSceneLight*	GetShadowCasterLight(NiNode* Caster);
-
+	BSXFlags*			GetBSXFlags(NiAVObject* Source, bool Allocate = false);
+	TESObjectREFR*		GetNodeObjectRef(NiAVObject* Source);
 
 	void*				NiRTTI_Cast(const NiRTTI* TypeDescriptor, NiRefObject* NiObject);
 
