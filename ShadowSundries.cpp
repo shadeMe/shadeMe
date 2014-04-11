@@ -72,13 +72,15 @@ namespace ShadowSundries
 					{
 						BSXFlags* xFlags = Utilities::GetBSXFlags(Node);
 
-						FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s %s %s",
+						FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s %s %s %s %s",
 							((DebugSel->flags & ShadowFacts::kTESFormSpecialFlag_DoesntCastShadow) ? "NoShd(REF)" : "-"),
 							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kDontCastShadow) ? "NoShd(BSX)" : "-"),
 							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kDontReceiveShadow) ? "NoRcv(BSX)" : "-"),
 							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics) ? "IntHeu" : "-"),
 							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kCannotBeLargeObject) ? "NoLO" : "-"),
 							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap) ? "BkFc" : "-"),
+							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kOnlySelfShadowInterior) ? "OlySelf(I)" : "-"),
+							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kOnlySelfShadowExterior) ? "OlySelf(E)" : "-"),
 							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorShadow) ? "NoInt" : "-"),
 							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorShadow) ? "NoExt" : "-"),
 							(NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorSelfShadow) ? "NoInt(S)" : "-"),

@@ -1,3 +1,4 @@
 To Do
 =====
+> Actors only receive self shadows
 > Look into the dark shadow issue - precision or LOD?

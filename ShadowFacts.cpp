@@ -888,7 +888,12 @@ namespace ShadowFacts
 		}
 
 		if (Settings::kEnableDebugShader().i)
-			Source->showDebug = 1;
+		{
+			if (ShadowSundries::kDebugSelection == NULL || ShadowSundries::kDebugSelection == Utilities::GetNodeObjectRef(Node))
+				Source->showDebug = 1;
+			else
+				Source->showDebug = 0;
+		}
 		else
 			Source->showDebug = 0;
 	}
@@ -1007,7 +1012,10 @@ namespace ShadowFacts
 			if (Object)
 			{
 				if (PerformExclusiveSelfShadowCheck(Source->sourceNode, Object) == false)
+				{
 					AllowReceiver = false;
+					SHADOW_DEBUG(Object, "Failed Final Exclusive Self-Shadows check");
+				}
 			}
 		}
 

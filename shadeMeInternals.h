@@ -183,14 +183,14 @@ public:
 
 	float												unkDC;		// time left before full fade-in opacity?
 	float												unkE0;		// time elapsed during fade-in?
-	NiTPointerList<NiTriBasedGeom>						unkE4;		// light blocker/receiver geometry ?
+	NiTPointerList<NiTriBasedGeom>						unkE4;		// light receiver geometry?
 	UInt8												unkF4;		// shadow map rendered/casts shadow flag?
 	UInt8												unkF5;
 	UInt8												unkF5Pad[2];
 	float												unkF8;
 	UInt8												unkFC;
 	UInt8												unkFCPad[3];
-	NiPointLight*										sourceLight;	// 100 - parent light
+	NiPointLight*										sourceLight;// 100 - parent light
 	UInt8												unk104;	
 	UInt8												unk104Pad[3];
 	NiVector3											unk108;		// sourceLight->m_worldTranslate
@@ -204,14 +204,19 @@ public:
 	UInt8												showDebug;	// 12C - debug shader toggle
 	UInt8												unk12CPad[3];
 	BSFadeNode*											sourceNode;	// 130 - node being lighted/shadowed
-	NiTPointerList<NiPointer<NiAVObject>>				unk134;
-	void*												unk144;
+	NiTPointerList<NiAVObject>							unk134;
+	NiTPointerList<NiTriBasedGeom>::Node*				unk144;		// points to the fence trishape
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
 	NiCamera*											unk14C;		// used when performing LOC checks/frustum culling
-	UInt32												unk1B0;		
+	float												unk150[24];	// probably an array of another aggregate type like NiVector3
+	UInt32												unk1B0;		// either 1 or zero, checked and set when updating receiver geometry
+	UInt32												unk1B4[27];
 };
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceLight) == 0x100);
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceNode) == 0x130);
+STATIC_ASSERT(offsetof(ShadowSceneLight, unk150) == 0x150);
+STATIC_ASSERT(offsetof(ShadowSceneLight, unk1B0) == 0x1B0);
+STATIC_ASSERT(sizeof(ShadowSceneLight) == 0x220);
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
 typedef std::vector<BSFadeNode*>				FadeNodeListT;
