@@ -685,7 +685,8 @@ namespace ShadowFacts
 	PathSubstringListT			ShadowRenderTasks::InteriorHeuristicsIncludePaths;
 	PathSubstringListT			ShadowRenderTasks::InteriorHeuristicsExcludePaths;
 	const float					ShadowRenderTasks::InteriorDirectionalCheckThresholdDistance = 50.f;
-
+	PathSubstringListT			ShadowRenderTasks::SelfExclusiveIncludePathsExterior;
+	PathSubstringListT			ShadowRenderTasks::SelfExclusiveIncludePathsInterior;
 
 	void ShadowRenderTasks::ToggleBackFaceCulling(bool State)
 	{
@@ -709,6 +710,8 @@ namespace ShadowFacts
 				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap, false);
 				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kDontPerformLOSCheck, false);
 				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics, false);
+				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kOnlySelfShadowInterior, false);
+				BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kOnlySelfShadowExterior, false);
 
 				for (PathSubstringListT::ParameterListT::const_iterator Itr = BackFaceIncludePaths().begin(); Itr != BackFaceIncludePaths().end(); Itr++)
 				{
@@ -758,6 +761,28 @@ namespace ShadowFacts
 					{
 						// disallow
 						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kAllowInteriorHeuristics, false);
+						break;
+					}
+				}
+
+				for (PathSubstringListT::ParameterListT::const_iterator Itr = SelfExclusiveIncludePathsInterior().begin();
+																		Itr != SelfExclusiveIncludePathsInterior().end();
+																		Itr++)
+				{
+					if (NodeName.find(*Itr) != std::string::npos)
+					{
+						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kOnlySelfShadowInterior, true);
+						break;
+					}
+				}
+
+				for (PathSubstringListT::ParameterListT::const_iterator Itr = SelfExclusiveIncludePathsExterior().begin();
+																		Itr != SelfExclusiveIncludePathsExterior().end();
+																		Itr++)
+				{
+					if (NodeName.find(*Itr) != std::string::npos)
+					{
+						BSXFlagsSpecialFlags::SetFlag(xFlags, BSXFlagsSpecialFlags::kOnlySelfShadowExterior, true);
 						break;
 					}
 				}
@@ -906,6 +931,14 @@ namespace ShadowFacts
 		_MESSAGE("Loading interior heuristic blacklist...");
 		InteriorHeuristicsExcludePaths.Refresh(&Settings::kInteriorHeuristicsExcludePath);
 		InteriorHeuristicsExcludePaths.Dump();
+
+		_MESSAGE("Loading interior self-shadow-only whitelist...");
+		SelfExclusiveIncludePathsInterior.Refresh(&Settings::kSelfIncludePathInterior);
+		SelfExclusiveIncludePathsInterior.Dump();
+
+		_MESSAGE("Loading exterior self-shadow-only whitelist...");
+		SelfExclusiveIncludePathsExterior.Refresh(&Settings::kSelfIncludePathExterior);
+		SelfExclusiveIncludePathsExterior.Dump();
 	}
 
 	void ShadowRenderTasks::RefreshMiscPathLists( void )
@@ -915,9 +948,11 @@ namespace ShadowFacts
 		LightLOSCheckExcludePaths.Refresh(&Settings::kLightLOSExcludedPath);
 		InteriorHeuristicsIncludePaths.Refresh(&Settings::kInteriorHeuristicsIncludePath);
 		InteriorHeuristicsExcludePaths.Refresh(&Settings::kInteriorHeuristicsExcludePath);
+		SelfExclusiveIncludePathsInterior.Refresh(&Settings::kSelfIncludePathInterior);
+		SelfExclusiveIncludePathsExterior.Refresh(&Settings::kSelfIncludePathExterior);
 	}
 
-	bool __stdcall ShadowRenderTasks::GetHasLightLOS( ShadowSceneLight* Source )
+	bool __stdcall ShadowRenderTasks::PerformAuxiliaryChecks( ShadowSceneLight* Source )
 	{
 		SME_ASSERT(Source);
 
@@ -931,83 +966,58 @@ namespace ShadowFacts
 			TESObjectREFR* Object = Utilities::GetNodeObjectRef(Source->sourceNode);
 			if (Object)	
 			{
-				SHADOW_DEBUG(Object, "Light LOS check (L[%f, %f, %f] ==> DIST[%f])",
-									Source->sourceLight->m_worldTranslate.x,
-									Source->sourceLight->m_worldTranslate.y,
-									Source->sourceLight->m_worldTranslate.z,
-									Utilities::GetDistance(Source->sourceLight, Node));
-				gLog.Indent();
+				UInt8 SelfShadowsState = *(UInt8*)0x00B06F0C;
+				if (SelfShadowsState == 0 && PerformExclusiveSelfShadowCheck(Node, Object) == false)
+					Result = false;
 
-				if (GetCanHaveDirectionalShadow(Source) == false)
-				{
-					// we estimate (rather crudely) if the source light is more or less directly above the node
-					Vector3 Buffer(*(Vector3*)&Source->sourceLight->m_worldTranslate);
-					Buffer.z = Object->posZ + 10.f;
-					float Distance = Utilities::GetDistance(&Buffer, (Vector3*)&Object->posX);
-					SHADOW_DEBUG(Object, "Adjusted Light DIST[%f]", Distance);
-
-					if (Distance < InteriorDirectionalCheckThresholdDistance)
-					{
-						SHADOW_DEBUG(Object, "Failed Interior Directional check");
-						Result = false;
-					}
-				}
-				
 				if (Result)
 				{
-					if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontPerformLOSCheck) == false)
+					SHADOW_DEBUG(Object, "Light LOS check (L[%f, %f, %f] ==> DIST[%f])",
+								Source->sourceLight->m_worldTranslate.x,
+								Source->sourceLight->m_worldTranslate.y,
+								Source->sourceLight->m_worldTranslate.z,
+								Utilities::GetDistance(Source->sourceLight, Node));
+
+					gLog.Indent();
+
+					Result = PerformInteriorDirectionalShadowCheck(Source, Object);
+
+					if (Result)
 					{
-
-						if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
-						{
-							// light LOS checks don't really work well in interiors as they're performed on the projected translation coords of the source light
-							// only small objects, i.e, those that use a close-to-vanilla projection multiplier pass these checks in such cells
-							// so we'll limit it to them (just as well, as we're only concerned about them anyway)
-							bool CheckInterior = Object->parentCell->IsInterior() &&
-												Settings::kLightLOSCheckInterior().i &&
-												Node->m_kWorldBound.radius < Settings::kObjectTier2BoundRadius().f;
-
-							if (CheckInterior || (Object->parentCell->IsInterior() == false && Settings::kLightLOSCheckExterior().i))
-							{
-								if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
-								{
-									bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
-									if (LOSCheck == false)
-									{
-										Result = false;
-									}
-									SHADOW_DEBUG(Object, "LOS[%d]", LOSCheck);
-								}
-							}
-						}
-						else SHADOW_DEBUG(Object, "Failed Light LOS Large Object check");
+						Result = PerformLightLOSCheck(Source, Object);
 					}
-					else SHADOW_DEBUG(Object, "Failed BSXFlags DontPerformLOS check");
-				}
 
-				gLog.Outdent();
+					gLog.Outdent();
+				}
+				else SHADOW_DEBUG(Object, "Failed Prelim Exclusive Self-Shadows check");
 			}
 		}
 
 		return Result;
 	}
 
-	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateReceiverProlog( ShadowSceneLight* Source )
+	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateReceiver( ShadowSceneLight* Source, NiNode* SceneGraph )
 	{
-		SME_ASSERT(Source);
+		SME_ASSERT(Source && SceneGraph);
 
+		bool AllowReceiver = true;
 		if (Source->sourceNode)
 		{
-			Source->sourceNode->m_flags |= NiAVObject::kFlag_AppCulled;
+			TESObjectREFR* Object = Utilities::GetNodeObjectRef(Source->sourceNode);
+			if (Object)
+			{
+				if (PerformExclusiveSelfShadowCheck(Source->sourceNode, Object) == false)
+					AllowReceiver = false;
+			}
 		}
-	}
 
-	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateReceiverEpilog( ShadowSceneLight* Source )
-	{
-		SME_ASSERT(Source);
-
-		if (Source->sourceNode)
+		if (AllowReceiver)
 		{
+			// prevents non-actor casters from self occluding regardless of the self shadow setting
+			Source->sourceNode->m_flags |= NiAVObject::kFlag_AppCulled;
+
+			thisCall<void>(0x007D59E0, Source, SceneGraph);
+
 			Source->sourceNode->m_flags &= ~NiAVObject::kFlag_AppCulled;
 		}
 	}
@@ -1034,13 +1044,12 @@ namespace ShadowFacts
 			bool BoundsCheck = (Interior || Node->m_kWorldBound.radius < Settings::kObjectTier5BoundRadius().f);
 			if (BoundsCheck == true)
 			{
-				if (Utilities::GetAbovePlayer(Object, 10) && Utilities::GetPlayerHasLOS(Object, true) == false)
+				bool Above = (Settings::kPlayerLOSCheckHighAccuracy().i && Interior) || Utilities::GetAbovePlayer(Object, 10);
+				bool Below = (Settings::kPlayerLOSCheckHighAccuracy().i && Interior) || Utilities::GetBelowPlayer(Object, 35);
+				if (Above == true || Below == true)
 				{
-					return false;
-				}
-				else if (Utilities::GetBelowPlayer(Object, 35) && Utilities::GetPlayerHasLOS(Object, true) == false)
-				{
-					return false;
+					if (Utilities::GetPlayerHasLOS(Object, true) == false)
+						return false;
 				}
 			}
 		}
@@ -1187,6 +1196,75 @@ namespace ShadowFacts
 		return true;
 	}
 
+	bool ShadowRenderTasks::PerformExclusiveSelfShadowCheck( BSFadeNode* Node, TESObjectREFR* Object )
+	{
+		if ((BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kOnlySelfShadowInterior) && Object->parentCell->IsInterior()) ||
+			(BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kOnlySelfShadowExterior) && Object->parentCell->IsInterior() == false))
+		{
+			return false;
+		}
+
+		return true;
+	}
+
+	bool ShadowRenderTasks::PerformInteriorDirectionalShadowCheck( ShadowSceneLight* Source, TESObjectREFR* Object )
+	{
+		bool Result = true;
+
+		if (GetCanHaveDirectionalShadow(Source) == false)
+		{
+			// we estimate (rather crudely) if the source light is more or less directly above the node
+			Vector3 Buffer(*(Vector3*)&Source->sourceLight->m_worldTranslate);
+			Buffer.z = Object->posZ + 10.f;
+			float Distance = Utilities::GetDistance(&Buffer, (Vector3*)&Object->posX);
+			SHADOW_DEBUG(Object, "Adjusted Light DIST[%f]", Distance);
+
+			if (Distance < InteriorDirectionalCheckThresholdDistance)
+			{
+				SHADOW_DEBUG(Object, "Failed Interior Directional check");
+				Result = false;
+			}
+		}
+
+		return Result;
+	}
+
+	bool ShadowRenderTasks::PerformLightLOSCheck( ShadowSceneLight* Source, TESObjectREFR* Object )
+	{
+		bool Result = true;
+
+		if (BSXFlagsSpecialFlags::GetFlag(Source->sourceNode, BSXFlagsSpecialFlags::kDontPerformLOSCheck) == false)
+		{
+			if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
+			{
+				// light LOS checks don't really work well in interiors as they're performed on the projected translation coords of the source light
+				// only small objects, i.e, those that use a close-to-vanilla projection multiplier pass these checks in such cells
+				// so we'll limit it to them (just as well, as we're only concerned about them anyway)
+				bool CheckInterior = Object->parentCell->IsInterior() &&
+									Settings::kLightLOSCheckInterior().i &&
+									Source->sourceNode->m_kWorldBound.radius < Settings::kObjectTier2BoundRadius().f;
+
+				if (CheckInterior || (Object->parentCell->IsInterior() == false && Settings::kLightLOSCheckExterior().i))
+				{
+					if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
+					{
+						bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
+						if (LOSCheck == false)
+						{
+							Result = false;
+						}
+						SHADOW_DEBUG(Object, "LOS[%d]", LOSCheck);
+					}
+				}
+			}
+			else SHADOW_DEBUG(Object, "Failed Light LOS Large Object check");
+		}
+		else SHADOW_DEBUG(Object, "Failed BSXFlags DontPerformLOS check");
+
+		return Result;
+	}
+
+
 
 
 
@@ -1198,7 +1276,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(UpdateGeometryLighting, 0x00407945);
 	_DefineHookHdlr(UpdateGeometryLightingSelf, 0x0040795C);
 	_DefineHookHdlr(RenderShadowMap, 0x007D4E89);
-	_DefineHookHdlr(CheckSourceLightLOS, 0x00407901);
+	_DefineHookHdlr(PerformAuxSSLChecks, 0x00407901);
 	_DefineHookHdlr(CheckLargeObjectLightSource, 0x007D23F7);
 	_DefineHookHdlr(CheckShadowReceiver, 0x007D692D);
 	_DefineHookHdlr(CheckInteriorLightSource, 0x007D282C);
@@ -1273,21 +1351,15 @@ namespace ShadowFacts
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x0040794A);
-		_hhSetVar(Call, 0x007D6900);
 		__asm
 		{	
 			pushad
+			push	edx
 			push	esi
-			call	ShadowRenderTasks::HandleShadowLightUpdateReceiverProlog
+			call	ShadowRenderTasks::HandleShadowLightUpdateReceiver
 			popad
 
-			call	_hhGetVar(Call)
-
-			pushad
-			push	esi
-			call	ShadowRenderTasks::HandleShadowLightUpdateReceiverEpilog
-			popad
-
+			pop		edx
 			jmp		_hhGetVar(Retn)
 		}
 	}
@@ -1345,7 +1417,7 @@ namespace ShadowFacts
 		
 	}
 
-	#define _hhName	CheckSourceLightLOS
+	#define _hhName	PerformAuxSSLChecks
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x00407906);
@@ -1357,7 +1429,7 @@ namespace ShadowFacts
 
 			pushad
 			push	esi
-			call	ShadowRenderTasks::GetHasLightLOS
+			call	ShadowRenderTasks::PerformAuxiliaryChecks
 			test	al, al
 			jz		SKIP
 
@@ -1437,6 +1509,7 @@ namespace ShadowFacts
 			jmp		_hhGetVar(Jump)
 		}
 	}
+
 #if 0
 	_DeclareMemHdlr(TestHook, "");
 	_DefineHookHdlr(TestHook, 0x007D640B);
@@ -1569,7 +1642,7 @@ namespace ShadowFacts
 		_MemHdlr(UpdateGeometryLighting).WriteJump();
 		_MemHdlr(UpdateGeometryLightingSelf).WriteJump();
 		_MemHdlr(RenderShadowMap).WriteJump();
-		_MemHdlr(CheckSourceLightLOS).WriteJump();
+		_MemHdlr(PerformAuxSSLChecks).WriteJump();
 		_MemHdlr(CheckLargeObjectLightSource).WriteJump();
 		_MemHdlr(CheckShadowReceiver).WriteJump();
 		_MemHdlr(CheckInteriorLightSource).WriteJump();

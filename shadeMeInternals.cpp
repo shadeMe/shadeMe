@@ -54,6 +54,7 @@ namespace Settings
 
 	SME::INI::INISetting			kPlayerLOSCheckInterior("Interior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kPlayerLOSCheckExterior("Exterior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
+	SME::INI::INISetting			kPlayerLOSCheckHighAccuracy("HighAccuracy", "Shadows::PlayerLOSCheck", "Remove the Z-delta constraint from the check", (SInt32)0);
 
 
 	SME::INI::INISetting			kSelfExcludedTypesInterior("Interior", "SelfShadows::ExcludedTypes", "Form types that can't cast shadows", "");
@@ -69,6 +70,11 @@ namespace Settings
 	SME::INI::INISetting			kSelfEnableDistanceToggle("EnableDistanceToggle", "SelfShadows::General", "Toggle self-shadowing depending upon distance from player", (SInt32)0);
 	SME::INI::INISetting			kSelfMaxDistance("MaxDistance", "SelfShadows::General", "Distance beyond which self-shadows are turned off", (float)2000.f);
 
+	SME::INI::INISetting			kSelfIncludePathInterior("Interior", "SelfShadows::IncludePaths",
+															"Meshes with these substrings in their file paths will ONLY cast self-shadows", "");
+	SME::INI::INISetting			kSelfIncludePathExterior("Exterior", "SelfShadows::IncludePaths", 
+															"Meshes with these substrings in their file paths will ONLY cast self-shadows", "");
+	
 
 	SME::INI::INISetting			kReceiverExcludedTypesInterior("Interior", "ShadowReceiver::ExcludedTypes", "Form types that can't receive shadows", "");
 	SME::INI::INISetting			kReceiverExcludedTypesExterior("Exterior", "ShadowReceiver::ExcludedTypes", "Form types that can't receive shadows", "");
@@ -124,12 +130,16 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 
 	RegisterSetting(&Settings::kPlayerLOSCheckInterior);
 	RegisterSetting(&Settings::kPlayerLOSCheckExterior);
+	RegisterSetting(&Settings::kPlayerLOSCheckHighAccuracy);
 
 	RegisterSetting(&Settings::kSelfExcludedTypesInterior);
 	RegisterSetting(&Settings::kSelfExcludedTypesExterior);
 
 	RegisterSetting(&Settings::kSelfExcludedPathInterior);
 	RegisterSetting(&Settings::kSelfExcludedPathExterior);
+
+	RegisterSetting(&Settings::kSelfIncludePathInterior);
+	RegisterSetting(&Settings::kSelfIncludePathExterior);
 	
 	RegisterSetting(&Settings::kSelfPerformFogCheck);
 	RegisterSetting(&Settings::kSelfEnableDistanceToggle);

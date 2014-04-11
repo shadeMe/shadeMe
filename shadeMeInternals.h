@@ -77,6 +77,7 @@ namespace Settings
 
 	extern SME::INI::INISetting				kPlayerLOSCheckInterior;
 	extern SME::INI::INISetting				kPlayerLOSCheckExterior;
+	extern SME::INI::INISetting				kPlayerLOSCheckHighAccuracy;
 
 	extern SME::INI::INISetting				kSelfExcludedTypesInterior;
 	extern SME::INI::INISetting				kSelfExcludedTypesExterior;
@@ -106,6 +107,9 @@ namespace Settings
 	extern SME::INI::INISetting				kObjectTier4BoundRadius;		// minimum radius need to qualify for interior heuristics
 	extern SME::INI::INISetting				kObjectTier5BoundRadius;		// exterior player LOS checks are limited to tier 5 or lower
 	extern SME::INI::INISetting				kObjectTier6BoundRadius;		// large objects
+
+	extern SME::INI::INISetting				kSelfIncludePathInterior;
+	extern SME::INI::INISetting				kSelfIncludePathExterior;
 }
 
 class BSRenderedTexture;

@@ -154,6 +154,8 @@ namespace ShadowFacts
 			kRenderBackFacesToShadowMap		= 1 << 7,
 			kDontPerformLOSCheck			= 1 << 8,
 			kAllowInteriorHeuristics		= 1 << 9,
+			kOnlySelfShadowInterior			= 1 << 10,
+			kOnlySelfShadowExterior			= 1 << 11,
 
 			//=========================================================================
 			k__BEGINEXTERNAL				= 1 << 29,
@@ -259,9 +261,14 @@ namespace ShadowFacts
 		static PathSubstringListT					InteriorHeuristicsIncludePaths;
 		static PathSubstringListT					InteriorHeuristicsExcludePaths;
 		static const float							InteriorDirectionalCheckThresholdDistance;
+		static PathSubstringListT					SelfExclusiveIncludePathsInterior;
+		static PathSubstringListT					SelfExclusiveIncludePathsExterior;
 
 		static void									ToggleBackFaceCulling(bool State);
 		static void									PerformModelLoadTask(BSFadeNode* Node, BSXFlags* xFlags);
+		static bool									PerformExclusiveSelfShadowCheck(BSFadeNode* Node, TESObjectREFR* Object);
+		static bool									PerformInteriorDirectionalShadowCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
+		static bool									PerformLightLOSCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
 	public:
 		static void									Initialize(void);
 		static void									RefreshMiscPathLists(void);
@@ -272,8 +279,7 @@ namespace ShadowFacts
 		static void	__stdcall						HandleShadowMapRenderingProlog(BSFadeNode* Node, ShadowSceneLight* Source);
 		static void	__stdcall						HandleShadowMapRenderingEpilog(BSFadeNode* Node, ShadowSceneLight* Source);
 
-		static void	__stdcall						HandleShadowLightUpdateReceiverProlog(ShadowSceneLight* Source);
-		static void	__stdcall						HandleShadowLightUpdateReceiverEpilog(ShadowSceneLight* Source);
+		static void	__stdcall						HandleShadowLightUpdateReceiver(ShadowSceneLight* Source, NiNode* SceneGraph);
 
 		static void __stdcall						HandleShadowLightUpdateProjectionProlog(ShadowSceneLight* Source);
 		static void __stdcall						HandleShadowLightUpdateProjectionEpilog(ShadowSceneLight* Source);
@@ -285,7 +291,7 @@ namespace ShadowFacts
 
 		static bool									GetCanBeLargeObject(BSFadeNode* Node);
 		static bool									GetIsLargeObject(BSFadeNode* Node);
-		static bool	__stdcall						GetHasLightLOS(ShadowSceneLight* Source);
+		static bool	__stdcall						PerformAuxiliaryChecks(ShadowSceneLight* Source);
 		static bool									GetHasPlayerLOS(TESObjectREFR* Object, BSFadeNode* Node);
 		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
 		static bool									GetCanReceiveShadow(BSFadeNode* Node);
@@ -300,10 +306,10 @@ namespace ShadowFacts
 	_DeclareMemHdlr(RenderShadowsProlog, "");
 	_DeclareMemHdlr(RenderShadowsEpilog, "");
 	_DeclareMemHdlr(QueueModel3D, "");
-	_DeclareMemHdlr(UpdateGeometryLighting, "prevents non-actor casters from self occluding regardless of the self shadow setting");
+	_DeclareMemHdlr(UpdateGeometryLighting, "");
 	_DeclareMemHdlr(UpdateGeometryLightingSelf, "selective self-shadowing support");
 	_DeclareMemHdlr(RenderShadowMap, "");
-	_DeclareMemHdlr(CheckSourceLightLOS, "");
+	_DeclareMemHdlr(PerformAuxSSLChecks, "");
 	_DeclareMemHdlr(CheckLargeObjectLightSource, "prevents large objects from being affected by small light sources (z.B magic projectiles, torches, etc)");
 	_DeclareMemHdlr(CheckShadowReceiver, "");
 	_DeclareMemHdlr(CheckInteriorLightSource, "");
