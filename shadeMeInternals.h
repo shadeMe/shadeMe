@@ -55,6 +55,8 @@ namespace Settings
 	extern SME::INI::INISetting				kCasterMaxDistance;
 	extern SME::INI::INISetting				kEnableDebugShader;
 	extern SME::INI::INISetting				kEnableDetailedDebugSelection;
+	extern SME::INI::INISetting				kForceActorShadows;
+	extern SME::INI::INISetting				kNoInteriorSunShadows;
 
 	extern SME::INI::INISetting				kLargeObjectHigherPriority;
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;
@@ -234,6 +236,7 @@ namespace Utilities
 
 	void				UpdateBounds(NiNode* Node);
 	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);
+	float				GetDistance(Vector3* Source, Vector3* Destination);
 	ShadowSceneLight*	GetShadowCasterLight(NiNode* Caster);
 	BSXFlags*			GetBSXFlags(NiAVObject* Source, bool Allocate = false);
 	TESObjectREFR*		GetNodeObjectRef(NiAVObject* Source);

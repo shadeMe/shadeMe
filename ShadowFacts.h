@@ -258,6 +258,7 @@ namespace ShadowFacts
 		static long double							LightProjectionMultiplierBuffer;
 		static PathSubstringListT					InteriorHeuristicsIncludePaths;
 		static PathSubstringListT					InteriorHeuristicsExcludePaths;
+		static const float							InteriorDirectionalCheckThresholdDistance;
 
 		static void									ToggleBackFaceCulling(bool State);
 		static void									PerformModelLoadTask(BSFadeNode* Node, BSXFlags* xFlags);
@@ -289,6 +290,7 @@ namespace ShadowFacts
 		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
 		static bool									GetCanReceiveShadow(BSFadeNode* Node);
 		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, BSFadeNode* Node, float BoundRadius);		// return true to allow
+		static bool __stdcall						GetCanHaveDirectionalShadow(ShadowSceneLight* Source);
 	};
 
 	
@@ -304,6 +306,7 @@ namespace ShadowFacts
 	_DeclareMemHdlr(CheckSourceLightLOS, "");
 	_DeclareMemHdlr(CheckLargeObjectLightSource, "prevents large objects from being affected by small light sources (z.B magic projectiles, torches, etc)");
 	_DeclareMemHdlr(CheckShadowReceiver, "");
+	_DeclareMemHdlr(CheckInteriorLightSource, "");
 
 
 	void Patch(void);

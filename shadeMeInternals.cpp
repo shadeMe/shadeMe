@@ -20,6 +20,8 @@ namespace Settings
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
 	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General", 
 													"Toggle the expanded console debug selection description", (SInt32)1);
+	SME::INI::INISetting			kForceActorShadows("ForceActorShadows", "Shadows::General", "Queue actors regardless of their deficiencies", (SInt32)0);
+	SME::INI::INISetting			kNoInteriorSunShadows("ValidateInteriorLightSources", "Shadows::General", "Prevents arbitrary sun shadows", (SInt32)1);
 
 
 	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
@@ -100,6 +102,8 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kCasterMaxDistance);
 	RegisterSetting(&Settings::kEnableDebugShader);
 	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
+	RegisterSetting(&Settings::kForceActorShadows);
+	RegisterSetting(&Settings::kNoInteriorSunShadows);
 
 	RegisterSetting(&Settings::kLargeObjectHigherPriority);
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
@@ -356,10 +360,17 @@ namespace Utilities
 		Vector3* WorldTranslateDest = (Vector3*)&Destination->m_worldTranslate;
 		Vector3* WorldTranslateSource = (Vector3*)&Source->m_worldTranslate;
 
+		return GetDistance(WorldTranslateSource, WorldTranslateDest);
+	}
+
+	float GetDistance( Vector3* Source, Vector3* Destination )
+	{
+		SME_ASSERT(Source && Destination);
+
 		Vector3 Buffer;
-		Buffer.x = WorldTranslateDest->x - WorldTranslateSource->x;
-		Buffer.y= WorldTranslateDest->y - WorldTranslateSource->y;
-		Buffer.z = WorldTranslateDest->z - WorldTranslateSource->z;
+		Buffer.x = Destination->x - Source->x;
+		Buffer.y= Destination->y - Source->y;
+		Buffer.z = Destination->z - Source->z;
 
 		return sqrt((Buffer.x * Buffer.x) + (Buffer.y * Buffer.y) + (Buffer.z * Buffer.z));
 	}

@@ -270,17 +270,19 @@ namespace ShadowSundries
 
 	void WriteShadowDebug( const char* Format, ... )
 	{
-		char Buffer[0x1000] = {0};
+		if (kDebugSelection)
+		{
+			char Buffer[0x1000] = {0};
 
-		va_list Args;
-		va_start(Args, Format);
-		vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
-		va_end(Args);
+			va_list Args;
+			va_start(Args, Format);
+			vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
+			va_end(Args);
 
-		SME_ASSERT(kDebugSelection);
 
-		_MESSAGE("ShadowDebugRef[%08X %s]: %s", kDebugSelection->refID,
+			_MESSAGE("ShadowDebugRef[%08X %s]: %s", kDebugSelection->refID,
 				(kDebugSelection->niNode ? kDebugSelection->niNode->m_pcName : "<null>"),
 				Buffer);
+		}
 	}
 }
