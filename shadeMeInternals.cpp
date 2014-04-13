@@ -12,11 +12,14 @@ namespace Interfaces
 
 shadeMeINIManager					shadeMeINIManager::Instance;
 
+BSTextureManager**					BSTextureManager::Singleton = (BSTextureManager**)0x00B42F50;
+
+
 
 namespace Settings
 {
 	SME::INI::INISetting			kCasterMaxDistance("CasterMaxDistance", "Shadows::General",
-													"Threshold distance b'ween the player and the shadow caster", (float)10000.0f);
+													"Threshold distance b'ween the player and the shadow caster", (float)7500.0f);
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
 	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General", 
 													"Toggle the expanded console debug selection description", (SInt32)1);
@@ -98,6 +101,16 @@ namespace Settings
 	SME::INI::INISetting			kObjectTier5BoundRadius("Tier5", "BoundRadius::Tiers", "", (float)250.f);
 	SME::INI::INISetting			kObjectTier6BoundRadius("Tier6", "BoundRadius::Tiers", "", (float)700.f);
 
+	SME::INI::INISetting			kDynMapEnableDistance("Distance", "DynamicShadowMap::General", "", (SInt32)0);
+	SME::INI::INISetting			kDynMapEnableBoundRadius("BoundRadius", "DynamicShadowMap::General", "", (SInt32)0);
+
+	SME::INI::INISetting			kDynMapResolutionTier1("Tier1", "DynamicShadowMap::Resolution", "", (SInt32)1024);
+	SME::INI::INISetting			kDynMapResolutionTier2("Tier2", "DynamicShadowMap::Resolution", "", (SInt32)512);
+	SME::INI::INISetting			kDynMapResolutionTier3("Tier3", "DynamicShadowMap::Resolution", "", (SInt32)256);
+
+	SME::INI::INISetting			kDynMapDistanceNear("Near", "DynamicShadowMap::Distance", "", (float)1500.f);
+	SME::INI::INISetting			kDynMapDistanceFar("Far", "DynamicShadowMap::Distance", "", (float)4000.f);
+
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -163,6 +176,17 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kObjectTier4BoundRadius);
 	RegisterSetting(&Settings::kObjectTier5BoundRadius);
 	RegisterSetting(&Settings::kObjectTier6BoundRadius);
+
+	RegisterSetting(&Settings::kDynMapEnableDistance);
+	RegisterSetting(&Settings::kDynMapEnableBoundRadius);
+
+	RegisterSetting(&Settings::kDynMapResolutionTier1);
+	RegisterSetting(&Settings::kDynMapResolutionTier2);
+	RegisterSetting(&Settings::kDynMapResolutionTier3);
+
+	RegisterSetting(&Settings::kDynMapDistanceNear);
+	RegisterSetting(&Settings::kDynMapDistanceFar);
+
 
 	Save();
 }
@@ -586,3 +610,4 @@ namespace Utilities
 			return NULL;
 	}
 }
+

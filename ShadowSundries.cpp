@@ -101,14 +101,14 @@ namespace ShadowSundries
 						}
 					}
 
-					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] Pos[%.3f,%.3f,%.3f] BndRad[%f.3f]\n\nShadow flags[%s]",
+					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%.3f]\n\nPos[%.0f,%.0f,%.0f] Shadow flags[%s]",
 						thisCall<const char*>(0x004DA2A0, DebugSel),
 						DebugSel->refID,
 						(Node && Node->m_pcName ? Node->m_pcName : ""),
+						(Node ? Node->m_kWorldBound.radius : 0.f),
 						(Node ? Node->m_worldTranslate.x : 0.f),
 						(Node ? Node->m_worldTranslate.y : 0.f),
 						(Node ? Node->m_worldTranslate.z : 0.f),
-						(Node ? Node->m_kWorldBound.radius : 0.f),
 						SpecialFlags);
 				}
 				else

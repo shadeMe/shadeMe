@@ -110,6 +110,16 @@ namespace Settings
 
 	extern SME::INI::INISetting				kSelfIncludePathInterior;
 	extern SME::INI::INISetting				kSelfIncludePathExterior;
+
+	extern SME::INI::INISetting				kDynMapEnableDistance;
+	extern SME::INI::INISetting				kDynMapEnableBoundRadius;
+
+	extern SME::INI::INISetting				kDynMapResolutionTier1;
+	extern SME::INI::INISetting				kDynMapResolutionTier2;
+	extern SME::INI::INISetting				kDynMapResolutionTier3;
+
+	extern SME::INI::INISetting				kDynMapDistanceNear;
+	extern SME::INI::INISetting				kDynMapDistanceFar;
 }
 
 class BSRenderedTexture;
@@ -217,6 +227,44 @@ STATIC_ASSERT(offsetof(ShadowSceneLight, sourceNode) == 0x130);
 STATIC_ASSERT(offsetof(ShadowSceneLight, unk150) == 0x150);
 STATIC_ASSERT(offsetof(ShadowSceneLight, unk1B0) == 0x1B0);
 STATIC_ASSERT(sizeof(ShadowSceneLight) == 0x220);
+
+// 24
+class BSRenderedTexture : public NiRefObject
+{
+public:
+	// members
+	///*00*/ NiRefObject
+	/*08*/ NiRenderTargetGroup*		renderTargets;
+	/*0C*/ UInt32					unk0C;
+	/*10*/ UInt32					unk10;
+	/*14*/ UInt32					unk14;
+	/*18*/ UInt32					unk18;
+	/*1C*/ UInt32					unk1C;
+	/*20*/ NiRenderedTexture*		renderedTexture;
+};
+
+// manages off-screen render targets
+// 48
+class BSTextureManager
+{
+public:
+	// ?
+	struct RenderedTextureData
+	{
+		UInt32		unk00;
+	};
+
+	NiTPointerList<RenderedTextureData>				unk00;				// 00
+	NiTPointerList<RenderedTextureData>				unk10;				// 10
+	NiTPointerList<BSRenderedTexture>				shadowMaps;			// 20
+	NiTPointerList<BSRenderedTexture>				unk30;				// 30
+	void*											unk40;				// 40 - smart pointer, screenshot rendertarget?
+	void*											unk44;				// 44 - smart pointer
+
+	static BSTextureManager**						Singleton;
+};
+STATIC_ASSERT(sizeof(BSTextureManager) == 0x48);
+
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
 typedef std::vector<BSFadeNode*>				FadeNodeListT;

@@ -74,11 +74,14 @@ namespace ShadowFacts
 							UInt32 Refraction = thisCall<UInt32>(0x005E9670, Object);
 							UInt32 Invisibility = thisVirtualCall<UInt32>(0x284, Object, kActorVal_Invisibility);
 							UInt32 SleepingState = thisVirtualCall<UInt32>(0x18C, Object);
+							TESCreature* Creature = OBLIVION_CAST(Object->baseForm, TESForm, TESCreature);
+							bool CreatureCheck = (Creature == NULL || (Creature->actorBaseData.flags & TESActorBaseData::kCreatureFlag_NoShadow) == false);
 
 							if (Horse == NULL &&		// when not on horseback
 								Refraction == 0 &&		// zero refraction
 								Invisibility == 0 &&	// zero invisibility
-								SleepingState != 4)		
+								SleepingState != 4 &&	// not sitting/sleeping
+								CreatureCheck)			// creature has shadow
 							{
 								Result = true;
 							}
@@ -1273,6 +1276,192 @@ namespace ShadowFacts
 	}
 
 
+	ShadowMapTexturePool			ShadowMapTexturePool::Instance;
+
+
+	void ShadowMapTexturePool::Create( void )
+	{
+		SME_ASSERT(TexturePool[kPool_Tier1] == NULL);
+
+		for (int i = kPool_Tier1; i < kPool__MAX; i++)
+		{
+			BSTextureManager* Instance = (BSTextureManager*)FormHeap_Allocate(0x48);
+			thisCall<void>(0x007C1FF0, Instance);
+
+			TexturePool[i] = Instance;
+		}
+	}
+
+	void ShadowMapTexturePool::Reset( void )
+	{
+		SME_ASSERT(TexturePool[kPool_Tier1]);
+
+		for (int i = kPool_Tier1; i < kPool__MAX; i++)
+		{
+			BSTextureManager* Instance = TexturePool[i];
+			thisCall<void>(0x007C2100, Instance);
+			FormHeap_Free(Instance);
+
+			TexturePool[i] = NULL;
+		}
+	}
+
+	void ShadowMapTexturePool::SetShadowMapResolution( UInt16 Resolution )
+	{
+		SME_ASSERT(Resolution <= 2048);
+
+		UInt16* ResolutionPtr = (UInt16*)0x00B2C67C;
+		*ResolutionPtr = Resolution;
+	}
+
+	void ShadowMapTexturePool::ReserveShadowMaps( BSTextureManager* Manager, UInt32 Count ) const
+	{
+		SME_ASSERT(Manager);
+
+		thisCall<void>(0x007C2710, Manager, *g_renderer, Count);
+	}
+
+	ShadowMapTexturePool::ShadowMapTexturePool()
+	{
+		TexturePool[kPool_Tier1] = NULL;
+		TexturePool[kPool_Tier2] = NULL;
+		TexturePool[kPool_Tier3] = NULL;
+
+		PoolResolution[kPool_Tier1] = 1024;
+		PoolResolution[kPool_Tier2] = 512;
+		PoolResolution[kPool_Tier3] = 256;
+	}
+
+	ShadowMapTexturePool::~ShadowMapTexturePool()
+	{
+		Reset();
+	}
+
+	void ShadowMapTexturePool::Initialize( void )
+	{
+		UInt16 Tier1Res = Settings::kDynMapResolutionTier1().i;
+		UInt16 Tier2Res = Settings::kDynMapResolutionTier2().i;
+		UInt16 Tier3Res = Settings::kDynMapResolutionTier3().i;
+
+		if (Tier3Res < 128)
+			Tier3Res = 128;
+
+		if (Tier1Res > 2048)
+			Tier1Res = 2048;
+
+		SME_ASSERT(Tier1Res && Tier2Res && Tier3Res);
+
+		Create();
+		PoolResolution[kPool_Tier1] = Tier1Res;
+		PoolResolution[kPool_Tier2] = Tier2Res;
+		PoolResolution[kPool_Tier3] = Tier3Res;
+
+		_MESSAGE("Shadow Map Tiers => %d > %d > %d", Tier1Res, Tier2Res, Tier3Res);
+	}
+
+	void ShadowMapTexturePool::HandleShadowPass( NiDX9Renderer* Renderer, UInt32 MaxShadowCount )
+	{
+		for (int i = kPool_Tier1; i < kPool__MAX; i++)
+		{
+			SetShadowMapResolution(PoolResolution[i]);
+			ReserveShadowMaps(TexturePool[i], MaxShadowCount);
+		}
+	}
+
+	BSRenderedTexture* ShadowMapTexturePool::GetShadowMapTexture( ShadowSceneLight* Light )
+	{
+		SME_ASSERT(Light && Light->sourceNode);
+
+		BSFadeNode* Node = Light->sourceNode;
+		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
+		UInt16 DistancePool = kPool__MAX;
+		UInt16 BoundPool = kPool__MAX;
+		float Distance = Utilities::GetDistanceFromPlayer(Node);
+		float Bound = Node->m_kWorldBound.radius;
+
+		if (Settings::kDynMapEnableDistance().i)
+		{
+			if (Distance > 0 && Distance < Settings::kDynMapDistanceNear().f)
+				DistancePool = kPool_Tier1;
+			else if (Distance > Settings::kDynMapDistanceNear().f && Distance < Settings::kDynMapDistanceFar().f)
+				DistancePool = kPool_Tier2;
+			else
+				DistancePool = kPool_Tier3;
+		}
+		
+		if (Settings::kDynMapEnableBoundRadius().i && Object && Object->IsActor() == false)
+		{
+			if (Bound < Settings::kObjectTier3BoundRadius().f)
+				BoundPool = kPool_Tier3;
+			else if (Bound < Settings::kObjectTier4BoundRadius().f)
+				BoundPool = kPool_Tier2;
+			else
+				BoundPool = kPool_Tier1;
+		}
+		
+		UInt16 PoolSelection = DistancePool;
+		if (DistancePool == kPool__MAX)
+			PoolSelection = BoundPool;
+
+		if (DistancePool < kPool__MAX && BoundPool < kPool__MAX)
+		{
+			if (DistancePool > BoundPool)
+				PoolSelection = DistancePool;
+			else
+				PoolSelection = BoundPool;
+		}
+
+		SME_ASSERT(PoolSelection < kPool__MAX);
+
+		if (Object == *g_thePlayer)
+			PoolSelection = kPool_Tier1;
+
+		SHADOW_DEBUG(Object, "Shadow Map pool [D=%d,BR=%d] %d @ %dx", DistancePool + 1, BoundPool + 1, PoolSelection + 1, PoolResolution[PoolSelection]);
+
+		BSTextureManager* Manager = TexturePool[PoolSelection];
+		SME_ASSERT(Manager);
+
+		BSRenderedTexture* Texture = thisCall<BSRenderedTexture*>(0x007C1960, Manager);
+		return Texture;
+	}
+
+	void ShadowMapTexturePool::DiscardShadowMapTexture( BSRenderedTexture* Texture )
+	{
+		bool Fallback = true;
+		if (Texture)
+		{
+			if (Texture->renderTargets && Texture->renderTargets->targets[0])
+			{
+				UInt32 Width = Texture->renderTargets->targets[0]->width;
+				BSTextureManager* Manager = GetPoolByResolution(Width);
+				SME_ASSERT(Manager);
+
+				thisCall<void>(0x007C1A30, Manager, Texture);
+				Fallback = false;
+			}
+		}
+
+		if (Fallback)
+		{
+			for (int i = kPool_Tier1; i < kPool__MAX; i++)
+			{
+				thisCall<void>(0x007C1A30, TexturePool[i], Texture);
+			}
+
+			thisCall<void>(0x007C1A30, *BSTextureManager::Singleton, Texture);
+		}
+	}
+
+	BSTextureManager* ShadowMapTexturePool::GetPoolByResolution( UInt16 Resolution ) const
+	{
+		for (int i = kPool_Tier1; i < kPool__MAX; i++)
+		{
+			if (PoolResolution[i] == Resolution)
+				return TexturePool[i];
+		}
+
+		return NULL;
+	}
 
 
 
@@ -1288,6 +1477,8 @@ namespace ShadowFacts
 	_DefineHookHdlr(CheckLargeObjectLightSource, 0x007D23F7);
 	_DefineHookHdlr(CheckShadowReceiver, 0x007D692D);
 	_DefineHookHdlr(CheckInteriorLightSource, 0x007D282C);
+	_DefineHookHdlr(ShadowSceneLightGetShadowMap, 0x007D4760);
+	_DefineHookHdlr(CreateWorldSceneGraph, 0x0040EAAC);
 
 
 	#define _hhName	EnumerateFadeNodes
@@ -1499,8 +1690,10 @@ namespace ShadowFacts
 		_hhSetVar(Jump, 0x007D2872);
 		__asm
 		{	
-			mov		eax, [esp + 0x48]
+			jp		AWAY
+			mov     ecx, [esp + 0xBC]
 
+			mov		eax, [esp + 0x48]
 			pushad
 			push	eax
 			call	ShadowRenderTasks::GetCanHaveDirectionalShadow
@@ -1508,14 +1701,63 @@ namespace ShadowFacts
 			jz		SKIP
 
 			popad
-			jp		AWAY
-			mov     ecx, [esp + 0x0BC]
 			jmp		_hhGetVar(Retn)
 	SKIP:
 			popad
 	AWAY:
 			jmp		_hhGetVar(Jump)
 		}
+	}
+
+	#define _hhName	TextureManagerDiscardShadowMap
+	_hhBegin()
+	{
+		__asm
+		{	
+			lea		ecx, ShadowMapTexturePool::Instance
+			jmp		ShadowMapTexturePool::DiscardShadowMapTexture
+		}
+	}
+
+	#define _hhName	TextureManagerReserveShadowMaps
+	_hhBegin()
+	{
+		__asm
+		{	
+			lea		ecx, ShadowMapTexturePool::Instance
+			jmp		ShadowMapTexturePool::HandleShadowPass
+		}
+	}
+
+	#define _hhName	ShadowSceneLightGetShadowMap
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D4765);
+		__asm
+		{	
+			lea		ecx, ShadowMapTexturePool::Instance
+			push	ebx
+			call	ShadowMapTexturePool::GetShadowMapTexture
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	#define _hhName	CreateWorldSceneGraph
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x0040EAB1);
+		_hhSetVar(Call, 0x00406950);
+		__asm
+		{	
+			call	_hhGetVar(Call)
+
+			lea		ecx, ShadowMapTexturePool::Instance
+			call	ShadowMapTexturePool::Initialize	
+			
+			jmp		_hhGetVar(Retn)
+		}
+		
 	}
 
 #if 0
@@ -1654,6 +1896,36 @@ namespace ShadowFacts
 		_MemHdlr(CheckLargeObjectLightSource).WriteJump();
 		_MemHdlr(CheckShadowReceiver).WriteJump();
 		_MemHdlr(CheckInteriorLightSource).WriteJump();
+
+		if (Settings::kDynMapEnableDistance().i || Settings::kDynMapEnableBoundRadius().i)
+		{
+			for (int i = 0; i < 5; i++)
+			{
+				static const UInt32 kCallSites[5] =
+				{
+					0x007C5C6E,	0x007C5F19,
+					0x007D52CD, 0x007D688B,
+					0x007D5557					// ShadowSceneLight d'tor - iffy about this,
+				};
+
+				_DefineHookHdlr(TextureManagerDiscardShadowMap, kCallSites[i]);
+				_MemHdlr(TextureManagerDiscardShadowMap).WriteCall();
+			}
+
+			for (int i = 0; i < 2; i++)
+			{
+				static const UInt32 kCallSites[2] =
+				{
+					0x0040746D,	0x004074F3
+				};
+
+				_DefineHookHdlr(TextureManagerReserveShadowMaps, kCallSites[i]);
+				_MemHdlr(TextureManagerReserveShadowMaps).WriteCall();
+			}
+
+			_MemHdlr(ShadowSceneLightGetShadowMap).WriteJump();
+			_MemHdlr(CreateWorldSceneGraph).WriteJump();
+		}
 	}
 
 	void Initialize( void )
@@ -1663,4 +1935,5 @@ namespace ShadowFacts
 		ShadowReceiverExParams::Instance.Initialize();
 		ShadowRenderTasks::Initialize();
 	}
+
 }

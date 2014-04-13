@@ -252,6 +252,42 @@ namespace ShadowFacts
 		virtual void			AcceptLeaf(NiAVObject* Object);
 	};
 
+
+	class ShadowMapTexturePool
+	{
+	private:
+		// lowest resolution to highest
+		enum
+		{
+			kPool_Tier1		= 0,
+			kPool_Tier2		= 1,
+			kPool_Tier3		= 2,
+
+			kPool__MAX
+		};
+
+		BSTextureManager*							TexturePool[kPool__MAX];
+		UInt16										PoolResolution[kPool__MAX];
+
+		void										Create(void);
+		void										Reset(void);
+
+		void										SetShadowMapResolution(UInt16 Resolution);
+		void										ReserveShadowMaps(BSTextureManager* Manager, UInt32 Count) const;
+		BSTextureManager*							GetPoolByResolution(UInt16 Resolution) const;
+	public:
+		ShadowMapTexturePool();
+		~ShadowMapTexturePool();
+
+		void										Initialize(void);
+
+		void										HandleShadowPass(NiDX9Renderer* Renderer, UInt32 MaxShadowCount);
+		BSRenderedTexture*							GetShadowMapTexture(ShadowSceneLight* Light);
+		void										DiscardShadowMapTexture(BSRenderedTexture* Texture);
+
+		static ShadowMapTexturePool					Instance;
+	};
+
 	class ShadowRenderTasks
 	{
 		static PathSubstringListT					BackFaceIncludePaths;
@@ -313,6 +349,10 @@ namespace ShadowFacts
 	_DeclareMemHdlr(CheckLargeObjectLightSource, "prevents large objects from being affected by small light sources (z.B magic projectiles, torches, etc)");
 	_DeclareMemHdlr(CheckShadowReceiver, "");
 	_DeclareMemHdlr(CheckInteriorLightSource, "");
+	_DeclareMemHdlr(TextureManagerDiscardShadowMap, "");
+	_DeclareMemHdlr(TextureManagerReserveShadowMaps, "");
+	_DeclareMemHdlr(ShadowSceneLightGetShadowMap, "");
+	_DeclareMemHdlr(CreateWorldSceneGraph, "");
 
 
 	void Patch(void);
