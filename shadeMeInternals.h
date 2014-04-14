@@ -74,6 +74,7 @@ namespace Settings
 	extern SME::INI::INISetting				kLightLOSCheckExterior;
 	extern SME::INI::INISetting				kLightLOSSkipLargeObjects;
 	extern SME::INI::INISetting				kLightLOSExcludedPath;
+	extern SME::INI::INISetting				kLightLOSSkipActors;
 
 	extern SME::INI::INISetting				kPlayerLOSCheckInterior;
 	extern SME::INI::INISetting				kPlayerLOSCheckExterior;

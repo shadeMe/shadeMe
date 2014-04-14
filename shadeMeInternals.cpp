@@ -53,6 +53,7 @@ namespace Settings
 	SME::INI::INISetting			kLightLOSCheckExterior("Exterior", "Shadows::LightLOSCheck", "Check source light with caster", (SInt32)1);
 	SME::INI::INISetting			kLightLOSSkipLargeObjects("SkipLargeObjects", "Shadows::LightLOSCheck", "Don't perform checks on large objects", (SInt32)1);
 	SME::INI::INISetting			kLightLOSExcludedPath("ExcludePaths", "Shadows::LightLOSCheck", "Light LOS blacklist", "");
+	SME::INI::INISetting			kLightLOSSkipActors("SkipActors", "Shadows::LightLOSCheck", "Don't perform checks on actors", (SInt32)0);
 
 
 	SME::INI::INISetting			kPlayerLOSCheckInterior("Interior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
@@ -140,6 +141,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kLightLOSCheckExterior);
 	RegisterSetting(&Settings::kLightLOSSkipLargeObjects);
 	RegisterSetting(&Settings::kLightLOSExcludedPath);
+	RegisterSetting(&Settings::kLightLOSSkipActors);
 
 	RegisterSetting(&Settings::kPlayerLOSCheckInterior);
 	RegisterSetting(&Settings::kPlayerLOSCheckExterior);
@@ -318,7 +320,7 @@ namespace Utilities
 	}
 
 	// HACK! HACK! HACKATTACK!
-	// should have my tongue beaten wafer-thin with a steak tenderizer and stapled to the floor with a croquet
+	// should have my tongue beaten wafer-thin with a steak tenderizer and stapled to the floor with a croquet hoop
 	// seems reliable enough though
 	bool GetLightLOS( NiAVObject* Light, TESObjectREFR* Target )
 	{

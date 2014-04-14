@@ -1248,25 +1248,29 @@ namespace ShadowFacts
 		{
 			if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
 			{
-				// light LOS checks don't really work well in interiors as they're performed on the projected translation coords of the source light
-				// only small objects, i.e, those that use a close-to-vanilla projection multiplier pass these checks in such cells
-				// so we'll limit it to them (just as well, as we're only concerned about them anyway)
-				bool CheckInterior = Object->parentCell->IsInterior() &&
-									Settings::kLightLOSCheckInterior().i &&
-									Source->sourceNode->m_kWorldBound.radius < Settings::kObjectTier2BoundRadius().f;
-
-				if (CheckInterior || (Object->parentCell->IsInterior() == false && Settings::kLightLOSCheckExterior().i))
+				if (Object->IsActor() == false || Settings::kLightLOSSkipActors().i == 0)
 				{
-					if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
+					// light LOS checks don't really work well in interiors as they're performed on the projected translation coords of the source light
+					// only small objects, i.e, those that use a close-to-vanilla projection multiplier pass these checks in such cells
+					// so we'll limit it to them (just as well, as we're only concerned about them anyway)
+					bool CheckInterior = Object->parentCell->IsInterior() &&
+						Settings::kLightLOSCheckInterior().i &&
+						Source->sourceNode->m_kWorldBound.radius < Settings::kObjectTier2BoundRadius().f;
+
+					if (CheckInterior || (Object->parentCell->IsInterior() == false && Settings::kLightLOSCheckExterior().i))
 					{
-						bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
-						if (LOSCheck == false)
+						if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
 						{
-							Result = false;
+							bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
+							if (LOSCheck == false)
+							{
+								Result = false;
+							}
+							SHADOW_DEBUG(Object, "LOS[%d]", LOSCheck);
 						}
-						SHADOW_DEBUG(Object, "LOS[%d]", LOSCheck);
 					}
 				}
+				else SHADOW_DEBUG(Object, "Failed Light LOS Actor check");
 			}
 			else SHADOW_DEBUG(Object, "Failed Light LOS Large Object check");
 		}
@@ -1389,9 +1393,11 @@ namespace ShadowFacts
 				DistancePool = kPool_Tier3;
 		}
 		
-		if (Settings::kDynMapEnableBoundRadius().i && Object && Object->IsActor() == false)
+		if (Settings::kDynMapEnableBoundRadius().i)
 		{
-			if (Bound < Settings::kObjectTier3BoundRadius().f)
+			if (Object && Object->IsActor())
+				BoundPool = kPool_Tier1;			// actors get off easy
+			else if (Bound < Settings::kObjectTier3BoundRadius().f)
 				BoundPool = kPool_Tier3;
 			else if (Bound < Settings::kObjectTier4BoundRadius().f)
 				BoundPool = kPool_Tier2;
@@ -1411,7 +1417,11 @@ namespace ShadowFacts
 				PoolSelection = BoundPool;
 		}
 
-		SME_ASSERT(PoolSelection < kPool__MAX);
+		if (PoolSelection == kPool__MAX)
+		{
+			// we'll fallback to the middle ground if something went bollocks
+			PoolSelection = kPool_Tier2;
+		}
 
 		if (Object == *g_thePlayer)
 			PoolSelection = kPool_Tier1;
