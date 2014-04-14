@@ -217,7 +217,7 @@ public:
 	NiTPointerList<NiAVObject>							unk134;
 	NiTPointerList<NiTriBasedGeom>::Node*				unk144;		// points to the fence trishape
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
-	NiCamera*											unk14C;		// used when performing LOC checks/frustum culling
+	NiCamera*											unk14C;		// used when performing LOS checks/frustum culling
 	float												unk150[24];	// probably an array of another aggregate type like NiVector3
 	UInt32												unk1B0;		// either 1 or zero, checked and set when updating receiver geometry
 	UInt32												unk1B4[27];

@@ -635,7 +635,7 @@ namespace ShadowFacts
 	{
 		SME_ASSERT(Node && Flag > k__BEGININTERNAL);
 
-		return (Node->m_flags & Flag);
+		return (Node->m_flags & Flag) != 0;
 	}
 
 	void NiAVObjectSpecialFlags::SetFlag( NiAVObject* Node, UInt16 Flag, bool State )
@@ -653,7 +653,7 @@ namespace ShadowFacts
 	{
 		SME_ASSERT(Store && Flag > k__BEGININTERNAL);
 
-		return (Store->m_iValue & Flag);
+		return (Store->m_iValue & Flag) != 0;
 	}
 
 	void BSXFlagsSpecialFlags::SetFlag( BSXFlags* Store, UInt32 Flag, bool State )
@@ -1306,7 +1306,7 @@ namespace ShadowFacts
 		}
 	}
 
-	void ShadowMapTexturePool::SetShadowMapResolution( UInt16 Resolution )
+	void ShadowMapTexturePool::SetShadowMapResolution( UInt16 Resolution ) const
 	{
 		SME_ASSERT(Resolution <= 2048);
 
@@ -1359,7 +1359,7 @@ namespace ShadowFacts
 		_MESSAGE("Shadow Map Tiers => %d > %d > %d", Tier1Res, Tier2Res, Tier3Res);
 	}
 
-	void ShadowMapTexturePool::HandleShadowPass( NiDX9Renderer* Renderer, UInt32 MaxShadowCount )
+	void ShadowMapTexturePool::HandleShadowPass( NiDX9Renderer* Renderer, UInt32 MaxShadowCount ) const
 	{
 		for (int i = kPool_Tier1; i < kPool__MAX; i++)
 		{
@@ -1368,7 +1368,7 @@ namespace ShadowFacts
 		}
 	}
 
-	BSRenderedTexture* ShadowMapTexturePool::GetShadowMapTexture( ShadowSceneLight* Light )
+	BSRenderedTexture* ShadowMapTexturePool::GetShadowMapTexture( ShadowSceneLight* Light ) const
 	{
 		SME_ASSERT(Light && Light->sourceNode);
 
@@ -1425,7 +1425,7 @@ namespace ShadowFacts
 		return Texture;
 	}
 
-	void ShadowMapTexturePool::DiscardShadowMapTexture( BSRenderedTexture* Texture )
+	void ShadowMapTexturePool::DiscardShadowMapTexture( BSRenderedTexture* Texture ) const
 	{
 		bool Fallback = true;
 		if (Texture)

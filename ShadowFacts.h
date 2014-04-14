@@ -256,7 +256,7 @@ namespace ShadowFacts
 	class ShadowMapTexturePool
 	{
 	private:
-		// lowest resolution to highest
+		// highest resolution to lowest
 		enum
 		{
 			kPool_Tier1		= 0,
@@ -272,7 +272,7 @@ namespace ShadowFacts
 		void										Create(void);
 		void										Reset(void);
 
-		void										SetShadowMapResolution(UInt16 Resolution);
+		void										SetShadowMapResolution(UInt16 Resolution) const;
 		void										ReserveShadowMaps(BSTextureManager* Manager, UInt32 Count) const;
 		BSTextureManager*							GetPoolByResolution(UInt16 Resolution) const;
 	public:
@@ -281,9 +281,9 @@ namespace ShadowFacts
 
 		void										Initialize(void);
 
-		void										HandleShadowPass(NiDX9Renderer* Renderer, UInt32 MaxShadowCount);
-		BSRenderedTexture*							GetShadowMapTexture(ShadowSceneLight* Light);
-		void										DiscardShadowMapTexture(BSRenderedTexture* Texture);
+		void										HandleShadowPass(NiDX9Renderer* Renderer, UInt32 MaxShadowCount) const;
+		BSRenderedTexture*							GetShadowMapTexture(ShadowSceneLight* Light) const;
+		void										DiscardShadowMapTexture(BSRenderedTexture* Texture) const;
 
 		static ShadowMapTexturePool					Instance;
 	};
