@@ -25,6 +25,7 @@ namespace Settings
 													"Toggle the expanded console debug selection description", (SInt32)1);
 	SME::INI::INISetting			kForceActorShadows("ForceActorShadows", "Shadows::General", "Queue actors regardless of their deficiencies", (SInt32)0);
 	SME::INI::INISetting			kNoInteriorSunShadows("ValidateInteriorLightSources", "Shadows::General", "Prevents arbitrary sun shadows", (SInt32)1);
+	SME::INI::INISetting			kActorsReceiveAllShadows("ActorsReceiveAllShadows", "Shadows::General", "Actors are valid shadow receivers", (SInt32)1);
 
 
 	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
@@ -124,6 +125,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
 	RegisterSetting(&Settings::kForceActorShadows);
 	RegisterSetting(&Settings::kNoInteriorSunShadows);
+	RegisterSetting(&Settings::kActorsReceiveAllShadows);
 
 	RegisterSetting(&Settings::kLargeObjectHigherPriority);
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
@@ -479,13 +481,13 @@ namespace Utilities
 		return thisCall<NiProperty*>(0x00707530, Source, ID);
 	}
 
-	UInt32 GetNodeActiveLights( NiNode* Source, ShadowLightListT* OutList )
+	UInt32 GetNodeActiveLights( NiNode* Source, ShadowLightListT* OutList, UInt32 Params )
 	{
 		SME_ASSERT(Source && OutList);
 
 		NiNodeChildrenWalker Walker(Source);
 		OutList->clear();
-		Walker.Walk(&ActiveShadowSceneLightEnumerator(OutList));
+		Walker.Walk(&ActiveShadowSceneLightEnumerator(OutList, Params));
 
 		return OutList->size();
 	}
@@ -534,8 +536,9 @@ namespace Utilities
 	}
 
 
-	ActiveShadowSceneLightEnumerator::ActiveShadowSceneLightEnumerator( ShadowLightListT* OutList ) :
-		ActiveLights(OutList)
+	ActiveShadowSceneLightEnumerator::ActiveShadowSceneLightEnumerator( ShadowLightListT* OutList, UInt32 Params ) :
+		ActiveLights(OutList),
+		Param(Params)
 	{
 		SME_ASSERT(OutList);
 	}
@@ -563,8 +566,13 @@ namespace Utilities
 					ShadowSceneLight* Current = Itr->data;
 					if (Current && Current->unk118 != 0xFF)
 					{
-						if (std::find(ActiveLights->begin(), ActiveLights->end(), Current) == ActiveLights->end())
-							ActiveLights->push_back(Current);
+						if (Param == kParam_Both ||
+							(Param == kParam_NonShadowCasters && Current->unkF4 == 0) ||
+							(Param == kParam_ShadowCasters) && Current->unkF4)
+						{
+							if (std::find(ActiveLights->begin(), ActiveLights->end(), Current) == ActiveLights->end())
+								ActiveLights->push_back(Current);
+						}
 					}
 				}
 			}
@@ -600,7 +608,7 @@ namespace Utilities
 
 	bool GetConsoleOpen( void )
 	{
-		return *((UInt8*)0x00B33415);
+		return *((UInt8*)0x00B33415) != 0;
 	}
 
 	TESObjectREFR* GetNodeObjectRef( NiAVObject* Source )
@@ -611,5 +619,11 @@ namespace Utilities
 		else
 			return NULL;
 	}
+
+	BSFadeNode* GetPlayerNode( bool FirstPerson /*= false*/ )
+	{
+		return thisCall<BSFadeNode*>(0x00660110, *g_thePlayer, FirstPerson);
+	}
+
 }
 

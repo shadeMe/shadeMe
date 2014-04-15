@@ -119,7 +119,9 @@ namespace ShadowFacts
 		if (Result)
 		{
 			CreateShadowSceneLight(Root);
+			SHADOW_DEBUG(Object, "Added to Shadow queue");
 		}
+		else SHADOW_DEBUG(Object, "Failed to queue");
 
 		return Result;
 	}
@@ -160,7 +162,7 @@ namespace ShadowFacts
 	{
 		bool Result = true;
 
-		if ((Node->m_flags & NiNode::kFlag_AppCulled) == false)
+		if (Node->IsCulled() == false)
 		{
 			BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
 			BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
@@ -175,13 +177,16 @@ namespace ShadowFacts
 				{
 					TESObjectREFR* ObjRef = Utilities::GetNodeObjectRef(FadeNode);
 
-					if (ObjRef && ObjRef->baseForm && ObjRef != (*g_thePlayer))
+					if (ObjRef && ObjRef->baseForm /*&& ObjRef != (*g_thePlayer)*/)
 					{
 						if ((ObjRef->flags & kTESFormSpecialFlag_DoesntCastShadow) == false)
 						{
 							// we allocate a BSXFlags extra data at instantiation
 							if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontCastShadow) == false)
+							{
 								Casters->push_back(ShadowCaster(FadeNode, ObjRef));
+								SHADOW_DEBUG(ObjRef, "Added to Scene Caster List");
+							}
 							else SHADOW_DEBUG(ObjRef, "Failed BSXFlag DoesntCastShadow check");
 						}
 						else SHADOW_DEBUG(ObjRef, "Failed TESForm DoesntCastShadow check");
@@ -574,7 +579,7 @@ namespace ShadowFacts
 	}
 
 
-	ShadowReceiverValidator::ShadowReceiverValidator( FadeNodeListT* OutList ) :
+	ShadowReceiverValidator::ShadowReceiverValidator( NiNodeListT* OutList ) :
 		NonReceivers(OutList)
 	{
 		SME_ASSERT(OutList);
@@ -588,13 +593,24 @@ namespace ShadowFacts
 	bool ShadowReceiverValidator::AcceptBranch( NiNode* Node )
 	{
 		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
-		if (FadeNode && FadeNode->IsCulled() == false)
+		BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
+
+		if (FadeNode)
 		{
-			if (ShadowRenderTasks::GetCanReceiveShadow(FadeNode) == false)
+			TESObjectREFR* Object = Utilities::GetNodeObjectRef(FadeNode);
+			if (FadeNode->IsCulled() == false && ShadowRenderTasks::GetCanReceiveShadow(FadeNode) == false)
 			{
+				SHADOW_DEBUG(Object, "Queued for Shadow Receiver culling");
 				NonReceivers->push_back(FadeNode);
-				return false;
 			}
+
+			return false;
+		}
+		else if (TreeNode && TreeNode->IsCulled() == false)
+		{
+			// we don't like trees...
+			NonReceivers->push_back(TreeNode);
+			return false;
 		}
 
 		return true;
@@ -1020,11 +1036,13 @@ namespace ShadowFacts
 		if (AllowReceiver)
 		{
 			// prevents non-actor casters from self occluding regardless of the self shadow setting
-			Source->sourceNode->m_flags |= NiAVObject::kFlag_AppCulled;
+			if (Source->sourceNode->cMultType != 3)
+				Source->sourceNode->SetCulled(true);
 
-			thisCall<void>(0x007D59E0, Source, SceneGraph);
+			thisCall<void>(0x007D6900, Source, SceneGraph);
 
-			Source->sourceNode->m_flags &= ~NiAVObject::kFlag_AppCulled;
+			if (Source->sourceNode->cMultType != 3)
+				Source->sourceNode->SetCulled(false);
 		}
 	}
 
@@ -1066,33 +1084,47 @@ namespace ShadowFacts
 	void __stdcall ShadowRenderTasks::HandleShadowReceiverLightingPropertyUpdate( ShadowSceneLight* Source, NiNode* Receiver )
 	{
 		SME_ASSERT(Source && Receiver);
-
-		if (Settings::kReceiverEnableExclusionParams().i == 0)
-			thisCall<void>(0x007D59E0, Source, Receiver);
-		else
+		
+		BSFadeNode* FadeNode = NI_CAST(Receiver, BSFadeNode);
+		if (FadeNode)
 		{
-			BSFadeNode* FadeNode = NI_CAST(Receiver, BSFadeNode);
-			if (FadeNode && FadeNode->IsCulled() == false)
+			TESObjectREFR* Object = Utilities::GetNodeObjectRef(FadeNode);
+			if (FadeNode->IsCulled() == false && (Settings::kReceiverEnableExclusionParams().i == 0 || GetCanReceiveShadow(FadeNode)))
 			{
-				if (GetCanReceiveShadow(FadeNode))
-					thisCall<void>(0x007D59E0, Source, Receiver);
-			}
-			else
-			{
-				// walking the scenegraph doesn't come without overhead
-				FadeNodeListT NonReceivers;
-				Utilities::NiNodeChildrenWalker Walker(Receiver);
-
-				Walker.Walk(&ShadowReceiverValidator(&NonReceivers));
-
-				for (FadeNodeListT::iterator Itr = NonReceivers.begin(); Itr != NonReceivers.end(); Itr++)
-					(*Itr)->m_flags |= NiAVObject::kFlag_AppCulled;
-
 				thisCall<void>(0x007D59E0, Source, Receiver);
-
-				for (FadeNodeListT::iterator Itr = NonReceivers.begin(); Itr != NonReceivers.end(); Itr++)
-					(*Itr)->m_flags &= ~NiAVObject::kFlag_AppCulled;
+				SHADOW_DEBUG(Object, "Updating Geomety for Self Shadow");
 			}
+
+			return;
+		}
+
+		NiNodeListT NonReceivers;
+		if (Settings::kReceiverEnableExclusionParams().i)
+		{
+			// walking the scenegraph doesn't come without overhead
+			Utilities::NiNodeChildrenWalker Walker(Receiver);
+
+			Walker.Walk(&ShadowReceiverValidator(&NonReceivers));
+
+			for (NiNodeListT::iterator Itr = NonReceivers.begin(); Itr != NonReceivers.end(); Itr++)
+				(*Itr)->SetCulled(true);
+		}
+
+		// uncull the player first person node to receive shadows
+		bool UnCullFPNode = Settings::kActorsReceiveAllShadows().i && Utilities::GetPlayerNode(true)->IsCulled() && (*g_thePlayer)->IsThirdPerson() == false;
+
+		if (UnCullFPNode)
+			Utilities::GetPlayerNode(true)->SetCulled(false);
+
+		thisCall<void>(0x007D59E0, Source, Receiver);
+
+		if (UnCullFPNode)
+			Utilities::GetPlayerNode(true)->SetCulled(true);
+
+		if (Settings::kReceiverEnableExclusionParams().i)
+		{
+			for (NiNodeListT::iterator Itr = NonReceivers.begin(); Itr != NonReceivers.end(); Itr++)
+				(*Itr)->SetCulled(false);
 		}
 	}
 
@@ -1222,15 +1254,17 @@ namespace ShadowFacts
 							SHADOW_DEBUG(Object, "LOS[%d]", LOSCheck);
 						}
 					}
+					else SHADOW_DEBUG(Object, "Skipped with Light LOS Cell/Bound Radius check");
 				}
-				else SHADOW_DEBUG(Object, "Failed Light LOS Actor check");
+				else SHADOW_DEBUG(Object, "Skipped with Light LOS Actor check");
 			}
-			else SHADOW_DEBUG(Object, "Failed Light LOS Large Object check");
+			else SHADOW_DEBUG(Object, "Skipped with Light LOS Large Object check");
 		}
-		else SHADOW_DEBUG(Object, "Failed BSXFlags DontPerformLOS check");
+		else SHADOW_DEBUG(Object, "Skipped BSXFlags DontPerformLOS check");
 
 		return Result;
 	}
+
 
 
 	ShadowMapTexturePool			ShadowMapTexturePool::Instance;
@@ -1443,6 +1477,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(CheckInteriorLightSource, 0x007D282C);
 	_DefineHookHdlr(ShadowSceneLightGetShadowMap, 0x007D4760);
 	_DefineHookHdlr(CreateWorldSceneGraph, 0x0040EAAC);
+	_DefinePatchHdlr(CullCellActorNode, 0x004076C1 + 1);
 
 
 	#define _hhName	EnumerateFadeNodes
@@ -1732,117 +1767,48 @@ namespace ShadowFacts
 
 #if 0
 	_DeclareMemHdlr(TestHook, "");
-	_DefineHookHdlr(TestHook, 0x007D640B);
+	_DefineHookHdlr(TestHook, 0x004076D5);
 
-	void __stdcall DoTestHook(ShadowSceneLight* Source, int  Stage, int result)
+	void __stdcall DoTestHook(ShadowSceneLight* Source, NiGeometry* Geometry)
 	{
-		if (Source->sourceNode == NULL)
-			return;
-
-		TESObjectREFR* Ref = Utilities::GetNodeObjectRef(Source->sourceNode);
-		if (Ref == NULL)
-			return;
-
-		switch (Stage)
+		BSFadeNode* PCNode = Utilities::GetPlayerNode();
+		if (PCNode && Source->sourceNode)
 		{
-		case 1:
-			SHADOW_DEBUG(Ref, "0x007D34C0 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
-			break;
-		case 2:
-			SHADOW_DEBUG(Ref, "0x0047DA70 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
-			break;
-		case 3:
-			SHADOW_DEBUG(Ref, "0x007415E0 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
-			break;
-		case 4:
-			SHADOW_DEBUG(Ref, "0x007D5B20 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
-			break;
+			NiAVObject* Root = Geometry->m_parent;
+			BSFadeNode* FadeCheck = NULL;
+			bool PlayerRoot = false;
+			do
+			{
+				FadeCheck = NI_CAST(Root, BSFadeNode);
+				if (FadeCheck)
+				{
+					if (FadeCheck == PCNode)
+						PlayerRoot = true;
+
+					break;
+				}
+
+				if (Root)
+					Root = Root->m_parent;
+			} while (Root);
+
+			if (PlayerRoot)
+			{
+				_MESSAGE("Player geo %s receiver check for %s", Geometry->m_pcName, Source->sourceNode->m_pcName);
+			}
+			else if (FadeCheck)
+				_MESSAGE("Geo %s receiver check for %s", FadeCheck->m_pcName, Source->sourceNode->m_pcName);
 		}
 	}
-
 
 	#define _hhName	TestHook
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x007D6410);
-		_hhSetVar(Call, 0x007D34C0);
+		_hhSetVar(Retn, 0x004076DA);
+		_hhSetVar(Call, 0x007D5790);
 		__asm
 		{	
-			call	_hhGetVar(Call)
-			pushad
-			movzx	eax, al
-			push eax
-			push 1
-			push ebp
-			call DoTestHook
-			popad
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	_DeclareMemHdlr(TestHook1, "");
-	_DefineHookHdlr(TestHook1, 0x007D647A);
-
-	
-	#define _hhName	TestHook1
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x007D647F);
-		_hhSetVar(Call, 0x0047DA70);
-		__asm
-		{	
-			call	_hhGetVar(Call)
-			pushad
-			push eax
-			push 2
-			push ebp
-			call DoTestHook
-			popad
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	_DeclareMemHdlr(TestHook2, "iffy");
-	_DefineHookHdlr(TestHook2, 0x007D6491);
-
-	
-	#define _hhName	TestHook2
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x007D6496);
-		_hhSetVar(Call, 0x007415E0);
-		__asm
-		{	
-			call	_hhGetVar(Call)
-				pushad
-				movzx	eax, al
-				push eax
-				push 3
-				push ebp
-				call DoTestHook
-				popad
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	_DeclareMemHdlr(TestHook3, "");
-	_DefineHookHdlr(TestHook3, 0x007D6517);
-
-	
-	#define _hhName	TestHook3
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x007D651C);
-		_hhSetVar(Call, 0x007D5B20);
-		__asm
-		{	
-			call	_hhGetVar(Call)
-				pushad
-				push eax
-				push 4
-				push ebp
-				call DoTestHook
-				popad
+			add esp ,4
 			jmp		_hhGetVar(Retn)
 		}
 	}
@@ -1850,10 +1816,7 @@ namespace ShadowFacts
 	void Patch(void)
 	{
 #if 0
-		_MemHdlr(TestHook).WriteJump();
-		_MemHdlr(TestHook1).WriteJump();
-		_MemHdlr(TestHook2).WriteJump();
-		_MemHdlr(TestHook3).WriteJump();
+	//	_MemHdlr(TestHook).WriteJump();
 #endif
 		_MemHdlr(EnumerateFadeNodes).WriteJump();
 		_MemHdlr(RenderShadowsProlog).WriteJump();
@@ -1867,6 +1830,11 @@ namespace ShadowFacts
 		_MemHdlr(CheckShadowReceiver).WriteJump();
 		_MemHdlr(CheckInteriorLightSource).WriteJump();
 
+		if (Settings::kActorsReceiveAllShadows().i)
+		{
+			_MemHdlr(CullCellActorNode).WriteUInt8(1);
+		}
+
 		if (Settings::kDynMapEnableDistance().i || Settings::kDynMapEnableBoundRadius().i)
 		{
 			for (int i = 0; i < 5; i++)
@@ -1875,7 +1843,7 @@ namespace ShadowFacts
 				{
 					0x007C5C6E,	0x007C5F19,
 					0x007D52CD, 0x007D688B,
-					0x007D5557					// ShadowSceneLight d'tor - iffy about this,
+					0x007D5557					// ShadowSceneLight d'tor - iffy about this
 				};
 
 				_DefineHookHdlr(TextureManagerDiscardShadowMap, kCallSites[i]);
@@ -1905,5 +1873,4 @@ namespace ShadowFacts
 		ShadowReceiverExParams::Instance.Initialize();
 		ShadowRenderTasks::Initialize();
 	}
-
 }

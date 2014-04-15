@@ -57,6 +57,7 @@ namespace Settings
 	extern SME::INI::INISetting				kEnableDetailedDebugSelection;
 	extern SME::INI::INISetting				kForceActorShadows;
 	extern SME::INI::INISetting				kNoInteriorSunShadows;
+	extern SME::INI::INISetting				kActorsReceiveAllShadows;
 
 	extern SME::INI::INISetting				kLargeObjectHigherPriority;
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;
@@ -219,8 +220,8 @@ public:
 	NiTPointerList<NiTriBasedGeom>::Node*				unk144;		// points to the fence trishape
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
 	NiCamera*											unk14C;		// used when performing LOS checks/frustum culling
-	float												unk150[24];	// probably an array of another aggregate type like NiVector3
-	UInt32												unk1B0;		// either 1 or zero, checked and set when updating receiver geometry
+	NiVector4											unk150[6];
+	UInt32												unk1B0;		// first six bits are checked and set when updating receiver geometry
 	UInt32												unk1B4[27];
 };
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceLight) == 0x100);
@@ -269,6 +270,7 @@ STATIC_ASSERT(sizeof(BSTextureManager) == 0x48);
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
 typedef std::vector<BSFadeNode*>				FadeNodeListT;
+typedef std::vector<NiNode*>					NiNodeListT;
 
 // ?
 class BSTreeNode : public NiNode
@@ -290,7 +292,8 @@ namespace Utilities
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
 	NiExtraData*		GetNiExtraDataByName(NiAVObject* Source, const char* Name);
 	NiProperty*			GetNiPropertyByID(NiAVObject* Source, UInt8 ID);
-	UInt32				GetNodeActiveLights(NiNode* Source, ShadowLightListT* OutList);
+	UInt32				GetNodeActiveLights(NiNode* Source, ShadowLightListT* OutList, UInt32 Params);
+	BSFadeNode*			GetPlayerNode(bool FirstPerson = false);
 
 	void				UpdateBounds(NiNode* Node);
 	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);
@@ -411,8 +414,16 @@ namespace Utilities
 	{
 	protected:
 		ShadowLightListT*		ActiveLights;
+		UInt32					Param;
 	public:
-		ActiveShadowSceneLightEnumerator(ShadowLightListT* OutList);
+		enum
+		{
+			kParam_NonShadowCasters		= 0,
+			kParam_ShadowCasters		= 1,
+			kParam_Both					= 2,
+		};
+
+		ActiveShadowSceneLightEnumerator(ShadowLightListT* OutList, UInt32 Params);
 		virtual ~ActiveShadowSceneLightEnumerator();
 
 		virtual bool			AcceptBranch(NiNode* Node);

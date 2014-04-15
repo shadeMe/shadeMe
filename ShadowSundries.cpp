@@ -72,7 +72,7 @@ namespace ShadowSundries
 					{
 						BSXFlags* xFlags = Utilities::GetBSXFlags(Node);
 
-						FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s %s %s %s %s",
+						FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s",
 							((DebugSel->flags & ShadowFacts::kTESFormSpecialFlag_DoesntCastShadow) ? "NoShd(REF)" : "-"),
 							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kDontCastShadow) ? "NoShd(BSX)" : "-"),
 							(BSXFlagsSpecialFlags::GetFlag(xFlags, BSXFlagsSpecialFlags::kDontReceiveShadow) ? "NoRcv(BSX)" : "-"),
@@ -175,6 +175,15 @@ namespace ShadowSundries
 		ShadowReceiverExParams::Instance.RefreshParameters();
 		ShadowRenderTasks::RefreshMiscPathLists();
 
+		if (Settings::kActorsReceiveAllShadows().i)
+		{
+			_MemHdlr(CullCellActorNode).WriteUInt8(1);
+		}
+		else
+		{
+			_MemHdlr(CullCellActorNode).WriteUInt8(0);
+		}
+
 		ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
 		Utilities::NiNodeChildrenWalker Walker((NiNode*)RootNode->m_children.data[3]);
 		Walker.Walk(&FadeNodeShadowFlagUpdater());
@@ -193,8 +202,12 @@ namespace ShadowSundries
 			BSFadeNode* Node = NI_CAST(Ref->niNode, BSFadeNode);
 			if (Node)
 			{
+				Console_Print(" ");
+				Console_Print("Light data for Node %s ==>>", Node->m_pcName);
+				Console_Print(" ");
+
 				ShadowLightListT Lights;
-				if (Utilities::GetNodeActiveLights(Node, &Lights))
+				if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_NonShadowCasters))
 				{
 					Console_Print("Active lights = %d", Lights.size());
 
@@ -213,10 +226,40 @@ namespace ShadowSundries
 				}
 				else
 					Console_Print("No active lights");
+
+				Console_Print(" ");
+
+				Lights.clear();
+				if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_ShadowCasters))
+				{
+					Console_Print("Shadow casters = %d", Lights.size());
+
+					for (ShadowLightListT::iterator Itr = Lights.begin(); Itr != Lights.end(); Itr++)
+					{
+						ShadowSceneLight* ShadowLight = *Itr;
+						if (ShadowLight->sourceNode)
+						{
+							if (ShadowLight->sourceNode != Node)
+							{
+								Console_Print("Node %s @ %f, %f, %f",
+									ShadowLight->sourceNode->m_pcName,
+									ShadowLight->sourceNode->m_worldTranslate.x,
+									ShadowLight->sourceNode->m_worldTranslate.y,
+									ShadowLight->sourceNode->m_worldTranslate.z);
+							}
+							else
+								Console_Print("Node SELF-SHADOW");
+						}
+					}
+				}
+				else
+					Console_Print("No shadow casters");
 			}
 
-			Console_Print("Scene lights:");
+			Console_Print(" ");
+
 			ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+			Console_Print("Scene lights = %d", RootNode->lights.numItems);
 			for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->lights.start; Itr && Itr->data; Itr = Itr->next)
 			{
 				ShadowSceneLight* ShadowLight = Itr->data;
@@ -224,7 +267,9 @@ namespace ShadowSundries
 					ShadowLight->sourceLight->m_worldTranslate.x,
 					ShadowLight->sourceLight->m_worldTranslate.y,
 					ShadowLight->sourceLight->m_worldTranslate.z);
-			}
+			}	
+
+			Console_Print(" ");
 		}
 
 		return true;

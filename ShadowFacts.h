@@ -234,9 +234,9 @@ namespace ShadowFacts
 	class ShadowReceiverValidator : public Utilities::NiNodeChildVisitor
 	{
 	protected:
-		FadeNodeListT*			NonReceivers;
+		NiNodeListT*			NonReceivers;
 	public:
-		ShadowReceiverValidator(FadeNodeListT* OutList);
+		ShadowReceiverValidator(NiNodeListT* OutList);
 		virtual ~ShadowReceiverValidator();
 
 		virtual bool			AcceptBranch(NiNode* Node);
@@ -349,6 +349,7 @@ namespace ShadowFacts
 	_DeclareMemHdlr(TextureManagerReserveShadowMaps, "");
 	_DeclareMemHdlr(ShadowSceneLightGetShadowMap, "");
 	_DeclareMemHdlr(CreateWorldSceneGraph, "");
+	_DeclareMemHdlr(CullCellActorNode, "");
 
 
 	void Patch(void);
