@@ -173,21 +173,18 @@ namespace ShadowFacts
 
 				if (FadeNode->m_kWorldBound.radius > 0.f)
 				{
-					TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(FadeNode, "REF");
-					if (xRef)
-					{	
-						TESObjectREFR* ObjRef = xRef->refr;
-						if (ObjRef && ObjRef->baseForm && ObjRef != (*g_thePlayer))
+					TESObjectREFR* ObjRef = Utilities::GetNodeObjectRef(FadeNode);
+
+					if (ObjRef && ObjRef->baseForm && ObjRef != (*g_thePlayer))
+					{
+						if ((ObjRef->flags & kTESFormSpecialFlag_DoesntCastShadow) == false)
 						{
-							if ((ObjRef->flags & kTESFormSpecialFlag_DoesntCastShadow) == false)
-							{
-								// we allocate a BSXFlags extra data at instantiation
-								if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontCastShadow) == false)
-									Casters->push_back(ShadowCaster(FadeNode, ObjRef));
-								else SHADOW_DEBUG(ObjRef, "Failed BSXFlag DoesntCastShadow check");
-							}
-							else SHADOW_DEBUG(ObjRef, "Failed TESForm DoesntCastShadow check");
+							// we allocate a BSXFlags extra data at instantiation
+							if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontCastShadow) == false)
+								Casters->push_back(ShadowCaster(FadeNode, ObjRef));
+							else SHADOW_DEBUG(ObjRef, "Failed BSXFlag DoesntCastShadow check");
 						}
+						else SHADOW_DEBUG(ObjRef, "Failed TESForm DoesntCastShadow check");
 					}
 				}						
 			}
@@ -821,12 +818,11 @@ namespace ShadowFacts
 		SME_ASSERT(Caster);
 
 		BSFadeNode* Node = Caster->sourceNode;
-		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Node, "REF");
+		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
 		bool Result = false;
 
-		if (xRef && xRef->refr)
+		if (Object)
 		{
-			TESObjectREFR* Object = xRef->refr;
 			if (SelfShadowExParams::Instance.GetAllowed(Node, Object))
 			{
 				BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
@@ -1147,20 +1143,19 @@ namespace ShadowFacts
 		SME_ASSERT(Node);
 
 		bool Result = true;
-		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Node, "REF");
-		if (xRef && xRef->refr)
+		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
+		if (Object)
 		{
-			Result = ShadowReceiverExParams::Instance.GetAllowed(Node, xRef->refr);
-
+			Result = ShadowReceiverExParams::Instance.GetAllowed(Node, Object);
 			if (Result)
 			{
 				if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontReceiveShadow))
 				{
 					Result = false;
-					SHADOW_DEBUG(xRef->refr, "Failed BSXFlags DontReceiveShadow check");
+					SHADOW_DEBUG(Object, "Failed BSXFlags DontReceiveShadow check");
 				}
 			}
-			else SHADOW_DEBUG(xRef->refr, "Failed ShadowReceiverExParams check");
+			else SHADOW_DEBUG(Object, "Failed ShadowReceiverExParams check");
 		}
 
 		return Result;
@@ -1298,13 +1293,14 @@ namespace ShadowFacts
 
 	void ShadowMapTexturePool::Reset( void )
 	{
-		SME_ASSERT(TexturePool[kPool_Tier1]);
-
 		for (int i = kPool_Tier1; i < kPool__MAX; i++)
 		{
 			BSTextureManager* Instance = TexturePool[i];
-			thisCall<void>(0x007C2100, Instance);
-			FormHeap_Free(Instance);
+			if (Instance)
+			{
+				thisCall<void>(0x007C2100, Instance);
+				FormHeap_Free(Instance);
+			}
 
 			TexturePool[i] = NULL;
 		}
