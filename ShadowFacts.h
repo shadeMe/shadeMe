@@ -293,7 +293,6 @@ namespace ShadowFacts
 		static PathSubstringListT					BackFaceIncludePaths;
 		static PathSubstringListT					LargeObjectExcludePaths;
 		static PathSubstringListT					LightLOSCheckExcludePaths;
-		static long double							LightProjectionMultiplierBuffer;
 		static PathSubstringListT					InteriorHeuristicsIncludePaths;
 		static PathSubstringListT					InteriorHeuristicsExcludePaths;
 		static const float							InteriorDirectionalCheckThresholdDistance;
@@ -316,9 +315,6 @@ namespace ShadowFacts
 		static void	__stdcall						HandleShadowMapRenderingEpilog(BSFadeNode* Node, ShadowSceneLight* Source);
 
 		static void	__stdcall						HandleShadowLightUpdateReceiver(ShadowSceneLight* Source, NiNode* SceneGraph);
-
-		static void __stdcall						HandleShadowLightUpdateProjectionProlog(ShadowSceneLight* Source);
-		static void __stdcall						HandleShadowLightUpdateProjectionEpilog(ShadowSceneLight* Source);
 
 		static void __stdcall						QueueShadowOccluders(UInt32 MaxShadowCount);
 		static bool	__stdcall						HandleSelfShadowing(ShadowSceneLight* Caster);		// return true to allow

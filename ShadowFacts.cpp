@@ -681,7 +681,6 @@ namespace ShadowFacts
 	PathSubstringListT			ShadowRenderTasks::BackFaceIncludePaths;
 	PathSubstringListT			ShadowRenderTasks::LargeObjectExcludePaths;
 	PathSubstringListT			ShadowRenderTasks::LightLOSCheckExcludePaths;
-	long double					ShadowRenderTasks::LightProjectionMultiplierBuffer;
 	PathSubstringListT			ShadowRenderTasks::InteriorHeuristicsIncludePaths;
 	PathSubstringListT			ShadowRenderTasks::InteriorHeuristicsExcludePaths;
 	const float					ShadowRenderTasks::InteriorDirectionalCheckThresholdDistance = 50.f;
@@ -1064,52 +1063,10 @@ namespace ShadowFacts
 		return true;
 	}
 
-	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateProjectionProlog( ShadowSceneLight* Source )
-	{
-		SME_ASSERT(Source);
-
-		LightProjectionMultiplierBuffer = ShadowFigures::SMRC_A38618.GetValue();
-
-		BSFadeNode* Node = Source->sourceNode;
-		if (Node)
-		{
-			float Bound = Node->m_kWorldBound.radius;
-			float NewValue = 0.f;
-			float BaseRadius = Settings::kObjectTier2BoundRadius().f;
-			float MaxRadius = Settings::kObjectTier3BoundRadius().f;
-			
-			float PerPart = (MaxRadius - BaseRadius) / 3.f;
-			float Part1 = BaseRadius + PerPart;
-			float Part2 = BaseRadius + PerPart * 2;
-			float Part3 = BaseRadius + PerPart * 3;
-
-			if (Bound < BaseRadius)
-				NewValue = 2.5f;
-			else if (Bound > BaseRadius && Bound < Part1)
-				NewValue = 2.6f;
-			else if (Bound > Part1 && Bound < Part2)
-				NewValue = 2.7f;
-			else if (Bound > Part2 && Bound < Part3)
-				NewValue = 2.8f;
-
-			if (NewValue)
-			{
-				ShadowFigures::SMRC_A38618.SetValue(NewValue);
-				SHADOW_DEBUG(Utilities::GetNodeObjectRef(Node), "Changed Projection Multiplier from %f to %f", LightProjectionMultiplierBuffer, NewValue);
-			}
-		}
-	}
-
-	void __stdcall ShadowRenderTasks::HandleShadowLightUpdateProjectionEpilog( ShadowSceneLight* Source )
-	{
-		ShadowFigures::SMRC_A38618.SetValue(LightProjectionMultiplierBuffer);
-	}
-
 	void __stdcall ShadowRenderTasks::HandleShadowReceiverLightingPropertyUpdate( ShadowSceneLight* Source, NiNode* Receiver )
 	{
 		SME_ASSERT(Source && Receiver);
 
-		// this one comes with a ton of overhead when walking the scenegraph
 		if (Settings::kReceiverEnableExclusionParams().i == 0)
 			thisCall<void>(0x007D59E0, Source, Receiver);
 		else
@@ -1122,6 +1079,7 @@ namespace ShadowFacts
 			}
 			else
 			{
+				// walking the scenegraph doesn't come without overhead
 				FadeNodeListT NonReceivers;
 				Utilities::NiNodeChildrenWalker Walker(Receiver);
 
@@ -1479,7 +1437,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(UpdateGeometryLighting, 0x00407945);
 	_DefineHookHdlr(UpdateGeometryLightingSelf, 0x0040795C);
 	_DefineHookHdlr(RenderShadowMap, 0x007D4E89);
-	_DefineHookHdlr(PerformAuxSSLChecks, 0x00407901);
+	_DefineHookHdlr(PerformAuxSSLChecks, 0x00407906);
 	_DefineHookHdlr(CheckLargeObjectLightSource, 0x007D23F7);
 	_DefineHookHdlr(CheckShadowReceiver, 0x007D692D);
 	_DefineHookHdlr(CheckInteriorLightSource, 0x007D282C);
@@ -1625,13 +1583,10 @@ namespace ShadowFacts
 	#define _hhName	PerformAuxSSLChecks
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x00407906);
+		_hhSetVar(Retn, 0x0040790B);
 		_hhSetVar(Skip, 0x0040796A);
-		_hhSetVar(Call, 0x007D2280);
 		__asm
 		{	
-			call	_hhGetVar(Call)
-
 			pushad
 			push	esi
 			call	ShadowRenderTasks::PerformAuxiliaryChecks
@@ -1639,6 +1594,8 @@ namespace ShadowFacts
 			jz		SKIP
 
 			popad
+			mov		ecx, [esp + 0x30]
+			push	ecx
 			jmp		_hhGetVar(Retn)
 		SKIP:
 			popad
@@ -1653,7 +1610,14 @@ namespace ShadowFacts
 		_hhSetVar(Jump, 0x007D272D);
 		__asm
 		{	
+// HACK! HACK!
+// hooking that SSL light space projection call screws with the stack in unholy ways
+// stack pointer offsets vary since the new call to the method lies inside our hook
+#ifndef NDEBUG
 			mov		eax, [esp + 0x8]
+#else
+			mov		eax, [esp + 0x4]
+#endif
 			mov		[esp + 0x1C], ebx
 
 			pushad

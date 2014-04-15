@@ -1,5 +1,5 @@
 #include "ShadowFigures.h"
-#include "ShadowFacts.h"
+#include "ShadowSundries.h"
 
 #pragma warning(disable: 4005 4748)
 
@@ -24,15 +24,21 @@ namespace ShadowFigures
 	//	DEF_SRC(SMRC_A2FC68, true, 0.0, 0x007D24E5 + 2);
 	//	DEF_SRC(SMRC_A2FC70, true, 1000.0, 0x007D28D2 + 2);
 	
+	// ====================================================
+	// Shadow Map Render Stage
+	// ====================================================
 	DEF_SRC(SRC_A30068, true, 0.05, 0x007D4740 + 2);	
 	DEF_SRC(SRC_B258E8, false, 0, 0x007D4811 + 2);
 	DEF_SRC(SRC_B258EC, false, 0, 0x007D4823 + 2);
 	DEF_SRC(SRC_B258F0, false, 1.0, 0x007D4833 + 2);
-	DEF_SRC(SRC_A91278, true, 0.01745327934622765, 0x007D49F2 + 2);
-	DEF_SRC(SRC_A91280, true, 110.0, 0x007D49D8 + 2);
+	DEF_SRC(SRC_A91278, true, 0.01745327934622765, 0x007D49F2 + 2);		// bias?
+	DEF_SRC(SRC_A91280, true, 110.0, 0x007D49D8 + 2);		// sampling scale?
 	DEF_SRC(SRC_A2FAA0, true, 0.5, 0x007D49EC + 2);			// umbra related?
 	DEF_SRC(SRC_A6BEA0, true, 400.0, 0x007D4CF7 + 2);
-	DEF_SRC(SMRC_A31C70, true, 0.75, 0x007D2CB4 + 2);		// distortion mul?
+	// ====================================================
+	// Light Projection Stage
+	// ====================================================
+	DEF_SRC(SMRC_A31C70, true, 0.75, 0x007D2CB4 + 2);		// distortion/extend mul?
 	DEF_SRC(SMRC_A3B1B8, true, 256.0, 0x007D2CEC + 2);		// some kinda resolution?
 	DEF_SRC(SMRC_A38618, true, 2.5, 0x007D2D01 + 2);		// light source dist mul
 	DEF_SRC(SMRC_A3F3A0, true, 6.0, 0x007D2D94 + 2);
@@ -211,41 +217,144 @@ namespace ShadowFigures
 		}
 	}
 
+	ShadowRenderConstantHotSwapper::Swapper::Swapper( ShadowRenderConstant* Constant ) :
+		Source(Constant),
+		OldValue(0.f),
+		Reset(false)
+	{
+		SME_ASSERT(Source);
 
-	_DefineHookHdlr(ProjectShadowLightProlog, 0x007D2CF9);
-	_DefineHookHdlr(ProjectShadowLightEpilog, 0x007D2D07);
-	
-	#define _hhName	ProjectShadowLightProlog
+		OldValue = Source->GetValue();
+	}
+
+	ShadowRenderConstantHotSwapper::Swapper::~Swapper()
+	{
+		if (Reset)
+			Source->SetValue(OldValue);
+	}
+
+	void ShadowRenderConstantHotSwapper::Swapper::Swap( long double NewValue )
+	{
+		Source->SetValue(NewValue);
+		Reset = true;
+	}
+
+
+	void __stdcall ShadowRenderConstantHotSwapper::HandleLightProjectionStage( ShadowSceneLight* Source, void* AuxParam )
+	{
+		SME_ASSERT(Source);
+
+		BSFadeNode* Node = Source->sourceNode;
+		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
+		if (Node && Object)
+		{
+			Swapper ProjDist(&SMRC_A38618);
+			Swapper ExtendDist(&SMRC_A31C70);
+
+			float Bound = Node->m_kWorldBound.radius;
+			float NewProjDistMul = 0.f;
+			float BaseRadius = Settings::kObjectTier2BoundRadius().f;
+			float MaxRadius = Settings::kObjectTier3BoundRadius().f;
+
+			float PerPart = (MaxRadius - BaseRadius) / 3.f;
+			float Part1 = BaseRadius + PerPart;
+			float Part2 = BaseRadius + PerPart * 2;
+			float Part3 = BaseRadius + PerPart * 3;
+
+			if (Bound < BaseRadius)
+				NewProjDistMul = 2.5f;
+			else if (Bound > BaseRadius && Bound < Part1)
+				NewProjDistMul = 2.6f;
+			else if (Bound > Part1 && Bound < Part2)
+				NewProjDistMul = 2.7f;
+			else if (Bound > Part2 && Bound < Part3)
+				NewProjDistMul = 2.8f;
+
+			if (NewProjDistMul)
+			{
+				ProjDist.Swap(NewProjDistMul);
+				SHADOW_DEBUG(Object, "Changed Projection Distance Multiplier to %f", NewProjDistMul);
+			}
+
+			float NewExtendDistMul = 1.5f;
+			if (Bound < MaxRadius)
+			{
+				ExtendDist.Swap(NewExtendDistMul);
+				SHADOW_DEBUG(Object, "Changed Extend Distance Multiplier to %f", NewExtendDistMul);
+			}
+
+			thisCall<void>(0x007D2280, Source, AuxParam);
+		}
+		else
+			thisCall<void>(0x007D2280, Source, AuxParam);
+	}
+
+	void __stdcall ShadowRenderConstantHotSwapper::HandleShadowMapRenderStage( ShadowSceneLight* Source, void* AuxParam )
+	{
+		SME_ASSERT(Source);
+
+		BSFadeNode* Node = Source->sourceNode;
+		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
+		if (Node && Object)
+		{
+			Swapper SamplingScale(&SRC_A91280);
+
+			float Bound = Node->m_kWorldBound.radius;
+			float NewSampScale = 220.f;
+			float BaseRadius = Settings::kObjectTier2BoundRadius().f;
+			float MaxRadius = Settings::kObjectTier3BoundRadius().f;
+
+			if (Bound < MaxRadius)
+			{
+				SamplingScale.Swap(NewSampScale);
+				SHADOW_DEBUG(Object, "Changed Sampling Scale Multiplier to %f", NewSampScale);
+			}
+
+			thisCall<void>(0x007D46C0, Source, AuxParam);
+		}
+		else
+			thisCall<void>(0x007D46C0, Source, AuxParam);
+	}
+
+
+
+	_DefineHookHdlr(SwapLightProjectionStageConstants, 0x004078FA);
+	_DefineHookHdlr(SwapShadowMapRenderStageConstants, 0x007D59D2);
+	_DefinePatchHdlr(FixSSLLightSpaceProjectionStack, 0x007D2E85 + 1);
+
+	// mighty iffy about this one
+	// the method call being hooked is a weird one, mucking about with the stack
+	// would be safer to wrap the org call with a prolog/epilog handler
+	#define _hhName	SwapLightProjectionStageConstants
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x007D2D01);
+		_hhSetVar(Retn, 0x00407906);
 		__asm
-		{		
-			jp		SKIP
-			fstp	st(1)
-			jmp		EXIT
-		SKIP:
-			fstp	st
-		EXIT:
+		{	
+			mov		[eax + 0x8], edi
+			mov		ecx, esi
+
 			pushad
-			push	esi
-			call	ShadowFacts::ShadowRenderTasks::HandleShadowLightUpdateProjectionProlog
+			push	0
+			push	ecx
+			call	ShadowRenderConstantHotSwapper::HandleLightProjectionStage
 			popad
 
+			add		esp, 0xC		// restore the stack pointer
 			jmp		_hhGetVar(Retn)
 		}
 	}
-	
-	#define _hhName	ProjectShadowLightEpilog
+
+	#define _hhName	SwapShadowMapRenderStageConstants
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x007D2D0D);
+		_hhSetVar(Retn, 0x007D59D8);
 		__asm
-		{		
-			mov		eax, [esi + 0x100]
+		{	
 			pushad
-			push	esi
-			call	ShadowFacts::ShadowRenderTasks::HandleShadowLightUpdateProjectionEpilog
+			push	eax
+			push	ecx
+			call	ShadowRenderConstantHotSwapper::HandleShadowMapRenderStage
 			popad
 
 			jmp		_hhGetVar(Retn)
@@ -255,8 +364,9 @@ namespace ShadowFigures
 
 	void Patch( void )
 	{
-		_MemHdlr(ProjectShadowLightProlog).WriteJump();
-		_MemHdlr(ProjectShadowLightEpilog).WriteJump();
+		_MemHdlr(SwapLightProjectionStageConstants).WriteJump();
+		_MemHdlr(FixSSLLightSpaceProjectionStack).WriteUInt16(0x4);
+		_MemHdlr(SwapShadowMapRenderStageConstants).WriteJump();
 
 		SRC_B258E8.AddPatchLocation(0x007D4BA0 + 2);
 		SRC_B258EC.AddPatchLocation(0x007D4BB4 + 2);
@@ -269,4 +379,5 @@ namespace ShadowFigures
 	{
 		ShadowRenderConstantRegistry::GetSingleton()->Load();
 	}
+
 }

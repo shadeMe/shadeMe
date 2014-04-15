@@ -6,6 +6,7 @@
 namespace ShadowFigures
 {
 	class ShadowRenderConstantRegistry;
+	class ShadowRenderConstantHotSwap;
 
 	class ShadowRenderConstant
 	{
@@ -37,8 +38,7 @@ namespace ShadowFigures
 		void								ResetDefault(void);
 	};
 
-	extern ShadowRenderConstant				SMRC_A38618;
-
+	
 	class ShadowRenderConstantRegistry
 	{
 		struct ValuePair
@@ -68,8 +68,29 @@ namespace ShadowFigures
 		void									UpdateConstants(void);		// switches b'ween the two sets of values depending upon the cell type
 	};
 
-	_DeclareMemHdlr(ProjectShadowLightProlog, "hotswap support for the projection distance multiplier");
-	_DeclareMemHdlr(ProjectShadowLightEpilog, "");
+
+	class ShadowRenderConstantHotSwapper
+	{
+		class Swapper
+		{
+			ShadowRenderConstant*				Source;
+			long double							OldValue;
+			bool								Reset;
+		public:
+			Swapper(ShadowRenderConstant* Constant);
+			~Swapper();
+
+			void								Swap(long double NewValue);
+		};
+	public:
+		static void __stdcall					HandleLightProjectionStage(ShadowSceneLight* Source, void* AuxParam);
+		static void __stdcall					HandleShadowMapRenderStage(ShadowSceneLight* Source, void* AuxParam);
+	};
+
+
+	_DeclareMemHdlr(SwapLightProjectionStageConstants, "per-caster shadow render constants");
+	_DeclareMemHdlr(FixSSLLightSpaceProjectionStack, "fixup the stack");
+	_DeclareMemHdlr(SwapShadowMapRenderStageConstants, "");
 
 	void									Patch(void);
 	void									Initialize(void);
