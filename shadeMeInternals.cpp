@@ -200,6 +200,36 @@ shadeMeINIManager::~shadeMeINIManager()
 	;//
 }
 
+
+void BSTextureManager::DiscardShadowMap( BSRenderedTexture* Texture )
+{
+	thisCall<void>(0x007C1A30, this, Texture);
+}
+
+BSRenderedTexture* BSTextureManager::FetchShadowMap( void )
+{
+	return thisCall<BSRenderedTexture*>(0x007C1960, this);
+}
+
+BSTextureManager* BSTextureManager::CreateInstance( void )
+{
+	BSTextureManager* Instance = (BSTextureManager*)FormHeap_Allocate(0x48);
+	thisCall<void>(0x007C1FF0, Instance);
+	return Instance;
+}
+
+void BSTextureManager::DeleteInstance( void )
+{
+	thisCall<void>(0x007C2100, this);
+	FormHeap_Free(this);
+}
+
+void BSTextureManager::ReserveShadowMaps( UInt32 Count )
+{
+	thisCall<void>(0x007C2710, this, *g_renderer, Count);
+}
+
+
 namespace Utilities
 {
 	float GetDistanceFromPlayer( NiNode* Node )
@@ -581,7 +611,7 @@ namespace Utilities
 
 	ShadowSceneLight* GetShadowCasterLight( NiNode* Caster )
 	{
-		ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+		ShadowSceneNode* RootNode = GetShadowSceneNode();
 		SME_ASSERT(RootNode && Caster);
 
 		for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->shadowCasters.start; Itr && Itr->data; Itr = Itr->next)
@@ -623,6 +653,11 @@ namespace Utilities
 	BSFadeNode* GetPlayerNode( bool FirstPerson /*= false*/ )
 	{
 		return thisCall<BSFadeNode*>(0x00660110, *g_thePlayer, FirstPerson);
+	}
+
+	ShadowSceneNode* GetShadowSceneNode( void )
+	{
+		return cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
 	}
 
 }

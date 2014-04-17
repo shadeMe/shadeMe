@@ -16,7 +16,7 @@ namespace ShadowFacts
 		bool							IsActor;
 		bool							IsUnderWater;
 
-		void							CreateShadowSceneLight(ShadowSceneNode* Root);
+		ShadowSceneLight*				CreateShadowSceneLight(ShadowSceneNode* Root);
 		bool							GetIsLargeObject(void) const;
 
 		static bool						SortComparatorDistance(ShadowCaster& LHS, ShadowCaster& RHS);
@@ -27,7 +27,7 @@ namespace ShadowFacts
 
 		TESObjectREFR*					GetObject(void) const;
 		void							GetDescription(std::string& Out) const;
-		bool							Queue(ShadowSceneNode* Root);		// returns true if successful
+		bool							Queue(ShadowSceneNode* Root, ShadowSceneLight** OutSSL = NULL);		// returns true if successful
 	};
 
 	class ShadowSceneProc
@@ -50,6 +50,9 @@ namespace ShadowFacts
 		ShadowSceneNode*				Root;
 
 		void							DebugDump(void) const;
+		void							CleanupSceneCasters(ShadowLightListT* ValidCasters) const;
+		void							EnumerateSceneCasters(void);
+		void							ProcessCell(TESObjectCELL* Cell);
 	public:
 		ShadowSceneProc(ShadowSceneNode* Root);
 		~ShadowSceneProc();
@@ -286,6 +289,8 @@ namespace ShadowFacts
 		void										DiscardShadowMapTexture(BSRenderedTexture* Texture) const;
 
 		static ShadowMapTexturePool					Instance;
+
+		static bool									GetEnabled(void);
 	};
 
 	class ShadowRenderTasks

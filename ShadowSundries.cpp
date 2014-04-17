@@ -101,7 +101,7 @@ namespace ShadowSundries
 						}
 					}
 
-					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%.3f]\n\nPos[%.0f,%.0f,%.0f] Shadow flags[%s]",
+					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%.3f]\n\nPos[%.0f,%.0f,%.0f] Dist[%.2f] Shadow flags[%s]",
 						thisCall<const char*>(0x004DA2A0, DebugSel),
 						DebugSel->refID,
 						(Node && Node->m_pcName ? Node->m_pcName : ""),
@@ -109,6 +109,7 @@ namespace ShadowSundries
 						(Node ? Node->m_worldTranslate.x : 0.f),
 						(Node ? Node->m_worldTranslate.y : 0.f),
 						(Node ? Node->m_worldTranslate.z : 0.f),
+						(Node ? Utilities::GetDistanceFromPlayer(Node) : 0.f),
 						SpecialFlags);
 				}
 				else
@@ -184,7 +185,7 @@ namespace ShadowSundries
 			_MemHdlr(CullCellActorNode).WriteUInt8(0);
 		}
 
-		ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+		ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
 		Utilities::NiNodeChildrenWalker Walker((NiNode*)RootNode->m_children.data[3]);
 		Walker.Walk(&FadeNodeShadowFlagUpdater());
 		gLog.Outdent();
@@ -258,7 +259,36 @@ namespace ShadowSundries
 
 			Console_Print(" ");
 
-			ShadowSceneNode* RootNode = cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+			ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
+			ShadowSceneLight* CasterSSL = NULL;
+			for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->shadowCasters.start; Itr && Itr->data; Itr = Itr->next)
+			{
+				ShadowSceneLight* ShadowLight = Itr->data;
+				if (ShadowLight->sourceNode == Node)
+				{
+					CasterSSL = ShadowLight;
+					break;
+				}
+			}
+
+			if (CasterSSL == NULL)
+				Console_Print("No shadow caster SSL");
+			else
+			{
+				Console_Print("Shadow caster SSL: Active[%d] Light%s[%f, %f, %f] Fade[%f, %f] Bnd[%f, %f]",
+							CasterSSL->unk118 != 0xFF,
+							CasterSSL->sourceLight->IsCulled() ? " (Culled)" : "",
+							CasterSSL->sourceLight->m_worldTranslate.x,
+							CasterSSL->sourceLight->m_worldTranslate.y,
+							CasterSSL->sourceLight->m_worldTranslate.z,
+							CasterSSL->unkDC,
+							CasterSSL->unkE0,
+							CasterSSL->m_combinedBounds.z,
+							CasterSSL->m_combinedBounds.radius);
+			}
+
+			Console_Print(" ");
+
 			Console_Print("Scene lights = %d", RootNode->lights.numItems);
 			for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->lights.start; Itr && Itr->data; Itr = Itr->next)
 			{
@@ -317,7 +347,7 @@ namespace ShadowSundries
 
 	void WriteShadowDebug( const char* Format, ... )
 	{
-		if (kDebugSelection)
+		if (kDebugSelection && Utilities::GetConsoleOpen() == false)
 		{
 			char Buffer[0x1000] = {0};
 
@@ -327,7 +357,7 @@ namespace ShadowSundries
 			va_end(Args);
 
 
-			_MESSAGE("ShadowDebugRef[%08X %s]: %s", kDebugSelection->refID,
+			_MESSAGE("SDR[%08X %s]: %s", kDebugSelection->refID,
 				(kDebugSelection->niNode ? kDebugSelection->niNode->m_pcName : "<null>"),
 				Buffer);
 		}

@@ -263,6 +263,14 @@ public:
 	void*											unk40;				// 40 - smart pointer, screenshot rendertarget?
 	void*											unk44;				// 44 - smart pointer
 
+	// methods
+	BSRenderedTexture*								FetchShadowMap(void);
+	void											DiscardShadowMap(BSRenderedTexture* Texture);
+	void											ReserveShadowMaps(UInt32 Count);
+
+	static BSTextureManager*						CreateInstance(void);
+	void											DeleteInstance(void);
+
 	static BSTextureManager**						Singleton;
 };
 STATIC_ASSERT(sizeof(BSTextureManager) == 0x48);
@@ -288,6 +296,7 @@ namespace Utilities
 	bool				GetAbovePlayer(TESObjectREFR* Ref, float Threshold);
 	bool				GetBelowPlayer(TESObjectREFR* Ref, float Threshold);
 	bool				GetConsoleOpen(void);
+	ShadowSceneNode*	GetShadowSceneNode(void);
 
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
 	NiExtraData*		GetNiExtraDataByName(NiAVObject* Source, const char* Name);
