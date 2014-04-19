@@ -29,7 +29,7 @@ namespace Settings
 
 
 	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
-																"Large objects are rendered before smaller ones", (SInt32)1);
+																"Large objects are rendered before smaller ones", (SInt32)0);
 	SME::INI::INISetting			kLargeObjectExcludedPath("ExcludePaths", "Shadows::LargeObjects", "Large object blacklist", "rocks\\");
 	SME::INI::INISetting			kLargeObjectSunShadowsOnly("OnlyCastSunShadows", "Shadows::LargeObjects",
 															"Large objects will not react to small light sources", (SInt32)1);

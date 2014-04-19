@@ -58,7 +58,11 @@ namespace ShadowFacts
 		{
 			if (IsActor && Settings::kForceActorShadows().i)
 			{
-				CreateShadowSceneLight(Root);
+				ShadowSceneLight* SSL = CreateShadowSceneLight(Root);
+				if (OutSSL)
+					*OutSSL = SSL;
+
+				SHADOW_DEBUG(Object, "Forced Actor shadow");
 				return true;
 			}
 
@@ -1946,11 +1950,8 @@ namespace ShadowFacts
 		
 	}
 
-#if 0
-	_DeclareMemHdlr(TestHook, "");
-	_DefineHookHdlr(TestHook, 0x007D640B);
-
-	void __stdcall DoTestHook(ShadowSceneLight* Source, int  Stage, int result)
+#ifndef NDEBUG
+	void __stdcall TraceSLLCulling(ShadowSceneLight* Source, int Stage, int Result)
 	{
 		if (Source->sourceNode == NULL)
 			return;
@@ -1962,22 +1963,46 @@ namespace ShadowFacts
 		switch (Stage)
 		{
 		case 1:
-			SHADOW_DEBUG(Ref, "0x007D34C0 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			SHADOW_DEBUG(Ref, "0x007D34C0 returned %d | Fade[%f,%f] Bnd[%f,%f]",
+						Result,
+						Source->unkDC,
+						Source->unkE0,
+						Source->m_combinedBounds.z,
+						Source->m_combinedBounds.radius);
+
 			break;
 		case 2:
-			SHADOW_DEBUG(Ref, "0x0047DA70 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			SHADOW_DEBUG(Ref, "0x0047DA70 returned %d | Fade[%f,%f] Bnd[%f,%f]",
+						Result,
+						Source->unkDC,
+						Source->unkE0,
+						Source->m_combinedBounds.z,
+						Source->m_combinedBounds.radius);
+
 			break;
 		case 3:
-			SHADOW_DEBUG(Ref, "0x007415E0 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			SHADOW_DEBUG(Ref, "0x007415E0 returned %d | Fade[%f,%f] Bnd[%f,%f]",
+						Result,
+						Source->unkDC,
+						Source->unkE0,
+						Source->m_combinedBounds.z,
+						Source->m_combinedBounds.radius);
+
 			break;
 		case 4:
-			SHADOW_DEBUG(Ref, "0x007D5B20 returned %d| DC=%f E0=%f", result, Source->unkDC, Source->unkE0);
+			SHADOW_DEBUG(Ref, "0x007D5B20 returned %d | Fade[%f,%f] Bnd[%f,%f]",
+						Result,
+						Source->unkDC,
+						Source->unkE0,
+						Source->m_combinedBounds.z,
+						Source->m_combinedBounds.radius);
+
 			break;
 		}
 	}
 
 
-	#define _hhName	TestHook
+	#define _hhName	SSLTraceCullingA
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x007D6410);
@@ -1985,22 +2010,20 @@ namespace ShadowFacts
 		__asm
 		{	
 			call	_hhGetVar(Call)
+
 			pushad
 			movzx	eax, al
-			push eax
-			push 1
-			push ebp
-			call DoTestHook
+			push	eax
+			push	1
+			push	ebp
+			call	TraceSLLCulling
 			popad
+
 			jmp		_hhGetVar(Retn)
 		}
 	}
 
-	_DeclareMemHdlr(TestHook1, "");
-	_DefineHookHdlr(TestHook1, 0x007D647A);
-
-	
-	#define _hhName	TestHook1
+	#define _hhName	SSLTraceCullingB
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x007D647F);
@@ -2008,21 +2031,19 @@ namespace ShadowFacts
 		__asm
 		{	
 			call	_hhGetVar(Call)
+
 			pushad
-			push eax
-			push 2
-			push ebp
-			call DoTestHook
+			push	eax
+			push	2
+			push	ebp
+			call	TraceSLLCulling
 			popad
+
 			jmp		_hhGetVar(Retn)
 		}
 	}
 
-	_DeclareMemHdlr(TestHook2, "iffy");
-	_DefineHookHdlr(TestHook2, 0x007D6491);
-
-	
-	#define _hhName	TestHook2
+	#define _hhName	SSLTraceCullingC
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x007D6496);
@@ -2030,22 +2051,20 @@ namespace ShadowFacts
 		__asm
 		{	
 			call	_hhGetVar(Call)
-				pushad
-				movzx	eax, al
-				push eax
-				push 3
-				push ebp
-				call DoTestHook
-				popad
+
+			pushad
+			movzx	eax, al
+			push	eax
+			push	3
+			push	ebp
+			call	TraceSLLCulling
+			popad
+			
 			jmp		_hhGetVar(Retn)
 		}
 	}
 
-	_DeclareMemHdlr(TestHook3, "");
-	_DefineHookHdlr(TestHook3, 0x007D6517);
-
-	
-	#define _hhName	TestHook3
+	#define _hhName	SSLTraceCullingD
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x007D651C);
@@ -2053,16 +2072,25 @@ namespace ShadowFacts
 		__asm
 		{	
 			call	_hhGetVar(Call)
-				pushad
-				push eax
-				push 4
-				push ebp
-				call DoTestHook
-				popad
+
+			pushad
+			push	eax
+			push	4
+			push	ebp
+			call	TraceSLLCulling
+			popad
+
 			jmp		_hhGetVar(Retn)
 		}
 	}
 
+	_DefineHookHdlr(SSLTraceCullingA, 0x007D640B);
+	_DefineHookHdlr(SSLTraceCullingB, 0x007D647A);
+	_DefineHookHdlr(SSLTraceCullingC, 0x007D6491);
+	_DefineHookHdlr(SSLTraceCullingD, 0x007D6517);
+#endif 
+
+#if 0
 	_DeclareMemHdlr(TestHook4, "");
 	_DefineHookHdlr(TestHook4, 0x007D6539);
 
@@ -2094,13 +2122,16 @@ namespace ShadowFacts
 #endif
 	void Patch(void)
 	{
+#ifndef NDEBUG
+		_MemHdlr(SSLTraceCullingA).WriteJump();
+		_MemHdlr(SSLTraceCullingB).WriteJump();
+		_MemHdlr(SSLTraceCullingC).WriteJump();
+		_MemHdlr(SSLTraceCullingD).WriteJump();
+#endif
+
 #if 0
-//		_MemHdlr(TestHook).WriteJump();
-//		_MemHdlr(TestHook1).WriteJump();
-//		_MemHdlr(TestHook2).WriteJump();
-//		_MemHdlr(TestHook3).WriteJump();
-//		_MemHdlr(TestHook4).WriteJump();
-//		WriteRelJump(0x00407930, 0x00407935);
+		_MemHdlr(TestHook4).WriteJump();
+		WriteRelJump(0x00407930, 0x00407935);
 #endif
 		_MemHdlr(EnumerateFadeNodes).WriteJump();
 		_MemHdlr(RenderShadowsProlog).WriteJump();
