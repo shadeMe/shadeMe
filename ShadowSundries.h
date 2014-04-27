@@ -15,6 +15,7 @@ namespace ShadowSundries
 	{
 		_DeclareMemHdlr(ConsoleDebugSelectionA, "provides more detail about the console debug selection");
 		_DeclareMemHdlr(ConsoleDebugSelectionB, "");
+		_DeclareMemHdlr(ForceShaderModel3RenderPath, "");
 	}
 
 	void WriteShadowDebug(const char* Format, ...);

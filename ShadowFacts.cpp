@@ -6,7 +6,7 @@
 
 namespace ShadowFacts
 {
-	ShadowCaster::ShadowCaster( BSFadeNode* Node, TESObjectREFR* Object ) :
+	ShadowCaster::ShadowCaster( NiNode* Node, TESObjectREFR* Object ) :
 		Node(Node),
 		Object(Object),
 		Distance(0),
@@ -261,19 +261,21 @@ namespace ShadowFacts
 
 			if (Object->niNode)
 			{
-				BSFadeNode* FadeNode = NI_CAST(Object->niNode, BSFadeNode);
+				NiNode* Node = Object->niNode;
+				BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
+
 				if (FadeNode)
 				{
 					if (Object->baseForm->typeID != kFormType_Tree)
 					{
-						if (FadeNode->m_kWorldBound.radius > 0.f)
+						if (Node->m_kWorldBound.radius > 0.f)
 						{
 							if ((Object->flags & kTESFormSpecialFlag_DoesntCastShadow) == false)
 							{
 								// we allocate a BSXFlags extra data at instantiation
-								if (BSXFlagsSpecialFlags::GetFlag(FadeNode, BSXFlagsSpecialFlags::kDontCastShadow) == false)
+								if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontCastShadow) == false)
 								{
-									Casters.push_back(ShadowCaster(FadeNode, Object));
+									Casters.push_back(ShadowCaster(Node, Object));
 									SHADOW_DEBUG(Object, "Added to Scene Caster List");
 								}
 								else SHADOW_DEBUG(Object, "Failed BSXFlag DoesntCastShadow check");
@@ -536,7 +538,7 @@ namespace ShadowFacts
 		gLog.Outdent();
 	}
 
-	bool ShadowExclusionParameters::GetAllowed( BSFadeNode* Node, TESObjectREFR* Object ) const
+	bool ShadowExclusionParameters::GetAllowed( NiNode* Node, TESObjectREFR* Object ) const
 	{
 		bool Result = true;
 
@@ -567,11 +569,14 @@ namespace ShadowFacts
 		return Result;
 	}
 
-	void ShadowExclusionParameters::HandleModelLoad( BSFadeNode* Node, BSXFlags* xFlags ) const
+	void ShadowExclusionParameters::HandleModelLoad( NiNode* Node, BSXFlags* xFlags ) const
 	{
 		SME_ASSERT(Node);
 
-		std::string NodeName(Node->m_pcName);
+		std::string NodeName("");
+		if (Node->m_pcName)
+			NodeName = Node->m_pcName;
+
 		if (NodeName.length())
 		{
 			SME::StringHelpers::MakeLower(NodeName);
@@ -618,22 +623,22 @@ namespace ShadowFacts
 
 	MainShadowExParams		MainShadowExParams::Instance;
 
-	void MainShadowExParams::SetInteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
+	void MainShadowExParams::SetInteriorFlag( bool State, NiNode* Node, BSXFlags* xFlags ) const
 	{
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorShadow, State);
 	}
 
-	void MainShadowExParams::SetExteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
+	void MainShadowExParams::SetExteriorFlag( bool State, NiNode* Node, BSXFlags* xFlags ) const
 	{
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorShadow, State);
 	}
 
-	bool MainShadowExParams::GetAllowedInterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	bool MainShadowExParams::GetAllowedInterior( NiNode* Node, BSXFlags* xFlags ) const
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorShadow) == false;
 	}
 
-	bool MainShadowExParams::GetAllowedExterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	bool MainShadowExParams::GetAllowedExterior( NiNode* Node, BSXFlags* xFlags ) const
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorShadow) == false;
 	}
@@ -664,22 +669,22 @@ namespace ShadowFacts
 
 	SelfShadowExParams			SelfShadowExParams::Instance;
 
-	void SelfShadowExParams::SetInteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
+	void SelfShadowExParams::SetInteriorFlag( bool State, NiNode* Node, BSXFlags* xFlags ) const
 	{
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorSelfShadow, State);
 	}
 
-	void SelfShadowExParams::SetExteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
+	void SelfShadowExParams::SetExteriorFlag( bool State, NiNode* Node, BSXFlags* xFlags ) const
 	{
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorSelfShadow, State);
 	}
 
-	bool SelfShadowExParams::GetAllowedInterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	bool SelfShadowExParams::GetAllowedInterior( NiNode* Node, BSXFlags* xFlags ) const
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastInteriorSelfShadow) == false;
 	}
 
-	bool SelfShadowExParams::GetAllowedExterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	bool SelfShadowExParams::GetAllowedExterior( NiNode* Node, BSXFlags* xFlags ) const
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorSelfShadow) == false;
 	}
@@ -708,22 +713,22 @@ namespace ShadowFacts
 
 	ShadowReceiverExParams			ShadowReceiverExParams::Instance;
 
-	void ShadowReceiverExParams::SetInteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
+	void ShadowReceiverExParams::SetInteriorFlag( bool State, NiNode* Node, BSXFlags* xFlags ) const
 	{
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveInteriorShadow, State);
 	}
 
-	void ShadowReceiverExParams::SetExteriorFlag( bool State, BSFadeNode* Node, BSXFlags* xFlags ) const
+	void ShadowReceiverExParams::SetExteriorFlag( bool State, NiNode* Node, BSXFlags* xFlags ) const
 	{
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow, State);
 	}
 
-	bool ShadowReceiverExParams::GetAllowedInterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	bool ShadowReceiverExParams::GetAllowedInterior( NiNode* Node, BSXFlags* xFlags ) const
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveInteriorShadow) == false;
 	}
 
-	bool ShadowReceiverExParams::GetAllowedExterior( BSFadeNode* Node, BSXFlags* xFlags ) const
+	bool ShadowReceiverExParams::GetAllowedExterior( NiNode* Node, BSXFlags* xFlags ) const
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow) == false;
 	}
@@ -882,11 +887,14 @@ namespace ShadowFacts
 			(*g_renderer)->device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
 	}
 
-	void ShadowRenderTasks::PerformModelLoadTask(BSFadeNode* Node, BSXFlags* xFlags)
+	void ShadowRenderTasks::PerformModelLoadTask(NiNode* Node, BSXFlags* xFlags)
 	{
 		SME_ASSERT(Node);
 
-		std::string NodeName(Node->m_pcName);
+		std::string NodeName("");
+		if (Node->m_pcName)
+			NodeName = Node->m_pcName;
+
 		if (NodeName.length())
 		{
 			SME::StringHelpers::MakeLower(NodeName);
@@ -999,6 +1007,17 @@ namespace ShadowFacts
 		if (InterfaceManager::GetSingleton()->IsGameMode() == false)
 			return;
 
+		TESWeather* CurrentWeather = Sky::GetSingleton()->firstWeather;
+		if (CurrentWeather && TES::GetSingleton()->currentInteriorCell == NULL)
+		{
+			if (CurrentWeather->precipType == TESWeather::kType_Cloudy && Settings::kWeatherDisableCloudy().i)
+				return;
+			else if (CurrentWeather->precipType == TESWeather::kType_Rainy && Settings::kWeatherDisableRainy().i)
+				return;
+			else if (CurrentWeather->precipType == TESWeather::kType_Snow && Settings::kWeatherDisableSnow().i)
+				return;
+		}
+
 		ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
 		if (RootNode)
 		{
@@ -1011,7 +1030,7 @@ namespace ShadowFacts
 	{
 		SME_ASSERT(Caster);
 
-		BSFadeNode* Node = Caster->sourceNode;
+		NiNode* Node = Caster->sourceNode;
 		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
 		bool Result = false;
 
@@ -1028,8 +1047,8 @@ namespace ShadowFacts
 					float FogStart = Fog->fogStart;
 					float FogEnd = Fog->fogEnd;
 					float Delta = FogEnd - FogStart;
-				//	if (FogStart < 0)
-				//		Delta = FogEnd + FogStart;
+					if (FogStart < 0)
+						Delta = FogEnd + FogStart;
 
 					if (Distance < Delta)
 						Result = true;
@@ -1055,7 +1074,7 @@ namespace ShadowFacts
 		return Result;			
 	}
 
-	void __stdcall ShadowRenderTasks::HandleModelLoad( BSFadeNode* Node, bool Allocation )
+	void __stdcall ShadowRenderTasks::HandleModelLoad( NiNode* Node, bool Allocation )
 	{
 		// add BSXFlags if necessary
 		BSXFlags* xFlags = Utilities::GetBSXFlags(Node, Allocation);
@@ -1066,7 +1085,7 @@ namespace ShadowFacts
 		PerformModelLoadTask(Node, xFlags);
 	}
 
-	void __stdcall ShadowRenderTasks::HandleShadowMapRenderingProlog( BSFadeNode* Node, ShadowSceneLight* Source )
+	void __stdcall ShadowRenderTasks::HandleShadowMapRenderingProlog( NiNode* Node, ShadowSceneLight* Source )
 	{
 		if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap))
 		{
@@ -1074,7 +1093,7 @@ namespace ShadowFacts
 		}
 	}
 
-	void __stdcall ShadowRenderTasks::HandleShadowMapRenderingEpilog( BSFadeNode* Node, ShadowSceneLight* Source )
+	void __stdcall ShadowRenderTasks::HandleShadowMapRenderingEpilog( NiNode* Node, ShadowSceneLight* Source )
 	{
 		if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kRenderBackFacesToShadowMap))
 		{
@@ -1092,14 +1111,14 @@ namespace ShadowFacts
 			Source->showDebug = 0;
 	}
 
-	bool ShadowRenderTasks::GetCanBeLargeObject( BSFadeNode* Node )
+	bool ShadowRenderTasks::GetCanBeLargeObject( NiNode* Node )
 	{
 		SME_ASSERT(Node);
 
 		return BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kCannotBeLargeObject) == false;
 	}
 
-	bool ShadowRenderTasks::GetIsLargeObject( BSFadeNode* Node )
+	bool ShadowRenderTasks::GetIsLargeObject( NiNode* Node )
 	{
 		SME_ASSERT(Node);
 
@@ -1157,7 +1176,7 @@ namespace ShadowFacts
 
 		bool Result = true;
 
-		BSFadeNode* Node = Source->sourceNode;
+		NiNode* Node = Source->sourceNode;
 		NiLight* Light = Source->sourceLight;
 
 		if (Light && Node && InterfaceManager::GetSingleton()->IsGameMode())
@@ -1237,7 +1256,7 @@ namespace ShadowFacts
 			return true;
 	}
 
-	bool ShadowRenderTasks::GetHasPlayerLOS( TESObjectREFR* Object, BSFadeNode* Node )
+	bool ShadowRenderTasks::GetHasPlayerLOS( TESObjectREFR* Object, NiNode* Node )
 	{
 		SME_ASSERT(Object && Node);
 
@@ -1266,7 +1285,7 @@ namespace ShadowFacts
 	{
 		SME_ASSERT(Source && Receiver);
 		
-		BSFadeNode* FadeNode = NI_CAST(Receiver, BSFadeNode);
+		NiNode* FadeNode = NI_CAST(Receiver, BSFadeNode);
 		if (FadeNode)
 		{
 			TESObjectREFR* Object = Utilities::GetNodeObjectRef(FadeNode);
@@ -1312,7 +1331,7 @@ namespace ShadowFacts
 		}
 	}
 
-	bool ShadowRenderTasks::GetCanReceiveShadow( BSFadeNode* Node )
+	bool ShadowRenderTasks::GetCanReceiveShadow( NiNode* Node )
 	{
 		SME_ASSERT(Node);
 
@@ -1335,7 +1354,7 @@ namespace ShadowFacts
 		return Result;
 	}
 
-	bool ShadowRenderTasks::RunInteriorHeuristicGauntlet( TESObjectREFR* Caster, BSFadeNode* Node, float BoundRadius )
+	bool ShadowRenderTasks::RunInteriorHeuristicGauntlet( TESObjectREFR* Caster, NiNode* Node, float BoundRadius )
 	{
 		bool Result = true;
 
@@ -1376,7 +1395,7 @@ namespace ShadowFacts
 		return true;
 	}
 
-	bool ShadowRenderTasks::PerformExclusiveSelfShadowCheck( BSFadeNode* Node, TESObjectREFR* Object )
+	bool ShadowRenderTasks::PerformExclusiveSelfShadowCheck( NiNode* Node, TESObjectREFR* Object )
 	{
 		if ((BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kOnlySelfShadowInterior) && Object->parentCell->IsInterior()) ||
 			(BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kOnlySelfShadowExterior) && Object->parentCell->IsInterior() == false))
@@ -1447,6 +1466,12 @@ namespace ShadowFacts
 		else SHADOW_DEBUG(Object, "Skipped BSXFlags DontPerformLOS check");
 
 		return Result;
+	}
+
+	void __stdcall ShadowRenderTasks::HandleTreeModelLoad( BSTreeNode* Node )
+	{
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveInteriorShadow, true);
+		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow, true);
 	}
 
 
@@ -1544,7 +1569,7 @@ namespace ShadowFacts
 	{
 		SME_ASSERT(Light && Light->sourceNode);
 
-		BSFadeNode* Node = Light->sourceNode;
+		NiNode* Node = Light->sourceNode;
 		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
 		UInt16 DistancePool = kPool__MAX;
 		UInt16 BoundPool = kPool__MAX;
@@ -1663,6 +1688,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(ShadowSceneLightGetShadowMap, 0x007D4760);
 	_DefineHookHdlr(CreateWorldSceneGraph, 0x0040EAAC);
 	_DefinePatchHdlr(CullCellActorNode, 0x004076C1 + 1);
+	_DefineHookHdlr(BlacklistTreeNode, 0x0056118F);
 
 
 	#define _hhName	EnumerateFadeNodes
@@ -1950,6 +1976,24 @@ namespace ShadowFacts
 		
 	}
 
+	#define _hhName	BlacklistTreeNode
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x00561194);
+		_hhSetVar(Call, 0x005640E0);
+		__asm
+		{	
+			call	_hhGetVar(Call)
+
+			pushad
+			push	eax
+			call	ShadowRenderTasks::HandleTreeModelLoad
+			popad
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
 #ifndef NDEBUG
 	void __stdcall TraceSLLCulling(ShadowSceneLight* Source, int Stage, int Result)
 	{
@@ -2092,30 +2136,30 @@ namespace ShadowFacts
 
 #if 0
 	_DeclareMemHdlr(TestHook4, "");
-	_DefineHookHdlr(TestHook4, 0x007D6539);
+	_DefineHookHdlr(TestHook4, 0x0049885B);
 
-	void __stdcall FixLODCull(ShadowSceneLight* Light)
+	void __stdcall FixRange(void)
 	{
-		Light->m_combinedBounds.z = Light->m_combinedBounds.radius = 1;
-		Light->unkDC = Light->unkE0 = 1.f;
-	//	Light->unk118 = 0;
-	//	Light->sourceLight->SetCulled(false);
+		UInt32* pshader1 = (UInt32*)0x00B42F48;
+		UInt32* pshader2 = (UInt32*)0x00B42D74;
+		UInt8* useps3shader = (UInt8*)0x00B42EA5;
+
+		*pshader1 = *pshader2 = 7;
+		*useps3shader = 1;
 	}
 
 	
 	#define _hhName	TestHook4
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x007D653F);
+		_hhSetVar(Retn, 0x00498860);
+		_hhSetVar(Call, 0x007B45F0);
+
 		__asm
 		{	
 			pushad
-			push ebp
-			call FixLODCull
+			call FixRange
 			popad
-
-			mov word ptr [esp+1Ch], 0
-			fld dword ptr [ebp+0xd4]
 			jmp		_hhGetVar(Retn)
 		}
 	}
@@ -2131,7 +2175,6 @@ namespace ShadowFacts
 
 #if 0
 		_MemHdlr(TestHook4).WriteJump();
-		WriteRelJump(0x00407930, 0x00407935);
 #endif
 		_MemHdlr(EnumerateFadeNodes).WriteJump();
 		_MemHdlr(RenderShadowsProlog).WriteJump();
@@ -2144,6 +2187,7 @@ namespace ShadowFacts
 		_MemHdlr(CheckLargeObjectLightSource).WriteJump();
 		_MemHdlr(CheckShadowReceiver).WriteJump();
 		_MemHdlr(CheckInteriorLightSource).WriteJump();
+		_MemHdlr(BlacklistTreeNode).WriteJump();
 
 		if (Settings::kActorsReceiveAllShadows().i)
 		{
@@ -2158,7 +2202,7 @@ namespace ShadowFacts
 				{
 					0x007C5C6E,	0x007C5F19,
 					0x007D52CD, 0x007D688B,
-					0x007D5557					// ShadowSceneLight d'tor - iffy about this
+					0x007D5557
 				};
 
 				_DefineHookHdlr(TextureManagerDiscardShadowMap, kCallSites[i]);

@@ -113,6 +113,16 @@ namespace Settings
 	SME::INI::INISetting			kDynMapDistanceNear("Near", "DynamicShadowMap::Distance", "", (float)1500.f);
 	SME::INI::INISetting			kDynMapDistanceFar("Far", "DynamicShadowMap::Distance", "", (float)4000.f);
 
+	SME::INI::INISetting			kWeatherDisableCloudy("DisableCloudy", "Shadows::Weather", "", (SInt32)0);
+	SME::INI::INISetting			kWeatherDisableRainy("DisableRainy", "Shadows::Weather", "", (SInt32)0);
+	SME::INI::INISetting			kWeatherDisableSnow("DisableSnow", "Shadows::Weather", "", (SInt32)0);
+
+	SME::INI::INISetting			kWeatherDiffuseCloudy("DiffuseCloudy", "Shadows::Weather", "", (SInt32)0);
+	SME::INI::INISetting			kWeatherDiffuseRainy("DiffuseRainy", "Shadows::Weather", "", (SInt32)0);
+	SME::INI::INISetting			kWeatherDiffuseSnow("DiffuseSnow", "Shadows::Weather", "", (SInt32)0);
+
+	SME::INI::INISetting			kMiscForceSM3RenderPath("ForceSM3RenderPath", "Misc::Renderer", "", (SInt32)0);
+
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -191,6 +201,15 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kDynMapDistanceNear);
 	RegisterSetting(&Settings::kDynMapDistanceFar);
 
+	RegisterSetting(&Settings::kWeatherDiffuseCloudy);
+	RegisterSetting(&Settings::kWeatherDiffuseRainy);
+	RegisterSetting(&Settings::kWeatherDiffuseSnow);
+
+	RegisterSetting(&Settings::kWeatherDisableCloudy);
+	RegisterSetting(&Settings::kWeatherDisableRainy);
+	RegisterSetting(&Settings::kWeatherDisableSnow);
+
+	RegisterSetting(&Settings::kMiscForceSM3RenderPath);
 
 	Save();
 }

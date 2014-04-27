@@ -55,6 +55,7 @@ namespace ShadowSundries
 	{
 		_DefineHookHdlr(ConsoleDebugSelectionA, 0x0058290B);
 		_DefineHookHdlr(ConsoleDebugSelectionB, 0x0057CA43);
+		_DefineHookHdlr(ForceShaderModel3RenderPath, 0x0049885B);
 
 		void __stdcall UpdateDebugSelectionDesc(BSStringT* OutString, TESObjectREFR* DebugSel)
 		{
@@ -155,10 +156,42 @@ namespace ShadowSundries
 			}
 		}
 
+		void __stdcall ForceSM3Shaders(void)
+		{
+			UInt32* PixelShaderID = (UInt32*)0x00B42F48;
+			UInt32* PixelShaderIDEx = (UInt32*)0x00B42D74;
+			UInt8* UsePS30ShaderFlag = (UInt8*)0x00B42EA5;
+
+			*PixelShaderID = *PixelShaderIDEx = 7;
+			*UsePS30ShaderFlag = 1;
+		}
+
+		#define _hhName	ForceShaderModel3RenderPath
+		_hhBegin()
+		{
+			_hhSetVar(Retn, 0x00498860);
+			_hhSetVar(Call, 0x007B45F0);
+			__asm
+			{	
+				call	_hhGetVar(Call)
+				
+				pushad
+				call	ForceSM3Shaders
+				popad
+
+				jmp		_hhGetVar(Retn)
+			}
+		}
+
 		void Patch( void )
 		{
 			_MemHdlr(ConsoleDebugSelectionA).WriteJump();
 			_MemHdlr(ConsoleDebugSelectionB).WriteJump();
+
+			if (Settings::kMiscForceSM3RenderPath().i)
+			{
+				_MemHdlr(ForceShaderModel3RenderPath).WriteJump();
+			}
 		}
 	}
 
@@ -205,7 +238,7 @@ namespace ShadowSundries
 			{
 				Console_Print(" ");
 				Console_Print("Light data for Node %s ==>>", Node->m_pcName);
-				Console_Print(" ");
+				Console_Print("========================================================================================");
 
 				ShadowLightListT Lights;
 				if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_NonShadowCasters))
@@ -228,7 +261,7 @@ namespace ShadowSundries
 				else
 					Console_Print("No active lights");
 
-				Console_Print(" ");
+				Console_Print("========================================================================================");
 
 				Lights.clear();
 				if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_ShadowCasters))
@@ -257,7 +290,7 @@ namespace ShadowSundries
 					Console_Print("No shadow casters");
 			}
 
-			Console_Print(" ");
+			Console_Print("========================================================================================");
 
 			ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
 			ShadowSceneLight* CasterSSL = NULL;
@@ -287,7 +320,7 @@ namespace ShadowSundries
 							CasterSSL->m_combinedBounds.radius);
 			}
 
-			Console_Print(" ");
+			Console_Print("========================================================================================");
 
 			Console_Print("Scene lights = %d", RootNode->lights.numItems);
 			for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->lights.start; Itr && Itr->data; Itr = Itr->next)
@@ -299,6 +332,7 @@ namespace ShadowSundries
 					ShadowLight->sourceLight->m_worldTranslate.z);
 			}	
 
+			Console_Print("========================================================================================");
 			Console_Print(" ");
 		}
 
@@ -330,8 +364,8 @@ namespace ShadowSundries
 			ToggleShadowVolumes->execute = ToggleShadowVolumes_Execute;
 
 			CommandInfo* WasteMemory = (CommandInfo*)0x00B0C758;
-			WasteMemory->longName = "CheckShadowLightLOS";
-			WasteMemory->shortName = "csllos";
+			WasteMemory->longName = "DumpShadowLightData";
+			WasteMemory->shortName = "dsd";
 			WasteMemory->execute = WasteMemory_Execute;
 			WasteMemory->numParams = ToggleShadowVolumes->numParams;
 			WasteMemory->params = ToggleShadowVolumes->params;

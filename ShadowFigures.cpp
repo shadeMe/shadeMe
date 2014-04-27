@@ -38,7 +38,7 @@ namespace ShadowFigures
 	// ====================================================
 	// Light Projection Stage
 	// ====================================================
-	DEF_SRC(SMRC_A31C70, true, 0.75, 0x007D2CB4 + 2);		// distortion/extend mul?
+	DEF_SRC(SMRC_A31C70, true, 0.75, 0x007D2CB4 + 2);		// distortion/extrude mul?
 	DEF_SRC(SMRC_A3B1B8, true, 256.0, 0x007D2CEC + 2);		// some kinda resolution?
 	DEF_SRC(SMRC_A38618, true, 2.5, 0x007D2D01 + 2);		// light source dist mul
 	DEF_SRC(SMRC_A3F3A0, true, 6.0, 0x007D2D94 + 2);
@@ -203,6 +203,20 @@ namespace ShadowFigures
 			else
 				Itr->first->SetValue(Itr->second.Exterior);
 		}
+
+		// special overrides
+		static const float DiffuseMultiplier = 3.5;
+
+		TESWeather* CurrentWeather = Sky::GetSingleton()->firstWeather;
+		if (CurrentWeather && TES::GetSingleton()->currentInteriorCell == NULL)
+		{
+			if ((CurrentWeather->precipType == TESWeather::kType_Cloudy && Settings::kWeatherDiffuseCloudy().i) ||
+				(CurrentWeather->precipType == TESWeather::kType_Rainy && Settings::kWeatherDiffuseRainy().i) ||
+				(CurrentWeather->precipType == TESWeather::kType_Snow && Settings::kWeatherDiffuseSnow().i))
+			{
+				SMRC_A3F3A0.SetValue(DiffuseMultiplier);
+			}
+		}
 	}
 
 	void ShadowRenderConstantRegistry::Register( ShadowRenderConstant* Constant )
@@ -244,7 +258,7 @@ namespace ShadowFigures
 	{
 		SME_ASSERT(Source);
 
-		BSFadeNode* Node = Source->sourceNode;
+		NiNode* Node = Source->sourceNode;
 		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
 		if (Node && Object)
 		{
@@ -293,7 +307,7 @@ namespace ShadowFigures
 	{
 		SME_ASSERT(Source);
 
-		BSFadeNode* Node = Source->sourceNode;
+		NiNode* Node = Source->sourceNode;
 		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
 		if (Node && Object)
 		{

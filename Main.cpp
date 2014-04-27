@@ -61,6 +61,9 @@ extern "C"
 
 	bool OBSEPlugin_Load(const OBSEInterface * obse)
 	{
+		_MESSAGE("Initializing INI Manager");
+		shadeMeINIManager::Instance.Initialize("Data\\OBSE\\Plugins\\shadeMe.ini", NULL);
+
 		ShadowSundries::Patch(obse->isEditor == 1);
 
 		if (obse->isEditor)
@@ -69,9 +72,6 @@ extern "C"
 		}
 		else
 		{
-			_MESSAGE("Initializing INI Manager");
-			shadeMeINIManager::Instance.Initialize("Data\\OBSE\\Plugins\\shadeMe.ini", NULL);
-
 			Interfaces::kOBSEMessaging->RegisterListener(Interfaces::kOBSEPluginHandle, "OBSE", OBSEMessageHandler);
 
 			ShadowFacts::Patch();

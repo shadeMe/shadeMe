@@ -9,7 +9,7 @@ namespace ShadowFacts
 	{
 		friend class ShadowSceneProc;
 
-		BSFadeNode*						Node;
+		NiNode*							Node;
 		TESObjectREFR*					Object;
 		float							Distance;							// from the player
 		float							BoundRadius;
@@ -22,7 +22,7 @@ namespace ShadowFacts
 		static bool						SortComparatorDistance(ShadowCaster& LHS, ShadowCaster& RHS);
 		static bool						SortComparatorBoundRadius(ShadowCaster& LHS, ShadowCaster& RHS);
 	public:
-		ShadowCaster(BSFadeNode* Node, TESObjectREFR* Object);
+		ShadowCaster(NiNode* Node, TESObjectREFR* Object);
 		~ShadowCaster();
 
 		TESObjectREFR*					GetObject(void) const;
@@ -102,10 +102,10 @@ namespace ShadowFacts
 
 		void										LoadParameters(UInt8 ParamType, SME::INI::INISetting* ExcludedTypes, SME::INI::INISetting* ExcludedPaths);
 
-		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const = 0;
-		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const = 0;
-		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const = 0;
-		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const = 0;
+		virtual void								SetInteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const = 0;
+		virtual void								SetExteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const = 0;
+		virtual bool								GetAllowedInterior(NiNode* Node, BSXFlags* xFlags) const = 0;
+		virtual bool								GetAllowedExterior(NiNode* Node, BSXFlags* xFlags) const = 0;
 
 		virtual const char*							GetDescription(void) const = 0;
 	public:
@@ -113,8 +113,8 @@ namespace ShadowFacts
 
 		virtual void								Initialize(void) = 0;
 
-		void										HandleModelLoad(BSFadeNode* Node, BSXFlags* xFlags) const;
-		bool										GetAllowed(BSFadeNode* Node, TESObjectREFR* Object) const;
+		void										HandleModelLoad(NiNode* Node, BSXFlags* xFlags) const;
+		bool										GetAllowed(NiNode* Node, TESObjectREFR* Object) const;
 		void										RefreshParameters(void);
 	};
 
@@ -186,10 +186,10 @@ namespace ShadowFacts
 	class MainShadowExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetInteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetExteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedInterior(NiNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedExterior(NiNode* Node, BSXFlags* xFlags) const;
 
 		virtual const char*							GetDescription(void) const;		
 	public:
@@ -203,10 +203,10 @@ namespace ShadowFacts
 	class SelfShadowExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetInteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetExteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedInterior(NiNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedExterior(NiNode* Node, BSXFlags* xFlags) const;
 
 		virtual const char*							GetDescription(void) const;
 	public:
@@ -220,10 +220,10 @@ namespace ShadowFacts
 	class ShadowReceiverExParams : public ShadowExclusionParameters
 	{
 	protected:
-		virtual void								SetInteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual void								SetExteriorFlag(bool State, BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual bool								GetAllowedInterior(BSFadeNode* Node, BSXFlags* xFlags) const;
-		virtual bool								GetAllowedExterior(BSFadeNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetInteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const;
+		virtual void								SetExteriorFlag(bool State, NiNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedInterior(NiNode* Node, BSXFlags* xFlags) const;
+		virtual bool								GetAllowedExterior(NiNode* Node, BSXFlags* xFlags) const;
 
 		virtual const char*							GetDescription(void) const;
 	public:
@@ -305,8 +305,8 @@ namespace ShadowFacts
 		static PathSubstringListT					SelfExclusiveIncludePathsExterior;
 
 		static void									ToggleBackFaceCulling(bool State);
-		static void									PerformModelLoadTask(BSFadeNode* Node, BSXFlags* xFlags);
-		static bool									PerformExclusiveSelfShadowCheck(BSFadeNode* Node, TESObjectREFR* Object);
+		static void									PerformModelLoadTask(NiNode* Node, BSXFlags* xFlags);
+		static bool									PerformExclusiveSelfShadowCheck(NiNode* Node, TESObjectREFR* Object);
 		static bool									PerformInteriorDirectionalShadowCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
 		static bool									PerformLightLOSCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
 	public:
@@ -316,23 +316,24 @@ namespace ShadowFacts
 		static void									HandleMainProlog(void);
 		static void									HandleMainEpilog(void);
 
-		static void	__stdcall						HandleShadowMapRenderingProlog(BSFadeNode* Node, ShadowSceneLight* Source);
-		static void	__stdcall						HandleShadowMapRenderingEpilog(BSFadeNode* Node, ShadowSceneLight* Source);
+		static void	__stdcall						HandleShadowMapRenderingProlog(NiNode* Node, ShadowSceneLight* Source);
+		static void	__stdcall						HandleShadowMapRenderingEpilog(NiNode* Node, ShadowSceneLight* Source);
 
 		static void	__stdcall						HandleShadowLightUpdateReceiver(ShadowSceneLight* Source, NiNode* SceneGraph);
 
 		static void __stdcall						QueueShadowOccluders(UInt32 MaxShadowCount);
 		static bool	__stdcall						HandleSelfShadowing(ShadowSceneLight* Caster);		// return true to allow
-		static void __stdcall						HandleModelLoad(BSFadeNode* Node, bool Allocation);
+		static void __stdcall						HandleModelLoad(NiNode* Node, bool Allocation);
 		static void __stdcall						HandleShadowReceiverLightingPropertyUpdate(ShadowSceneLight* Source, NiNode* Receiver);
+		static void __stdcall						HandleTreeModelLoad(BSTreeNode* Node);
 
-		static bool									GetCanBeLargeObject(BSFadeNode* Node);
-		static bool									GetIsLargeObject(BSFadeNode* Node);
+		static bool									GetCanBeLargeObject(NiNode* Node);
+		static bool									GetIsLargeObject(NiNode* Node);
 		static bool	__stdcall						PerformAuxiliaryChecks(ShadowSceneLight* Source);
-		static bool									GetHasPlayerLOS(TESObjectREFR* Object, BSFadeNode* Node);
+		static bool									GetHasPlayerLOS(TESObjectREFR* Object, NiNode* Node);
 		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
-		static bool									GetCanReceiveShadow(BSFadeNode* Node);
-		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, BSFadeNode* Node, float BoundRadius);		// return true to allow
+		static bool									GetCanReceiveShadow(NiNode* Node);
+		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, NiNode* Node, float BoundRadius);		// return true to allow
 		static bool __stdcall						GetCanHaveDirectionalShadow(ShadowSceneLight* Source);
 	};
 
@@ -355,6 +356,7 @@ namespace ShadowFacts
 	_DeclareMemHdlr(ShadowSceneLightGetShadowMap, "");
 	_DeclareMemHdlr(CreateWorldSceneGraph, "");
 	_DeclareMemHdlr(CullCellActorNode, "");
+	_DeclareMemHdlr(BlacklistTreeNode, "");
 
 
 	void Patch(void);

@@ -122,6 +122,16 @@ namespace Settings
 
 	extern SME::INI::INISetting				kDynMapDistanceNear;
 	extern SME::INI::INISetting				kDynMapDistanceFar;
+
+	extern SME::INI::INISetting				kWeatherDisableCloudy;
+	extern SME::INI::INISetting				kWeatherDisableRainy;
+	extern SME::INI::INISetting				kWeatherDisableSnow;
+
+	extern SME::INI::INISetting				kWeatherDiffuseCloudy;
+	extern SME::INI::INISetting				kWeatherDiffuseRainy;
+	extern SME::INI::INISetting				kWeatherDiffuseSnow;
+
+	extern SME::INI::INISetting				kMiscForceSM3RenderPath;
 }
 
 class BSRenderedTexture;
@@ -215,7 +225,7 @@ public:
 	UInt32												unk128;
 	UInt8												showDebug;	// 12C - debug shader toggle
 	UInt8												unk12CPad[3];
-	BSFadeNode*											sourceNode;	// 130 - node being lighted/shadowed
+	NiNode*												sourceNode;	// 130 - node being lighted/shadowed
 	NiTPointerList<NiAVObject>							unk134;
 	NiTPointerList<NiTriBasedGeom>::Node*				unk144;		// points to the fence trishape
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
