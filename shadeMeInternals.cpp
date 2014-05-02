@@ -123,6 +123,14 @@ namespace Settings
 	SME::INI::INISetting			kWeatherDiffuseRainy("DiffuseRainy", "Shadows::Weather", "", (SInt32)0);
 	SME::INI::INISetting			kWeatherDiffuseSnow("DiffuseSnow", "Shadows::Weather", "", (SInt32)0);
 
+	SME::INI::INISetting			kMaxCountActor("Actor", "Shadows::MaxCount", "", (SInt32)-1);
+	SME::INI::INISetting			kMaxCountBook("Book", "Shadows::MaxCount", "", (SInt32)5);
+	SME::INI::INISetting			kMaxCountFlora("Flora", "Shadows::MaxCount", "", (SInt32)5);
+	SME::INI::INISetting			kMaxCountIngredient("Ingredient", "Shadows::MaxCount", "", (SInt32)5);
+	SME::INI::INISetting			kMaxCountMiscItem("MiscItem", "Shadows::MaxCount", "", (SInt32)-1);
+	SME::INI::INISetting			kMaxCountAlchemyItem("AlchemyItem", "Shadows::MaxCount", "", (SInt32)5);
+	SME::INI::INISetting			kMaxCountEquipment("Equipment", "Shadows::MaxCount", "", (SInt32)-1);
+
 	SME::INI::INISetting			kMiscForceSM3RenderPath("ForceSM3RenderPath", "Misc::Renderer", "", (SInt32)0);
 
 }
@@ -211,6 +219,15 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kWeatherDisableCloudy);
 	RegisterSetting(&Settings::kWeatherDisableRainy);
 	RegisterSetting(&Settings::kWeatherDisableSnow);
+
+	RegisterSetting(&Settings::kMaxCountActor);
+	RegisterSetting(&Settings::kMaxCountBook);
+	RegisterSetting(&Settings::kMaxCountFlora);
+	RegisterSetting(&Settings::kMaxCountIngredient);
+	RegisterSetting(&Settings::kMaxCountMiscItem);
+	RegisterSetting(&Settings::kMaxCountAlchemyItem);
+	RegisterSetting(&Settings::kMaxCountEquipment);
+
 
 	RegisterSetting(&Settings::kMiscForceSM3RenderPath);
 

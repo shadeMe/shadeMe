@@ -10,6 +10,39 @@ namespace ShadowFacts
 // this will keep the SSL state synchronized with the current frame's but will also force delinquents to take up a slot in the queue
 #define DEFERRED_SSL_AUXCHECKS			0
 
+	class ShadowCaster;
+
+	class ShadowCasterCountTable
+	{
+		enum
+		{
+			kMaxShadows_Actor		= 0,
+			kMaxShadows_Book,
+			kMaxShadows_Flora,
+			kMaxShadows_Ingredient,
+			kMaxShadows_MiscItem,
+			kMaxShadows_AlchemyItem,
+			kMaxShadows_Equipment,
+
+			kMaxShadows__MAX
+		};
+
+		UInt32							Current[kMaxShadows__MAX];
+		UInt32							ValidatedShadowCount;
+		UInt32							MaxSceneShadowCount;
+
+		UInt32*							GetCurrentCount(UInt8 Type);
+		SInt32							GetMaxCount(UInt8 Type) const;
+	public:
+		ShadowCasterCountTable(UInt32 MaxSceneShadows);
+		~ShadowCasterCountTable();
+
+		bool							ValidateCount(ShadowCaster* Caster);		// returns true if max count was not exceeded
+		void							IncrementCount(ShadowCaster* Caster);		// increments current count for the caster's type
+
+		bool							GetSceneSaturated(void) const;				// returns true if the total number of shadows in the scene has been reached
+	};
+
 	class ShadowCaster
 	{
 		friend class ShadowSceneProc;
@@ -18,8 +51,8 @@ namespace ShadowFacts
 		TESObjectREFR*					Object;
 		float							Distance;							// from the player
 		float							BoundRadius;
-		bool							IsActor;
-		bool							IsUnderWater;
+		bool							Actor;
+		bool							UnderWater;
 
 
 		ShadowSceneLight*				CreateShadowSceneLight(ShadowSceneNode* Root);
@@ -33,7 +66,9 @@ namespace ShadowFacts
 
 		TESObjectREFR*					GetObject(void) const;
 		void							GetDescription(std::string& Out) const;
-		bool							Queue(ShadowSceneNode* Root, ShadowSceneLight** OutSSL = NULL);		// returns true if successful
+
+										// returns true if successful
+		bool							Queue(ShadowSceneNode* Root, ShadowCasterCountTable* Count, ShadowSceneLight** OutSSL = NULL);
 	};
 
 	class ShadowSceneProc
@@ -52,6 +87,7 @@ namespace ShadowFacts
 			virtual void			AcceptLeaf(NiAVObject* Object);
 		};
 
+		
 		CasterListT						Casters;
 		ShadowSceneNode*				Root;
 
@@ -63,7 +99,7 @@ namespace ShadowFacts
 		ShadowSceneProc(ShadowSceneNode* Root);
 		~ShadowSceneProc();
 
-		void							TraverseAndQueue(UInt32 MaxShadowCount);
+		void							Execute(UInt32 MaxShadowCount);
 	};
 
 	typedef	Utilities::FilePathINIParamList		PathSubstringListT;
@@ -301,6 +337,11 @@ namespace ShadowFacts
 
 	class ShadowRenderTasks
 	{
+	public:
+#if DEFERRED_SSL_AUXCHECKS == 0
+		static ShadowLightListT						LightProjectionUpdateQueue;
+#endif
+	private:
 		static PathSubstringListT					BackFaceIncludePaths;
 		static PathSubstringListT					LargeObjectExcludePaths;
 		static PathSubstringListT					LightLOSCheckExcludePaths;
@@ -361,7 +402,8 @@ namespace ShadowFacts
 	_DeclareMemHdlr(TextureManagerReserveShadowMaps, "");
 	_DeclareMemHdlr(ShadowSceneLightGetShadowMap, "");
 	_DeclareMemHdlr(CreateWorldSceneGraph, "");
-	_DeclareMemHdlr(CullCellActorNode, "");
+	_DeclareMemHdlr(CullCellActorNodeA, "");
+	_DeclareMemHdlr(CullCellActorNodeB, "");
 	_DeclareMemHdlr(BlacklistTreeNode, "");
 	_DeclareMemHdlr(TrifleSupportPatch, "compatibility patch for Trifle's first person shadows");
 

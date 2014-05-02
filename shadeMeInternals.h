@@ -133,6 +133,14 @@ namespace Settings
 	extern SME::INI::INISetting				kWeatherDiffuseRainy;
 	extern SME::INI::INISetting				kWeatherDiffuseSnow;
 
+	extern SME::INI::INISetting				kMaxCountActor;
+	extern SME::INI::INISetting				kMaxCountBook;
+	extern SME::INI::INISetting				kMaxCountFlora;
+	extern SME::INI::INISetting				kMaxCountIngredient;		// includes sigil stones, soul gems
+	extern SME::INI::INISetting				kMaxCountMiscItem;			// includes keys
+	extern SME::INI::INISetting				kMaxCountAlchemyItem;
+	extern SME::INI::INISetting				kMaxCountEquipment;			// includes armor, weapon, clothing, ammo
+
 	extern SME::INI::INISetting				kMiscForceSM3RenderPath;
 }
 

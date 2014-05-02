@@ -6,7 +6,6 @@
 namespace ShadowFigures
 {
 	class ShadowRenderConstantRegistry;
-	class ShadowRenderConstantHotSwap;
 
 	class ShadowRenderConstant
 	{

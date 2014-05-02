@@ -6,18 +6,130 @@
 
 namespace ShadowFacts
 {
+	UInt32* ShadowCasterCountTable::GetCurrentCount( UInt8 Type )
+	{
+		switch (Type)
+		{
+		case kFormType_NPC:
+		case kFormType_Creature:
+			return &Current[kMaxShadows_Actor];
+		case kFormType_Book:
+			return &Current[kMaxShadows_Book];
+		case kFormType_Flora:
+			return &Current[kMaxShadows_Flora];
+		case kFormType_Ingredient:
+		case kFormType_SigilStone:
+		case kFormType_SoulGem:
+			return &Current[kMaxShadows_Ingredient];
+		case kFormType_Misc:
+		case kFormType_Key:
+			return &Current[kMaxShadows_MiscItem];
+		case kFormType_AlchemyItem:
+			return &Current[kMaxShadows_AlchemyItem];
+		case kFormType_Ammo:
+		case kFormType_Armor:
+		case kFormType_Clothing:
+		case kFormType_Weapon:
+			return &Current[kMaxShadows_Equipment];
+		default:
+			return NULL;
+		}
+	}
+
+	SInt32 ShadowCasterCountTable::GetMaxCount( UInt8 Type ) const
+	{
+		switch (Type)
+		{
+		case kFormType_NPC:
+		case kFormType_Creature:
+			return Settings::kMaxCountActor().i;
+		case kFormType_Book:
+			return Settings::kMaxCountBook().i;
+		case kFormType_Flora:
+			return Settings::kMaxCountFlora().i;
+		case kFormType_Ingredient:
+		case kFormType_SigilStone:
+		case kFormType_SoulGem:
+			return Settings::kMaxCountIngredient().i;
+		case kFormType_Misc:
+		case kFormType_Key:
+			return Settings::kMaxCountMiscItem().i;
+		case kFormType_AlchemyItem:
+			return Settings::kMaxCountAlchemyItem().i;
+		case kFormType_Ammo:
+		case kFormType_Armor:
+		case kFormType_Clothing:
+		case kFormType_Weapon:
+			return Settings::kMaxCountEquipment().i;
+		default:
+			return -1;
+		}
+	}
+
+	ShadowCasterCountTable::ShadowCasterCountTable(UInt32 MaxSceneShadows)
+	{
+		MaxSceneShadowCount = MaxSceneShadows;
+		ValidatedShadowCount = 0;
+
+		for (int i = 0; i < kMaxShadows__MAX; i++)
+			Current[i] = 0;
+	}
+
+	ShadowCasterCountTable::~ShadowCasterCountTable()
+	{
+		;//
+	}
+
+	bool ShadowCasterCountTable::ValidateCount( ShadowCaster* Caster )
+	{
+		SME_ASSERT(Caster);
+
+		UInt8 Type = Caster->GetObject()->baseForm->typeID;
+		UInt32* CurrentCount = GetCurrentCount(Type);
+		SInt32 MaxCount = GetMaxCount(Type);
+
+		if (MaxCount >= 0 && CurrentCount)
+		{
+			if ((*CurrentCount) + 1 > MaxCount)
+				return false;
+		}
+
+		return true;
+	}
+
+	bool ShadowCasterCountTable::GetSceneSaturated( void ) const
+	{
+		if (ValidatedShadowCount >= MaxSceneShadowCount)
+			return true;
+		else
+			return false;
+	}
+
+	void ShadowCasterCountTable::IncrementCount( ShadowCaster* Caster )
+	{
+		SME_ASSERT(Caster);
+
+		UInt8 Type = Caster->GetObject()->baseForm->typeID;
+		UInt32* CurrentCount = GetCurrentCount(Type);
+
+		if (CurrentCount)
+			(*CurrentCount)++;
+
+		ValidatedShadowCount++;
+	}
+
 	ShadowCaster::ShadowCaster( NiNode* Node, TESObjectREFR* Object ) :
 		Node(Node),
 		Object(Object),
 		Distance(0),
 		BoundRadius(0),
-		IsActor(false),
-		IsUnderWater(false)
+		Actor(false),
+		UnderWater(false)
 	{
 		SME_ASSERT(Node && Object && Object->baseForm && Object->parentCell);
 		Distance = Utilities::GetDistanceFromPlayer(Node);
 		BoundRadius = Node->m_kWorldBound.radius;
-		IsActor = Object->IsActor();
+		Actor = Object->IsActor();
 
 		if ((Object->parentCell->HasWater()))
 		{
@@ -25,7 +137,7 @@ namespace ShadowFacts
 			if (xWaterHeight)
 			{
 				if (Node->m_worldTranslate.z < xWaterHeight->waterHeight)
-					IsUnderWater = true;
+					UnderWater = true;
 			}
 		}
 	}
@@ -47,16 +159,20 @@ namespace ShadowFacts
 		Out = Buffer;
 	}
 
-	bool ShadowCaster::Queue( ShadowSceneNode* Root, ShadowSceneLight** OutSSL )
+	bool ShadowCaster::Queue( ShadowSceneNode* Root, ShadowCasterCountTable* Count, ShadowSceneLight** OutSSL )
 	{
 		bool Result = false;
 		
 		if (OutSSL)
 			*OutSSL = NULL;
 
-		if (Distance < Settings::kCasterMaxDistance().f)
+		if (Count->ValidateCount(this) == false)
 		{
-			if (IsActor && Settings::kForceActorShadows().i)
+			SHADOW_DEBUG(Object, "Failed Shadow Count check");
+		}
+		else if (Distance < Settings::kCasterMaxDistance().f)
+		{
+			if (Actor && Settings::kForceActorShadows().i)
 			{
 				ShadowSceneLight* SSL = CreateShadowSceneLight(Root);
 				if (OutSSL)
@@ -68,14 +184,14 @@ namespace ShadowFacts
 
 			if (BoundRadius >= Settings::kObjectTier1BoundRadius().f)
 			{
-				if (IsUnderWater == false)
+				if (UnderWater == false)
 				{
 					BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
 
 					// don't queue if hidden by fog
 					if (Fog == NULL || Distance < Fog->fogEnd)
 					{
-						if (IsActor)
+						if (Actor)
 						{
 							TESObjectREFR* Horse = thisVirtualCall<TESObjectREFR*>(0x380, Object);
 							UInt32 Refraction = thisCall<UInt32>(0x005E9670, Object);
@@ -124,19 +240,27 @@ namespace ShadowFacts
 		}
 
 #if DEFERRED_SSL_AUXCHECKS == 0
+		ShadowSceneLight* Existing = Utilities::GetShadowCasterLight(Node);
 		if (Result)
 		{
-			ShadowSceneLight* Existing = Utilities::GetShadowCasterLight(Node);
 			if (Existing)
+			{
 				Result = ShadowRenderTasks::PerformAuxiliaryChecks(Existing);
+
+				// queue for forced light projection update
+				if (Result == false)
+					ShadowRenderTasks::LightProjectionUpdateQueue.push_back(Existing);
+			}
 		}
-#endif
+#endif	
 
 		if (Result)
 		{
 			ShadowSceneLight* SSL = CreateShadowSceneLight(Root);
 			if (OutSSL)
 				*OutSSL = SSL;
+
+			Count->IncrementCount(this);
 
 			SHADOW_DEBUG(Object, "Added to Shadow queue");
 		}
@@ -207,7 +331,7 @@ namespace ShadowFacts
 
 			if (FadeNode->IsCulled() == false)
 			{
-				if (ObjRef && ObjRef->baseForm && ObjRef != *g_thePlayer)
+				if (ObjRef && ObjRef->baseForm && ObjRef->refID != 0x14)
 				{
 					if (FadeNode->m_kWorldBound.radius > 0.f)
 					{
@@ -268,7 +392,7 @@ namespace ShadowFacts
 			TESObjectREFR* Object = Itr->refr;
 			SME_ASSERT(Object->baseForm);
 
-			if (Object->niNode && Object != *g_thePlayer)
+			if (Object->niNode && Object->refID != 0x14)
 			{
 				NiNode* Node = Object->niNode;
 				BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
@@ -381,11 +505,11 @@ namespace ShadowFacts
 		SME_ASSERT(Root->shadowCasters.numItems == ValidCasters->size());
 	}
 	
-	void ShadowSceneProc::TraverseAndQueue( UInt32 MaxShadowCount )
+	void ShadowSceneProc::Execute( UInt32 MaxShadowCount )
 	{
-		UInt32 ShadowCount = 0;
 		std::string Buffer;
 		ShadowLightListT ValidSSLs;
+		ShadowCasterCountTable CasterCount(MaxShadowCount);
 
 		Casters.clear();
 		Casters.reserve(MaxShadowCount);
@@ -411,24 +535,23 @@ namespace ShadowFacts
 				if (ShadowRenderTasks::GetCanBeLargeObject(Itr->Node))
 				{
 					ShadowSceneLight* NewSSL = NULL;
-					if (Itr->Queue(Root, &NewSSL) == true)
+					if (Itr->Queue(Root, &CasterCount, &NewSSL) == true)
 					{
-						ShadowCount++;
 						ValidSSLs.push_back(NewSSL);
 
 						if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
 						{
 							Itr->GetDescription(Buffer);
 							_MESSAGE("%s (Large Object) queued", Buffer.c_str());
-						}
-
-						// remove from list
-						Itr = Casters.erase(Itr);
-						continue;
+						}						
 					}
+
+					// remove from list
+					Itr = Casters.erase(Itr);
+					continue;
 				}
 
-				if (ShadowCount == MaxShadowCount)
+				if (CasterCount.GetSceneSaturated())
 					break;
 
 				Itr++;
@@ -440,27 +563,29 @@ namespace ShadowFacts
 		std::sort(Casters.begin(), Casters.end(), ShadowCaster::SortComparatorDistance);
 
 		// now come the actors
-		if (Settings::kForceActorShadows().i || ShadowCount < MaxShadowCount)
+		if (Settings::kForceActorShadows().i || CasterCount.GetSceneSaturated() == false)
 		{
 			for (CasterListT::iterator Itr = Casters.begin(); Itr != Casters.end();)
 			{
 				ShadowSceneLight* NewSSL = NULL;
-				if (Itr->IsActor && Itr->Queue(Root, &NewSSL) == true)
+				if (Itr->Actor)
 				{
-					ShadowCount++;
-					ValidSSLs.push_back(NewSSL);
-
-					if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
+					if (Itr->Queue(Root, &CasterCount, &NewSSL) == true)
 					{
-						Itr->GetDescription(Buffer);
-						_MESSAGE("%s (Actor) queued", Buffer.c_str());
+						ValidSSLs.push_back(NewSSL);
+
+						if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
+						{
+							Itr->GetDescription(Buffer);
+							_MESSAGE("%s (Actor) queued", Buffer.c_str());
+						}
 					}
 
 					Itr = Casters.erase(Itr);
 					continue;
 				}
 
-				if (Settings::kForceActorShadows().i == 0 && ShadowCount == MaxShadowCount)
+				if (Settings::kForceActorShadows().i == 0 && CasterCount.GetSceneSaturated())
 					break;
 
 				Itr++;
@@ -468,14 +593,13 @@ namespace ShadowFacts
 		}
 
 		// the rest follow
-		if (ShadowCount < MaxShadowCount)
+		if (CasterCount.GetSceneSaturated() == false)
 		{
 			for (CasterListT::iterator Itr = Casters.begin(); Itr != Casters.end(); Itr++)
 			{
 				ShadowSceneLight* NewSSL = NULL;
-				if (Itr->Queue(Root, &NewSSL) == true)
+				if (Itr->Queue(Root, &CasterCount, &NewSSL) == true)
 				{
-					ShadowCount++;
 					ValidSSLs.push_back(NewSSL);
 
 					if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
@@ -485,13 +609,12 @@ namespace ShadowFacts
 					}
 				}
 
-				if (ShadowCount == MaxShadowCount)
+				if (CasterCount.GetSceneSaturated())
 					break;
 			}
 		}
 
 		// ### buggy, causes shadow maps to be reapplied on receivers additively on interior/exterior switch
-		// cleanup the scene's existing casters
 		// CleanupSceneCasters(&ValidSSLs);
 
 		gLog.Outdent();
@@ -511,6 +634,7 @@ namespace ShadowFacts
 		
 		gLog.Outdent();
 	}
+
 
 	
 	ShadowExclusionParameters::~ShadowExclusionParameters()
@@ -881,6 +1005,9 @@ namespace ShadowFacts
 		return SetFlag(Utilities::GetBSXFlags(Node), Flag, State);
 	}
 
+#if DEFERRED_SSL_AUXCHECKS == 0
+	ShadowLightListT			ShadowRenderTasks::LightProjectionUpdateQueue;
+#endif
 	PathSubstringListT			ShadowRenderTasks::BackFaceIncludePaths;
 	PathSubstringListT			ShadowRenderTasks::LargeObjectExcludePaths;
 	PathSubstringListT			ShadowRenderTasks::LightLOSCheckExcludePaths;
@@ -1034,7 +1161,7 @@ namespace ShadowFacts
 		if (RootNode)
 		{
 			ShadowSceneProc SceneProc(RootNode);
-			SceneProc.TraverseAndQueue(MaxShadowCount);
+			SceneProc.Execute(MaxShadowCount);
 		}
 	}
 
@@ -1274,8 +1401,9 @@ namespace ShadowFacts
 
 		bool Interior = Object->parentCell->IsInterior();
 
-		if ((Interior && Settings::kPlayerLOSCheckInterior().i) ||
-			(Interior == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kPlayerLOSCheckExterior().i))
+		if (Object != *g_thePlayer &&
+			((Interior && Settings::kPlayerLOSCheckInterior().i) ||
+			(Interior == false && Object->parentCell == (*g_thePlayer)->parentCell && Settings::kPlayerLOSCheckExterior().i)))
 		{
 			bool BoundsCheck = (Interior || Node->m_kWorldBound.radius < Settings::kObjectTier5BoundRadius().f);
 			if (BoundsCheck == true)
@@ -1503,6 +1631,7 @@ namespace ShadowFacts
 
 
 
+
 	ShadowMapTexturePool			ShadowMapTexturePool::Instance;
 
 
@@ -1714,7 +1843,8 @@ namespace ShadowFacts
 	_DefineHookHdlr(CheckInteriorLightSource, 0x007D282C);
 	_DefineHookHdlr(ShadowSceneLightGetShadowMap, 0x007D4760);
 	_DefineHookHdlr(CreateWorldSceneGraph, 0x0040EAAC);
-	_DefinePatchHdlr(CullCellActorNode, 0x004076C1 + 1);
+	_DefinePatchHdlr(CullCellActorNodeA, 0x004076C1 + 1);
+	_DefinePatchHdlr(CullCellActorNodeB, 0x004079D4);
 	_DefineHookHdlr(BlacklistTreeNode, 0x0056118F);
 	_DefinePatchHdlrWithBuffer(TrifleSupportPatch, 0x00407684, 5, 0xE8, 0x57, 0xF7, 0x3B, 0x0);
 
@@ -1890,7 +2020,12 @@ namespace ShadowFacts
 #ifndef NDEBUG
 			mov		eax, [esp + 0x8]
 #else
+	#if DEFERRED_SSL_AUXCHECKS
 			mov		eax, [esp + 0x4]
+	#else
+			mov		eax, [esp + 0x8]
+			mov		eax, [eax]
+	#endif
 #endif
 			mov		[esp + 0x1C], ebx
 
@@ -2222,7 +2357,8 @@ namespace ShadowFacts
 
 		if (Settings::kActorsReceiveAllShadows().i)
 		{
-			_MemHdlr(CullCellActorNode).WriteUInt8(1);
+			_MemHdlr(CullCellActorNodeA).WriteUInt8(1);
+			_MemHdlr(CullCellActorNodeB).WriteUInt8(0xEB);
 		}
 
 		if (ShadowMapTexturePool::GetEnabled())
@@ -2263,4 +2399,6 @@ namespace ShadowFacts
 		ShadowReceiverExParams::Instance.Initialize();
 		ShadowRenderTasks::Initialize();
 	}
+
+
 }

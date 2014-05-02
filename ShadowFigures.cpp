@@ -1,4 +1,5 @@
 #include "ShadowFigures.h"
+#include "ShadowFacts.h"
 #include "ShadowSundries.h"
 
 #pragma warning(disable: 4005 4748)
@@ -261,49 +262,75 @@ namespace ShadowFigures
 	{
 		SME_ASSERT(Source);
 
-		NiNode* Node = Source->sourceNode;
-		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
-		if (Node && Object)
+#if DEFERRED_SSL_AUXCHECKS == 0
+		// the SSL light projection stage method is an utter bastard with a really weird stack frame (bloody compiler optimizations!)
+		// this essentially limits us to calling the function under very specific conditions, i.e., this wrapper works for some reason
+		// so we'll use this bugger to force update unqueued caster SSLs that failed their aux checks
+		// why? because we need to keep up with the source ref's state changes (and also the active scene lights)
+		if (std::find(ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.begin(),
+					ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.end(),
+					Source) == ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.end())
 		{
-			Swapper ProjDist(&SMRC_A38618);
-			Swapper ExtendDist(&SMRC_A31C70);
-
-			float Bound = Node->m_kWorldBound.radius;
-			float NewProjDistMul = 0.f;
-			float BaseRadius = Settings::kObjectTier2BoundRadius().f;
-			float MaxRadius = Settings::kObjectTier3BoundRadius().f;
-
-			float PerPart = (MaxRadius - BaseRadius) / 3.f;
-			float Part1 = BaseRadius + PerPart;
-			float Part2 = BaseRadius + PerPart * 2;
-			float Part3 = BaseRadius + PerPart * 3;
-
-			if (Bound < BaseRadius)
-				NewProjDistMul = 2.5f;
-			else if (Bound > BaseRadius && Bound < Part1)
-				NewProjDistMul = 2.6f;
-			else if (Bound > Part1 && Bound < Part2)
-				NewProjDistMul = 2.7f;
-			else if (Bound > Part2 && Bound < Part3)
-				NewProjDistMul = 2.8f;
-
-			if (NewProjDistMul)
-			{
-				ProjDist.Swap(NewProjDistMul);
-				SHADOW_DEBUG(Object, "Changed Projection Distance Multiplier to %f", NewProjDistMul);
-			}
-
-			float NewExtendDistMul = 1.5f;
-			if (Bound < MaxRadius)
-			{
-				ExtendDist.Swap(NewExtendDistMul);
-				SHADOW_DEBUG(Object, "Changed Extend Distance Multiplier to %f", NewExtendDistMul);
-			}
-
-			thisCall<void>(0x007D2280, Source, AuxParam);
+			ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.push_back(Source);
 		}
-		else
-			thisCall<void>(0x007D2280, Source, AuxParam);
+		
+		for (ShadowLightListT::iterator Itr = ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.begin();
+										Itr != ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.end();
+										Itr++)
+		{
+			Source = *Itr;
+#endif
+
+			NiNode* Node = Source->sourceNode;
+			TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
+			if (Node && Object)
+			{
+				Swapper ProjDist(&SMRC_A38618);
+				Swapper ExtendDist(&SMRC_A31C70);
+
+				float Bound = Node->m_kWorldBound.radius;
+				float NewProjDistMul = 0.f;
+				float BaseRadius = Settings::kObjectTier2BoundRadius().f;
+				float MaxRadius = Settings::kObjectTier3BoundRadius().f;
+
+				float PerPart = (MaxRadius - BaseRadius) / 3.f;
+				float Part1 = BaseRadius + PerPart;
+				float Part2 = BaseRadius + PerPart * 2;
+				float Part3 = BaseRadius + PerPart * 3;
+
+				if (Bound < BaseRadius)
+					NewProjDistMul = 2.5f;
+				else if (Bound > BaseRadius && Bound < Part1)
+					NewProjDistMul = 2.6f;
+				else if (Bound > Part1 && Bound < Part2)
+					NewProjDistMul = 2.7f;
+				else if (Bound > Part2 && Bound < Part3)
+					NewProjDistMul = 2.8f;
+
+				if (NewProjDistMul)
+				{
+					ProjDist.Swap(NewProjDistMul);
+					SHADOW_DEBUG(Object, "Changed Projection Distance Multiplier to %f", NewProjDistMul);
+				}
+
+				float NewExtendDistMul = 1.5f;
+				if (Bound < MaxRadius)
+				{
+					ExtendDist.Swap(NewExtendDistMul);
+					SHADOW_DEBUG(Object, "Changed Extend Distance Multiplier to %f", NewExtendDistMul);
+				}
+
+				thisCall<void>(0x007D2280, Source, AuxParam);
+			}
+			else
+				thisCall<void>(0x007D2280, Source, AuxParam);
+
+#if DEFERRED_SSL_AUXCHECKS == 0
+		}
+
+		// clear the queue as it's populated every single frame
+		ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.clear();
+#endif
 	}
 
 	void __stdcall ShadowRenderConstantHotSwapper::HandleShadowMapRenderStage( ShadowSceneLight* Source, void* AuxParam )

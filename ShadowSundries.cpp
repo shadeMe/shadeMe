@@ -211,11 +211,13 @@ namespace ShadowSundries
 
 		if (Settings::kActorsReceiveAllShadows().i)
 		{
-			_MemHdlr(CullCellActorNode).WriteUInt8(1);
+			_MemHdlr(CullCellActorNodeA).WriteUInt8(1);
+			_MemHdlr(CullCellActorNodeB).WriteUInt8(0xEB);
 		}
 		else
 		{
-			_MemHdlr(CullCellActorNode).WriteUInt8(0);
+			_MemHdlr(CullCellActorNodeA).WriteUInt8(0);
+			_MemHdlr(CullCellActorNodeB).WriteUInt8(0x75);
 		}
 
 		ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
