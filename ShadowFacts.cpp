@@ -111,7 +111,7 @@ namespace ShadowFacts
 
 		if (Result)
 		{
-			Result = ShadowRenderTasks::GetHasPlayerLOS(Object, Node);
+			Result = ShadowRenderTasks::GetHasPlayerLOS(Object, Node, Distance);
 			if (Result == false)
 				SHADOW_DEBUG(Object, "Failed Player LOS check");
 		}
@@ -1010,11 +1010,12 @@ namespace ShadowFacts
 		TESWeather* CurrentWeather = Sky::GetSingleton()->firstWeather;
 		if (CurrentWeather && TES::GetSingleton()->currentInteriorCell == NULL)
 		{
-			if (CurrentWeather->precipType == TESWeather::kType_Cloudy && Settings::kWeatherDisableCloudy().i)
+			UInt8 WeatherType = Utilities::GetWeatherClassification(CurrentWeather);
+			if (WeatherType == TESWeather::kType_Cloudy && Settings::kWeatherDisableCloudy().i)
 				return;
-			else if (CurrentWeather->precipType == TESWeather::kType_Rainy && Settings::kWeatherDisableRainy().i)
+			else if (WeatherType == TESWeather::kType_Rainy && Settings::kWeatherDisableRainy().i)
 				return;
-			else if (CurrentWeather->precipType == TESWeather::kType_Snow && Settings::kWeatherDisableSnow().i)
+			else if (WeatherType == TESWeather::kType_Snow && Settings::kWeatherDisableSnow().i)
 				return;
 		}
 
@@ -1256,7 +1257,7 @@ namespace ShadowFacts
 			return true;
 	}
 
-	bool ShadowRenderTasks::GetHasPlayerLOS( TESObjectREFR* Object, NiNode* Node )
+	bool ShadowRenderTasks::GetHasPlayerLOS( TESObjectREFR* Object, NiNode* Node, float Distance )
 	{
 		SME_ASSERT(Object && Node);
 
@@ -1268,12 +1269,18 @@ namespace ShadowFacts
 			bool BoundsCheck = (Interior || Node->m_kWorldBound.radius < Settings::kObjectTier5BoundRadius().f);
 			if (BoundsCheck == true)
 			{
-				bool Above = (Settings::kPlayerLOSCheckHighAccuracy().i && Interior) || Utilities::GetAbovePlayer(Object, 10);
-				bool Below = (Settings::kPlayerLOSCheckHighAccuracy().i && Interior) || Utilities::GetBelowPlayer(Object, 35);
-				if (Above == true || Below == true)
+				bool Above = Utilities::GetAbovePlayer(Object, 10);
+				bool Below = Utilities::GetBelowPlayer(Object, 35);
+				bool CloseToPC = Distance < Settings::kPlayerLOSCheckThresholdDist().f;
+				bool HighAccuracy = Settings::kPlayerLOSCheckHighAccuracy().i != 0;
+
+				if (Above == true || Below == true || HighAccuracy == true)
 				{
-					if (Utilities::GetPlayerHasLOS(Object, true) == false)
-						return false;
+					if ((Interior == false && CloseToPC == false) ||
+						(Interior == true && (CloseToPC == false || Above == true || Below == true)))
+					{
+						return Utilities::GetPlayerHasLOS(Object, true);
+					}
 				}
 			}
 		}

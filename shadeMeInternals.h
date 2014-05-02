@@ -80,6 +80,7 @@ namespace Settings
 	extern SME::INI::INISetting				kPlayerLOSCheckInterior;
 	extern SME::INI::INISetting				kPlayerLOSCheckExterior;
 	extern SME::INI::INISetting				kPlayerLOSCheckHighAccuracy;
+	extern SME::INI::INISetting				kPlayerLOSCheckThresholdDist;
 
 	extern SME::INI::INISetting				kSelfExcludedTypesInterior;
 	extern SME::INI::INISetting				kSelfExcludedTypesExterior;
@@ -207,7 +208,7 @@ public:
 	float												unkE0;		// time elapsed during fade-in?
 	NiTPointerList<NiTriBasedGeom>						unkE4;		// light receiver geometry?
 	UInt8												unkF4;		// shadow map rendered/casts shadow flag?
-	UInt8												unkF5;
+	UInt8												unkF5;		// use cubemap camera when set?
 	UInt8												unkF5Pad[2];
 	float												unkF8;
 	UInt8												unkFC;
@@ -220,7 +221,8 @@ public:
 	UInt16												unk118;		// when 0xFF, light source is culled (not active)
 	UInt16												unk11A;
 	UInt32												unk11C;
-	UInt32												unk120;
+	UInt8												unk120;		// force render shadow map?
+	UInt8												pad121[3];
 	NiPointer<BSCubeMapCamera>							unk124;		// light camera?
 	UInt32												unk128;
 	UInt8												showDebug;	// 12C - debug shader toggle
@@ -313,6 +315,7 @@ namespace Utilities
 	NiProperty*			GetNiPropertyByID(NiAVObject* Source, UInt8 ID);
 	UInt32				GetNodeActiveLights(NiNode* Source, ShadowLightListT* OutList, UInt32 Params);
 	BSFadeNode*			GetPlayerNode(bool FirstPerson = false);
+	UInt8				GetWeatherClassification(TESWeather* Weather);
 
 	void				UpdateBounds(NiNode* Node);
 	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);

@@ -170,7 +170,8 @@ namespace ShadowFigures
 			DataStore[&SRC_A6BEA0].Exterior = 16384;
 			DataStore[&SMRC_A38618].Exterior = 30;
 			DataStore[&SMRC_A38618].Interior = 30;
-
+			DataStore[&SMRC_A3F3A0].Exterior = 10;
+			
 			Save();
 		}
 	}
@@ -205,14 +206,16 @@ namespace ShadowFigures
 		}
 
 		// special overrides
-		static const float DiffuseMultiplier = 3.5;
+		static const float DiffusePercent = 55.f;
+		float DiffuseMultiplier = DiffusePercent / 100.f * SMRC_A3F3A0.GetValue();
 
 		TESWeather* CurrentWeather = Sky::GetSingleton()->firstWeather;
 		if (CurrentWeather && TES::GetSingleton()->currentInteriorCell == NULL)
 		{
-			if ((CurrentWeather->precipType == TESWeather::kType_Cloudy && Settings::kWeatherDiffuseCloudy().i) ||
-				(CurrentWeather->precipType == TESWeather::kType_Rainy && Settings::kWeatherDiffuseRainy().i) ||
-				(CurrentWeather->precipType == TESWeather::kType_Snow && Settings::kWeatherDiffuseSnow().i))
+			UInt8 WeatherType = Utilities::GetWeatherClassification(CurrentWeather);
+			if ((WeatherType == TESWeather::kType_Cloudy && Settings::kWeatherDiffuseCloudy().i) ||
+				(WeatherType == TESWeather::kType_Rainy && Settings::kWeatherDiffuseRainy().i) ||
+				(WeatherType == TESWeather::kType_Snow && Settings::kWeatherDiffuseSnow().i))
 			{
 				SMRC_A3F3A0.SetValue(DiffuseMultiplier);
 			}
@@ -323,7 +326,7 @@ namespace ShadowFigures
 				SamplingScale.Swap(NewSampScale);
 				SHADOW_DEBUG(Object, "Changed Sampling Scale Multiplier to %f", NewSampScale);
 			}
-
+			
 			thisCall<void>(0x007D46C0, Source, AuxParam);
 		}
 		else

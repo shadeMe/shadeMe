@@ -330,7 +330,7 @@ namespace ShadowFacts
 		static bool									GetCanBeLargeObject(NiNode* Node);
 		static bool									GetIsLargeObject(NiNode* Node);
 		static bool	__stdcall						PerformAuxiliaryChecks(ShadowSceneLight* Source);
-		static bool									GetHasPlayerLOS(TESObjectREFR* Object, NiNode* Node);
+		static bool									GetHasPlayerLOS(TESObjectREFR* Object, NiNode* Node, float Distance);
 		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
 		static bool									GetCanReceiveShadow(NiNode* Node);
 		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, NiNode* Node, float BoundRadius);		// return true to allow

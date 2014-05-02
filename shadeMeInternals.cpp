@@ -60,6 +60,7 @@ namespace Settings
 	SME::INI::INISetting			kPlayerLOSCheckInterior("Interior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kPlayerLOSCheckExterior("Exterior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kPlayerLOSCheckHighAccuracy("HighAccuracy", "Shadows::PlayerLOSCheck", "Remove the Z-delta constraint from the check", (SInt32)0);
+	SME::INI::INISetting			kPlayerLOSCheckThresholdDist("ThresholdDistance", "Shadows::PlayerLOSCheck", "", (float)200.f);
 
 
 	SME::INI::INISetting			kSelfExcludedTypesInterior("Interior", "SelfShadows::ExcludedTypes", "Form types that can't cast shadows", "");
@@ -158,6 +159,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kPlayerLOSCheckInterior);
 	RegisterSetting(&Settings::kPlayerLOSCheckExterior);
 	RegisterSetting(&Settings::kPlayerLOSCheckHighAccuracy);
+	RegisterSetting(&Settings::kPlayerLOSCheckThresholdDist);
 
 	RegisterSetting(&Settings::kSelfExcludedTypesInterior);
 	RegisterSetting(&Settings::kSelfExcludedTypesExterior);
@@ -677,6 +679,30 @@ namespace Utilities
 	ShadowSceneNode* GetShadowSceneNode( void )
 	{
 		return cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+	}
+
+	enum
+	{
+		kWeatherPrecipType_Pleasant = 1 << 0,
+		kWeatherPrecipType_Cloudy	= 1 << 1,
+		kWeatherPrecipType_Rainy	= 1 << 2,
+		kWeatherPrecipType_Snow		= 1 << 3,
+	};
+
+	UInt8 GetWeatherClassification( TESWeather* Weather )
+	{
+		SME_ASSERT(Weather);
+
+		if ((Weather->precipType & kWeatherPrecipType_Pleasant))
+			return TESWeather::kType_Pleasant;
+		else if ((Weather->precipType & kWeatherPrecipType_Cloudy))
+			return TESWeather::kType_Cloudy;
+		else if ((Weather->precipType & kWeatherPrecipType_Rainy))
+			return TESWeather::kType_Rainy;
+		else if ((Weather->precipType & kWeatherPrecipType_Snow))
+			return TESWeather::kType_Snow;
+		else
+			return TESWeather::kType_None;
 	}
 
 }
