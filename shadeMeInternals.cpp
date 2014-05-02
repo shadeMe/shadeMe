@@ -7,6 +7,7 @@ namespace Interfaces
 {
 	PluginHandle					kOBSEPluginHandle = kPluginHandle_Invalid;
 
+	const OBSEInterface*			kOBSE = NULL;
 	OBSEMessagingInterface*			kOBSEMessaging = NULL;
 }
 

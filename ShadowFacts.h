@@ -5,6 +5,11 @@
 // the outer part of a shadow is called the penumbra!
 namespace ShadowFacts
 {
+
+// auxiliary checks are performed after the light space projection stage as opposed to shadow caster queuing stage
+// this will keep the SSL state synchronized with the current frame's but will also force delinquents to take up a slot in the queue
+#define DEFERRED_SSL_AUXCHECKS			0
+
 	class ShadowCaster
 	{
 		friend class ShadowSceneProc;
@@ -15,6 +20,7 @@ namespace ShadowFacts
 		float							BoundRadius;
 		bool							IsActor;
 		bool							IsUnderWater;
+
 
 		ShadowSceneLight*				CreateShadowSceneLight(ShadowSceneNode* Root);
 		bool							GetIsLargeObject(void) const;
@@ -357,7 +363,7 @@ namespace ShadowFacts
 	_DeclareMemHdlr(CreateWorldSceneGraph, "");
 	_DeclareMemHdlr(CullCellActorNode, "");
 	_DeclareMemHdlr(BlacklistTreeNode, "");
-
+	_DeclareMemHdlr(TrifleSupportPatch, "compatibility patch for Trifle's first person shadows");
 
 	void Patch(void);
 	void Initialize(void);

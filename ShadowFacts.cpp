@@ -123,6 +123,15 @@ namespace ShadowFacts
 				SHADOW_DEBUG(Object, "Failed Interior Heuristic check");
 		}
 
+#if DEFERRED_SSL_AUXCHECKS == 0
+		if (Result)
+		{
+			ShadowSceneLight* Existing = Utilities::GetShadowCasterLight(Node);
+			if (Existing)
+				Result = ShadowRenderTasks::PerformAuxiliaryChecks(Existing);
+		}
+#endif
+
 		if (Result)
 		{
 			ShadowSceneLight* SSL = CreateShadowSceneLight(Root);
@@ -198,7 +207,7 @@ namespace ShadowFacts
 
 			if (FadeNode->IsCulled() == false)
 			{
-				if (ObjRef && ObjRef->baseForm)
+				if (ObjRef && ObjRef->baseForm && ObjRef != *g_thePlayer)
 				{
 					if (FadeNode->m_kWorldBound.radius > 0.f)
 					{
@@ -259,7 +268,7 @@ namespace ShadowFacts
 			TESObjectREFR* Object = Itr->refr;
 			SME_ASSERT(Object->baseForm);
 
-			if (Object->niNode)
+			if (Object->niNode && Object != *g_thePlayer)
 			{
 				NiNode* Node = Object->niNode;
 				BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
@@ -292,6 +301,8 @@ namespace ShadowFacts
 
 	void ShadowSceneProc::EnumerateSceneCasters( void )
 	{
+		Casters.push_back(ShadowCaster(Utilities::GetPlayerNode(), *g_thePlayer));
+
 #if 0
 		// walking the scenegraph is the easiest but it doesn't seem very reliable
 		// actors (other refs too?) randomly go missing during traversal
@@ -1417,7 +1428,10 @@ namespace ShadowFacts
 	{
 		bool Result = true;
 
-		if (GetCanHaveDirectionalShadow(Source) == false)
+		if (GetCanHaveDirectionalShadow(Source) == false &&
+			Source->sourceLight->m_worldTranslate.x != 0 &&
+			Source->sourceLight->m_worldTranslate.y != 0 &&
+			Source->sourceLight->m_worldTranslate.z != 0 )
 		{
 			// we estimate (rather crudely) if the source light is more or less directly above the node
 			Vector3 Buffer(*(Vector3*)&Source->sourceLight->m_worldTranslate);
@@ -1439,38 +1453,44 @@ namespace ShadowFacts
 	{
 		bool Result = true;
 
-		if (BSXFlagsSpecialFlags::GetFlag(Source->sourceNode, BSXFlagsSpecialFlags::kDontPerformLOSCheck) == false)
+		if (Source->sourceLight->m_worldTranslate.x != 0 &&
+			Source->sourceLight->m_worldTranslate.y != 0 &&
+			Source->sourceLight->m_worldTranslate.z != 0 )
 		{
-			if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
+			if (BSXFlagsSpecialFlags::GetFlag(Source->sourceNode, BSXFlagsSpecialFlags::kDontPerformLOSCheck) == false)
 			{
-				if (Object->IsActor() == false || Settings::kLightLOSSkipActors().i == 0)
+				if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
 				{
-					// light LOS checks don't really work well in interiors as they're performed on the projected translation coords of the source light
-					// only small objects, i.e, those that use a close-to-vanilla projection multiplier pass these checks in such cells
-					// so we'll limit it to them (just as well, as we're only concerned about them anyway)
-					bool CheckInterior = Object->parentCell->IsInterior() &&
-						Settings::kLightLOSCheckInterior().i &&
-						Source->sourceNode->m_kWorldBound.radius < Settings::kObjectTier2BoundRadius().f;
-
-					if (CheckInterior || (Object->parentCell->IsInterior() == false && Settings::kLightLOSCheckExterior().i))
+					if (Object->IsActor() == false || Settings::kLightLOSSkipActors().i == 0)
 					{
-						if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
+						// light LOS checks don't really work well in interiors as they're performed on the projected translation coords of the source light
+						// only small objects, i.e, those that use a close-to-vanilla projection multiplier pass these checks in such cells
+						// so we'll limit it to them (just as well, as we're only concerned about them anyway)
+						bool CheckInterior = Object->parentCell->IsInterior() &&
+							Settings::kLightLOSCheckInterior().i &&
+							Source->sourceNode->m_kWorldBound.radius < Settings::kObjectTier2BoundRadius().f;
+
+						if (CheckInterior || (Object->parentCell->IsInterior() == false && Settings::kLightLOSCheckExterior().i))
 						{
-							bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
-							if (LOSCheck == false)
+							if (Utilities::GetDistanceFromPlayer(Source->sourceNode) < Settings::kCasterMaxDistance().f)
 							{
-								Result = false;
+								bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Object);
+								if (LOSCheck == false)
+								{
+									Result = false;
+								}
+								SHADOW_DEBUG(Object, "LOS[%d]", LOSCheck);
 							}
-							SHADOW_DEBUG(Object, "LOS[%d]", LOSCheck);
 						}
+						else SHADOW_DEBUG(Object, "Skipped with Light LOS Cell/Bound Radius check");
 					}
-					else SHADOW_DEBUG(Object, "Skipped with Light LOS Cell/Bound Radius check");
+					else SHADOW_DEBUG(Object, "Skipped with Light LOS Actor check");
 				}
-				else SHADOW_DEBUG(Object, "Skipped with Light LOS Actor check");
+				else SHADOW_DEBUG(Object, "Skipped with Light LOS Large Object check");
 			}
-			else SHADOW_DEBUG(Object, "Skipped with Light LOS Large Object check");
+			else SHADOW_DEBUG(Object, "Skipped BSXFlags DontPerformLOS check");
 		}
-		else SHADOW_DEBUG(Object, "Skipped BSXFlags DontPerformLOS check");
+		
 
 		return Result;
 	}
@@ -1681,7 +1701,7 @@ namespace ShadowFacts
 
 
 
-	_DefineHookHdlr(EnumerateFadeNodes, 0x004075CE);
+	_DefineHookHdlr(EnumerateFadeNodes, 0x00407508);
 	_DefineHookHdlr(RenderShadowsProlog, 0x004073E4);
 	_DefineHookHdlr(RenderShadowsEpilog, 0x00407AD3);
 	_DefineHookHdlr(QueueModel3D, 0x00434BB2);
@@ -1696,6 +1716,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(CreateWorldSceneGraph, 0x0040EAAC);
 	_DefinePatchHdlr(CullCellActorNode, 0x004076C1 + 1);
 	_DefineHookHdlr(BlacklistTreeNode, 0x0056118F);
+	_DefinePatchHdlrWithBuffer(TrifleSupportPatch, 0x00407684, 5, 0xE8, 0x57, 0xF7, 0x3B, 0x0);
 
 
 	#define _hhName	EnumerateFadeNodes
@@ -2190,7 +2211,10 @@ namespace ShadowFacts
 		_MemHdlr(UpdateGeometryLighting).WriteJump();
 		_MemHdlr(UpdateGeometryLightingSelf).WriteJump();
 		_MemHdlr(RenderShadowMap).WriteJump();
+
+#if DEFERRED_SSL_AUXCHECKS
 		_MemHdlr(PerformAuxSSLChecks).WriteJump();
+#endif
 		_MemHdlr(CheckLargeObjectLightSource).WriteJump();
 		_MemHdlr(CheckShadowReceiver).WriteJump();
 		_MemHdlr(CheckInteriorLightSource).WriteJump();

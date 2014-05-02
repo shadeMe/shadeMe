@@ -10,7 +10,21 @@ void OBSEMessageHandler(OBSEMessagingInterface::Message* Msg)
 {
 	switch (Msg->type)
 	{
-	case OBSEMessagingInterface::kMessage_LoadGame:
+	case OBSEMessagingInterface::kMessage_PostPostLoad:
+		{
+#if DEFERRED_SSL_AUXCHECKS == 0
+			if (Interfaces::kOBSE)
+			{
+				if (Interfaces::kOBSE->GetPluginLoaded("Trifle"))
+				{
+					// overwrite Trifle's player shadow caster enumeration hook
+					// as we override the enumeration process
+					ShadowFacts::_MemHdlr(TrifleSupportPatch).WriteBuffer();
+				}
+			}
+#endif
+		}
+
 		break;
 	}
 }
@@ -26,6 +40,7 @@ extern "C"
 		info->version =		PACKED_SME_VERSION;
 
 		Interfaces::kOBSEPluginHandle = obse->GetPluginHandle();
+		Interfaces::kOBSE = obse;
 
 		if (obse->isEditor)
 		{
@@ -42,9 +57,9 @@ extern "C"
 				_MESSAGE("Unsupported runtime version %08X", obse->oblivionVersion);
 				return false;
 			}
-			else if(obse->obseVersion < OBSE_VERSION_INTEGER)
+			else if(obse->obseVersion < 21)
 			{
-				_ERROR("OBSE version too old (got %08X expected at least %08X)", obse->obseVersion, OBSE_VERSION_INTEGER);
+				_ERROR("OBSE version too old (got %08X expected at least %08X)", obse->obseVersion, 21);
 				return false;
 			}
 

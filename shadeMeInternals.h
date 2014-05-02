@@ -37,6 +37,7 @@ namespace Interfaces
 {
 	extern PluginHandle						kOBSEPluginHandle;
 
+	extern const OBSEInterface*				kOBSE;
 	extern OBSEMessagingInterface*			kOBSEMessaging;
 }
 
