@@ -909,7 +909,7 @@ namespace ShadowFacts
 		if (FadeNode)
 		{
 			TESObjectREFR* Object = Utilities::GetNodeObjectRef(FadeNode);
-			if (FadeNode->IsCulled() == false && ShadowRenderTasks::GetCanReceiveShadow(FadeNode) == false)
+			if (FadeNode->IsCulled() == false && Object && Object->parentCell && ShadowRenderTasks::GetCanReceiveShadow(FadeNode) == false)
 			{
 				SHADOW_DEBUG(Object, "Queued for Shadow Receiver culling");
 				NonReceivers->push_back(FadeNode);

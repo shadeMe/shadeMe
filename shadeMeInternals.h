@@ -310,7 +310,7 @@ public:
 
 namespace Utilities
 {
-	float				GetDistanceFromPlayer(NiNode* Node);
+	float				GetDistanceFromPlayer(NiAVObject* Source);
 	bool				GetPlayerHasLOS(TESObjectREFR* Target, bool HighAccuracy = false);	// slooooooooowwwwww!
 	bool				GetLightLOS(NiAVObject* Light, TESObjectREFR* Target);				// slooooooooooooooooooooowwwwwwwwwwwwwwwwwwwwwwwwweeeerrrrrrrr!
 																							// also, haaaaaaaaaaaaccccckkkkkyyyyy!

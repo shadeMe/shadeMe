@@ -59,7 +59,7 @@ extern "C"
 			}
 			else if(obse->obseVersion < 21)
 			{
-				_ERROR("OBSE version too old (got %08X expected at least %08X)", obse->obseVersion, 21);
+				_ERROR("OBSE version too old (got %d expected at least %d)", obse->obseVersion, 21);
 				return false;
 			}
 

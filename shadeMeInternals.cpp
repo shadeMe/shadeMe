@@ -271,14 +271,14 @@ void BSTextureManager::ReserveShadowMaps( UInt32 Count )
 
 namespace Utilities
 {
-	float GetDistanceFromPlayer( NiNode* Node )
-	{
-		SME_ASSERT(Node);
+	float GetDistanceFromPlayer( NiAVObject* Source )
+{
+		SME_ASSERT(Source);
 
 		NiNode* ThirdPersonNode = thisCall<NiNode*>(0x00660110, *g_thePlayer, false);
 		SME_ASSERT(ThirdPersonNode);
 
-		return GetDistance(ThirdPersonNode, Node);
+		return GetDistance(ThirdPersonNode, Source);
 	}
 
 	bool GetAbovePlayer( TESObjectREFR* Ref, float Threshold )

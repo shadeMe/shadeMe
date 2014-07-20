@@ -252,7 +252,7 @@ namespace ShadowSundries
 						ShadowSceneLight* Source = *Itr;
 						bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Ref);
 
-						Console_Print("Light%s@ %f, %f, %f ==> DIST[%f] LOS[%d]", (Source->sourceLight->IsCulled() ? " (Culled) " : " "),
+						Console_Print("Light%s@ %0.f, %0.f, %0.f ==> DIST[%.0f] LOS[%d]", (Source->sourceLight->IsCulled() ? " (Culled) " : " "),
 									Source->sourceLight->m_worldTranslate.x,
 									Source->sourceLight->m_worldTranslate.y,
 									Source->sourceLight->m_worldTranslate.z,
@@ -277,7 +277,7 @@ namespace ShadowSundries
 						{
 							if (ShadowLight->sourceNode != Node)
 							{
-								Console_Print("Node %s @ %f, %f, %f",
+								Console_Print("Node %s @ %0.f, %0.f, %0.f",
 									ShadowLight->sourceNode->m_pcName,
 									ShadowLight->sourceNode->m_worldTranslate.x,
 									ShadowLight->sourceNode->m_worldTranslate.y,
@@ -310,12 +310,14 @@ namespace ShadowSundries
 				Console_Print("No shadow caster SSL");
 			else
 			{
-				Console_Print("Shadow caster SSL: Active[%d] Light%s[%f, %f, %f] Fade[%f, %f] Bnd[%f, %f]",
+				bool LOSCheck = Utilities::GetLightLOS(CasterSSL->sourceLight, Ref);
+				Console_Print("Shadow caster SSL: Active[%d] Light%s[%.0f, %.0f, %.0f] LOS[%d] Fade[%f, %f] Bnd[%.0f, %.0f]",
 							CasterSSL->unk118 != 0xFF,
 							CasterSSL->sourceLight->IsCulled() ? " (Culled)" : "",
 							CasterSSL->sourceLight->m_worldTranslate.x,
 							CasterSSL->sourceLight->m_worldTranslate.y,
 							CasterSSL->sourceLight->m_worldTranslate.z,
+							LOSCheck,
 							CasterSSL->unkDC,
 							CasterSSL->unkE0,
 							CasterSSL->m_combinedBounds.z,
@@ -328,10 +330,14 @@ namespace ShadowSundries
 			for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->lights.start; Itr && Itr->data; Itr = Itr->next)
 			{
 				ShadowSceneLight* ShadowLight = Itr->data;
-				Console_Print("Light @ %f, %f, %f",
+				bool LOSCheck = Utilities::GetLightLOS(ShadowLight->sourceLight, Ref);
+
+				Console_Print("Light @ %.0f, %.0f, %.0f ==> DIST[%.0f] LOS[%d]",
 					ShadowLight->sourceLight->m_worldTranslate.x,
 					ShadowLight->sourceLight->m_worldTranslate.y,
-					ShadowLight->sourceLight->m_worldTranslate.z);
+					ShadowLight->sourceLight->m_worldTranslate.z,
+					Utilities::GetDistance(ShadowLight->sourceLight, Node),
+					LOSCheck);
 			}	
 
 			Console_Print("========================================================================================");
