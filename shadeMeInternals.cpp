@@ -15,19 +15,16 @@ shadeMeINIManager					shadeMeINIManager::Instance;
 
 BSTextureManager**					BSTextureManager::Singleton = (BSTextureManager**)0x00B42F50;
 
-
-
 namespace Settings
 {
 	SME::INI::INISetting			kCasterMaxDistance("CasterMaxDistance", "Shadows::General",
 													"Threshold distance b'ween the player and the shadow caster", (float)7500.0f);
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
-	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General", 
+	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General",
 													"Toggle the expanded console debug selection description", (SInt32)1);
 	SME::INI::INISetting			kForceActorShadows("ForceActorShadows", "Shadows::General", "Queue actors regardless of their deficiencies", (SInt32)0);
 	SME::INI::INISetting			kNoInteriorSunShadows("ValidateInteriorLightSources", "Shadows::General", "Prevents arbitrary sun shadows", (SInt32)1);
 	SME::INI::INISetting			kActorsReceiveAllShadows("ActorsReceiveAllShadows", "Shadows::General", "Actors are valid shadow receivers", (SInt32)1);
-
 
 	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
 																"Large objects are rendered before smaller ones", (SInt32)0);
@@ -35,21 +32,17 @@ namespace Settings
 	SME::INI::INISetting			kLargeObjectSunShadowsOnly("OnlyCastSunShadows", "Shadows::LargeObjects",
 															"Large objects will not react to small light sources", (SInt32)1);
 
-
 	SME::INI::INISetting			kRenderBackfacesIncludePath("IncludePaths", "Shadows::BackfaceRendering", "Backface rendering whitelist", "");
-
 
 	SME::INI::INISetting			kMainExcludedTypesInterior("Interior", "Shadows::ExcludedTypes", "Form types that can't cast shadows",
 													"24,26,41");
 	SME::INI::INISetting			kMainExcludedTypesExterior("Exterior", "Shadows::ExcludedTypes", "Form types that can't cast shadows",
 													"24,26,41");
 
-
 	SME::INI::INISetting			kMainExcludedPathInterior("Interior", "Shadows::ExcludedPaths", "Meshes with these substrings in their file paths won't cast shadows",
 													"");
 	SME::INI::INISetting			kMainExcludedPathExterior("Exterior", "Shadows::ExcludedPaths", "Meshes with these substrings in their file paths won't cast shadows",
 													"");
-
 
 	SME::INI::INISetting			kLightLOSCheckInterior("Interior", "Shadows::LightLOSCheck", "Check source light LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kLightLOSCheckExterior("Exterior", "Shadows::LightLOSCheck", "Check source light with caster", (SInt32)1);
@@ -57,20 +50,17 @@ namespace Settings
 	SME::INI::INISetting			kLightLOSExcludedPath("ExcludePaths", "Shadows::LightLOSCheck", "Light LOS blacklist", "");
 	SME::INI::INISetting			kLightLOSSkipActors("SkipActors", "Shadows::LightLOSCheck", "Don't perform checks on actors", (SInt32)0);
 
-
 	SME::INI::INISetting			kPlayerLOSCheckInterior("Interior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kPlayerLOSCheckExterior("Exterior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kPlayerLOSCheckHighAccuracy("HighAccuracy", "Shadows::PlayerLOSCheck", "Remove the Z-delta constraint from the check", (SInt32)0);
 	SME::INI::INISetting			kPlayerLOSCheckThresholdDist("ThresholdDistance", "Shadows::PlayerLOSCheck", "", (float)200.f);
 
-
 	SME::INI::INISetting			kSelfExcludedTypesInterior("Interior", "SelfShadows::ExcludedTypes", "Form types that can't cast shadows", "");
 	SME::INI::INISetting			kSelfExcludedTypesExterior("Exterior", "SelfShadows::ExcludedTypes", "Form types that can't cast shadows", "");
 
-
 	SME::INI::INISetting			kSelfExcludedPathInterior("Interior", "SelfShadows::ExcludedPaths",
 															"Meshes with these substrings in their file paths won't cast shadows", "");
-	SME::INI::INISetting			kSelfExcludedPathExterior("Exterior", "SelfShadows::ExcludedPaths", 
+	SME::INI::INISetting			kSelfExcludedPathExterior("Exterior", "SelfShadows::ExcludedPaths",
 															"Meshes with these substrings in their file paths won't cast shadows", "");
 
 	SME::INI::INISetting			kSelfPerformFogCheck("PerformFogCheck", "SelfShadows::General", "Toggle self-shadowing depending upon fog distance", (SInt32)1);
@@ -79,17 +69,15 @@ namespace Settings
 
 	SME::INI::INISetting			kSelfIncludePathInterior("Interior", "SelfShadows::IncludePaths",
 															"Meshes with these substrings in their file paths will ONLY cast self-shadows", "");
-	SME::INI::INISetting			kSelfIncludePathExterior("Exterior", "SelfShadows::IncludePaths", 
+	SME::INI::INISetting			kSelfIncludePathExterior("Exterior", "SelfShadows::IncludePaths",
 															"Meshes with these substrings in their file paths will ONLY cast self-shadows", "");
-	
 
 	SME::INI::INISetting			kReceiverExcludedTypesInterior("Interior", "ShadowReceiver::ExcludedTypes", "Form types that can't receive shadows", "");
 	SME::INI::INISetting			kReceiverExcludedTypesExterior("Exterior", "ShadowReceiver::ExcludedTypes", "Form types that can't receive shadows", "");
 
-
 	SME::INI::INISetting			kReceiverExcludedPathInterior("Interior", "ShadowReceiver::ExcludedPaths",
 															"Meshes with these substrings in their file paths won't receive shadows", "");
-	SME::INI::INISetting			kReceiverExcludedPathExterior("Exterior", "ShadowReceiver::ExcludedPaths", 
+	SME::INI::INISetting			kReceiverExcludedPathExterior("Exterior", "ShadowReceiver::ExcludedPaths",
 															"Meshes with these substrings in their file paths won't receive shadows", "");
 
 	SME::INI::INISetting			kReceiverEnableExclusionParams("EnableExclusionParams", "ShadowReceiver::General", "Turn on exclusion params", (SInt32)0);
@@ -132,7 +120,6 @@ namespace Settings
 	SME::INI::INISetting			kMaxCountEquipment("Equipment", "Shadows::MaxCount", "", (SInt32)-1);
 
 	SME::INI::INISetting			kMiscForceSM3RenderPath("ForceSM3RenderPath", "Misc::Renderer", "", (SInt32)0);
-
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -155,7 +142,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 
 	RegisterSetting(&Settings::kMainExcludedTypesInterior);
 	RegisterSetting(&Settings::kMainExcludedTypesExterior);
-	
+
 	RegisterSetting(&Settings::kMainExcludedPathInterior);
 	RegisterSetting(&Settings::kMainExcludedPathExterior);
 
@@ -178,7 +165,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 
 	RegisterSetting(&Settings::kSelfIncludePathInterior);
 	RegisterSetting(&Settings::kSelfIncludePathExterior);
-	
+
 	RegisterSetting(&Settings::kSelfPerformFogCheck);
 	RegisterSetting(&Settings::kSelfEnableDistanceToggle);
 	RegisterSetting(&Settings::kSelfMaxDistance);
@@ -228,7 +215,6 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMaxCountAlchemyItem);
 	RegisterSetting(&Settings::kMaxCountEquipment);
 
-
 	RegisterSetting(&Settings::kMiscForceSM3RenderPath);
 
 	Save();
@@ -238,7 +224,6 @@ shadeMeINIManager::~shadeMeINIManager()
 {
 	;//
 }
-
 
 void BSTextureManager::DiscardShadowMap( BSRenderedTexture* Texture )
 {
@@ -268,6 +253,10 @@ void BSTextureManager::ReserveShadowMaps( UInt32 Count )
 	thisCall<void>(0x007C2710, this, *g_renderer, Count);
 }
 
+BSRenderedTexture* BSTextureManager::GetDefaultRenderTarget(UInt32 Type)
+{
+	return thisCall<BSRenderedTexture*>(0x007C23C0, this, *g_renderer, Type);
+}
 
 namespace Utilities
 {
@@ -322,12 +311,12 @@ namespace Utilities
 			thisCall<void>(0x006FF8A0, Node, Bounds);
 
 #if 0
-			_MESSAGE("Bounds:\t\tCenter = %.4f, %.4f, %.4f\t\tExtents = %.4f, %.4f, %.4f", 
-				Bounds->center.x, 
-				Bounds->center.y, 
-				Bounds->center.z, 
-				Bounds->extents.x, 
-				Bounds->extents.y, 
+			_MESSAGE("Bounds:\t\tCenter = %.4f, %.4f, %.4f\t\tExtents = %.4f, %.4f, %.4f",
+				Bounds->center.x,
+				Bounds->center.y,
+				Bounds->center.z,
+				Bounds->extents.x,
+				Bounds->extents.y,
 				Bounds->extents.z);
 #endif
 		}
@@ -360,18 +349,18 @@ namespace Utilities
 	{
 		_hhSetVar(Retn, 0x004F91F7);
 		__asm
-		{	
+		{
 			mov		edi, RayCastSource
 			jmp		_hhGetVar(Retn)
 		}
-	}	
+	}
 
 	#define _hhName	SkipActorCheckB
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x004F9294);
 		__asm
-		{	
+		{
 			pop		edx
 			mov		[edx], 0
 			jmp		_hhGetVar(Retn)
@@ -383,7 +372,7 @@ namespace Utilities
 	{
 		_hhSetVar(Retn, 0x004F93BE);
 		__asm
-		{	
+		{
 			xor		al, al
 			fldz
 			jmp		_hhGetVar(Retn)
@@ -399,22 +388,22 @@ namespace Utilities
 
 		RayCastSource = Light;
 		double Result = 0;
-		
+
 		// the no of havok picks per frame is very limited when the game's not paused
 		// this severely limits ray casting accuracy
 		// so we trick the engine into thinking otherwise when we do our checks
 		// this obviously affects performance, but it's for a good cause...
-		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;		
+		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;
 		UInt8 PauseGameBuffer = *HavokGamePausedFlag;
 
 		// prevent console spam
-		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;		
+		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;
 		UInt8 ConsoleTextBuffer = *ShowConsoleTextFlag;
 
 		_MemHdlr(SkipActorCheckA).WriteJump();
 		_MemHdlr(SkipActorCheckB).WriteJump();
 		_MemHdlr(CatchFallthrough).WriteJump();
-		
+
 		*HavokGamePausedFlag = 1;
 		*ShowConsoleTextFlag = 0;
 		cdeclCall<void>(0x004F9120, (*g_thePlayer), Target, 0, &Result);
@@ -424,12 +413,11 @@ namespace Utilities
 		_MemHdlr(SkipActorCheckA).WriteBuffer();
 		_MemHdlr(SkipActorCheckB).WriteBuffer();
 		_MemHdlr(CatchFallthrough).WriteBuffer();
-		
+
 		RayCastSource = NULL;
 
 		return Result != 0.f;
 	}
-
 
 	bool GetPlayerHasLOS( TESObjectREFR* Target, bool HighAccuracy )
 	{
@@ -438,9 +426,9 @@ namespace Utilities
 		double Result =  0;
 
 		// as before, muck about with flags to improve picking accuracy
-		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;		
+		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;
 		UInt8 PauseGameBuffer = *HavokGamePausedFlag;
-		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;		
+		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;
 		UInt8 ConsoleTextBuffer = *ShowConsoleTextFlag;
 
 		if (HighAccuracy)
@@ -482,7 +470,6 @@ namespace Utilities
 		return sqrt((Buffer.x * Buffer.x) + (Buffer.y * Buffer.y) + (Buffer.z * Buffer.z));
 	}
 
-
 	void IntegerINIParamList::HandleParam( const char* Param )
 	{
 		int Arg = atoi(Param);
@@ -511,7 +498,6 @@ namespace Utilities
 
 		gLog.Outdent();
 	}
-
 
 	void FilePathINIParamList::HandleParam( const char* Param )
 	{
@@ -603,7 +589,6 @@ namespace Utilities
 		this->Visitor = Visitor;
 		Traverse(Root);
 	}
-
 
 	ActiveShadowSceneLightEnumerator::ActiveShadowSceneLightEnumerator( ShadowLightListT* OutList, UInt32 Params ) :
 		ActiveLights(OutList),
@@ -722,6 +707,4 @@ namespace Utilities
 		else
 			return TESWeather::kType_None;
 	}
-
 }
-

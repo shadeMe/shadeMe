@@ -162,7 +162,7 @@ namespace ShadowFacts
 	bool ShadowCaster::Queue( ShadowSceneNode* Root, ShadowCasterCountTable* Count, ShadowSceneLight** OutSSL )
 	{
 		bool Result = false;
-		
+
 		if (OutSSL)
 			*OutSSL = NULL;
 
@@ -252,7 +252,7 @@ namespace ShadowFacts
 					ShadowRenderTasks::LightProjectionUpdateQueue.push_back(Existing);
 			}
 		}
-#endif	
+#endif
 
 		if (Result)
 		{
@@ -322,7 +322,7 @@ namespace ShadowFacts
 		TESObjectREFR* ObjRef = Utilities::GetNodeObjectRef(Node);
 		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
 		BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
-		
+
 		if (TreeNode)
 			Result = false;
 		else if (FadeNode)
@@ -359,9 +359,8 @@ namespace ShadowFacts
 			{
 				if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
 					_MESSAGE("ShadowCasterEnumerator::AcceptBranch - Skipped culled node %s", Node->m_pcName);
-			}					
+			}
 		}
-		
 
 		return Result;
 	}
@@ -440,7 +439,7 @@ namespace ShadowFacts
 		else
 		{
 			GridCellArray* CellGrid = TES::GetSingleton()->gridCellArray;
-			
+
 			for (int i = 0; i < CellGrid->size; i++)
 			{
 				for (int j = 0; j < CellGrid->size; j++)
@@ -504,7 +503,7 @@ namespace ShadowFacts
 		Root->unk108 = Root->unk10C = Root->shadowCasters.start;
 		SME_ASSERT(Root->shadowCasters.numItems == ValidCasters->size());
 	}
-	
+
 	void ShadowSceneProc::Execute( UInt32 MaxShadowCount )
 	{
 		std::string Buffer;
@@ -543,7 +542,7 @@ namespace ShadowFacts
 						{
 							Itr->GetDescription(Buffer);
 							_MESSAGE("%s (Large Object) queued", Buffer.c_str());
-						}						
+						}
 					}
 
 					// remove from list
@@ -556,7 +555,6 @@ namespace ShadowFacts
 
 				Itr++;
 			}
-
 		}
 
 		// sort by least distance next
@@ -624,19 +622,17 @@ namespace ShadowFacts
 	{
 		_MESSAGE("Dumping ShadowSceneProc...");
 		gLog.Indent();
-		
+
 		std::string Desc;
 		for (CasterListT::const_iterator Itr = Casters.begin(); Itr != Casters.end(); Itr++)
 		{
 			Itr->GetDescription(Desc);
 			_MESSAGE("%s", Desc.c_str());
 		}
-		
+
 		gLog.Outdent();
 	}
 
-
-	
 	ShadowExclusionParameters::~ShadowExclusionParameters()
 	{
 		;//
@@ -669,7 +665,7 @@ namespace ShadowFacts
 
 		_MESSAGE("Path strings:");
 		DataStore->PathSubstrings.Dump();
-		
+
 		gLog.Outdent();
 	}
 
@@ -755,7 +751,6 @@ namespace ShadowFacts
 		Parameters[kParamType_Exterior].Refresh();
 	}
 
-
 	MainShadowExParams		MainShadowExParams::Instance;
 
 	void MainShadowExParams::SetInteriorFlag( bool State, NiNode* Node, BSXFlags* xFlags ) const
@@ -777,7 +772,7 @@ namespace ShadowFacts
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorShadow) == false;
 	}
-	
+
 	const char* MainShadowExParams::GetDescription( void ) const
 	{
 		return "MainShadow";
@@ -798,9 +793,6 @@ namespace ShadowFacts
 
 		gLog.Outdent();
 	}
-
-
-
 
 	SelfShadowExParams			SelfShadowExParams::Instance;
 
@@ -823,7 +815,7 @@ namespace ShadowFacts
 	{
 		return NiAVObjectSpecialFlags::GetFlag(Node, NiAVObjectSpecialFlags::kDontCastExteriorSelfShadow) == false;
 	}
-	
+
 	const char* SelfShadowExParams::GetDescription( void ) const
 	{
 		return "SelfShadow";
@@ -844,7 +836,6 @@ namespace ShadowFacts
 
 		gLog.Outdent();
 	}
-
 
 	ShadowReceiverExParams			ShadowReceiverExParams::Instance;
 
@@ -889,7 +880,6 @@ namespace ShadowFacts
 		gLog.Outdent();
 	}
 
-
 	ShadowReceiverValidator::ShadowReceiverValidator( NiNodeListT* OutList ) :
 		NonReceivers(OutList)
 	{
@@ -932,7 +922,6 @@ namespace ShadowFacts
 		;//
 	}
 
-
 	FadeNodeShadowFlagUpdater::~FadeNodeShadowFlagUpdater()
 	{
 		;//
@@ -971,7 +960,6 @@ namespace ShadowFacts
 		else
 			Node->m_flags &= ~Flag;
 	}
-
 
 	bool BSXFlagsSpecialFlags::GetFlag( BSXFlags* Store, UInt32 Flag )
 	{
@@ -1210,7 +1198,7 @@ namespace ShadowFacts
 		else
 			Result = true;		// projectiles are an exception
 
-		return Result;			
+		return Result;
 	}
 
 	void __stdcall ShadowRenderTasks::HandleModelLoad( NiNode* Node, bool Allocation )
@@ -1272,7 +1260,7 @@ namespace ShadowFacts
 		_MESSAGE("Loading backface rendering whitelist...");
 		BackFaceIncludePaths.Refresh(&Settings::kRenderBackfacesIncludePath);
 		BackFaceIncludePaths.Dump();
-		
+
 		_MESSAGE("Loading large object blacklist...");
 		LargeObjectExcludePaths.Refresh(&Settings::kLargeObjectExcludedPath);
 		LargeObjectExcludePaths.Dump();
@@ -1321,7 +1309,7 @@ namespace ShadowFacts
 		if (Light && Node && InterfaceManager::GetSingleton()->IsGameMode())
 		{
 			TESObjectREFR* Object = Utilities::GetNodeObjectRef(Source->sourceNode);
-			if (Object)	
+			if (Object)
 			{
 				UInt8 SelfShadowsState = *(UInt8*)0x00B06F0C;
 				if (SelfShadowsState == 0 && PerformExclusiveSelfShadowCheck(Node, Object) == false)
@@ -1430,7 +1418,7 @@ namespace ShadowFacts
 	void __stdcall ShadowRenderTasks::HandleShadowReceiverLightingPropertyUpdate( ShadowSceneLight* Source, NiNode* Receiver )
 	{
 		SME_ASSERT(Source && Receiver);
-		
+
 		NiNode* FadeNode = NI_CAST(Receiver, BSFadeNode);
 		if (FadeNode)
 		{
@@ -1526,7 +1514,7 @@ namespace ShadowFacts
 		SME_ASSERT(Source && Source->sourceNode);
 
 		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Source->sourceNode);
-		
+
 		if (Object && Object->parentCell->IsInterior() && Object->parentCell->BehavesLikeExterior() == false && Settings::kNoInteriorSunShadows().i)
 		{
 			float BoundRadius = Source->sourceNode->m_kWorldBound.radius;
@@ -1618,7 +1606,6 @@ namespace ShadowFacts
 			}
 			else SHADOW_DEBUG(Object, "Skipped BSXFlags DontPerformLOS check");
 		}
-		
 
 		return Result;
 	}
@@ -1629,11 +1616,7 @@ namespace ShadowFacts
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow, true);
 	}
 
-
-
-
 	ShadowMapTexturePool			ShadowMapTexturePool::Instance;
-
 
 	void ShadowMapTexturePool::Create( void )
 	{
@@ -1741,7 +1724,7 @@ namespace ShadowFacts
 			else
 				DistancePool = kPool_Tier3;
 		}
-		
+
 		if (Settings::kDynMapEnableBoundRadius().i)
 		{
 			if (Object && Object->IsActor())
@@ -1753,7 +1736,7 @@ namespace ShadowFacts
 			else
 				BoundPool = kPool_Tier1;
 		}
-		
+
 		UInt16 PoolSelection = DistancePool;
 		if (DistancePool == kPool__MAX)
 			PoolSelection = BoundPool;
@@ -1827,9 +1810,6 @@ namespace ShadowFacts
 		return Settings::kDynMapEnableDistance().i || Settings::kDynMapEnableBoundRadius().i;
 	}
 
-
-
-
 	_DefineHookHdlr(EnumerateFadeNodes, 0x00407508);
 	_DefineHookHdlr(RenderShadowsProlog, 0x004073E4);
 	_DefineHookHdlr(RenderShadowsEpilog, 0x00407AD3);
@@ -1848,13 +1828,12 @@ namespace ShadowFacts
 	_DefineHookHdlr(BlacklistTreeNode, 0x0056118F);
 	_DefinePatchHdlrWithBuffer(TrifleSupportPatch, 0x00407684, 5, 0xE8, 0x57, 0xF7, 0x3B, 0x0);
 
-
 	#define _hhName	EnumerateFadeNodes
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x0040767D);
 		__asm
-		{		
+		{
 			mov		eax, [esp + 0x18]
 			pushad
 			push	eax
@@ -1870,7 +1849,7 @@ namespace ShadowFacts
 	{
 		_hhSetVar(Retn, 0x004073EC);
 		__asm
-		{		
+		{
 			mov     dword ptr [esp + 0x14], 0
 			pushad
 			call	ShadowRenderTasks::HandleMainProlog
@@ -1884,7 +1863,7 @@ namespace ShadowFacts
 	_hhBegin()
 	{
 		__asm
-		{		
+		{
 			pushad
 			call	ShadowRenderTasks::HandleMainEpilog
 			popad
@@ -1894,14 +1873,14 @@ namespace ShadowFacts
 			retn
 		}
 	}
-	
+
 	#define _hhName	QueueModel3D
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x00434BB7);
 		_hhSetVar(Call, 0x004A12E0);
 		__asm
-		{	
+		{
 			call	_hhGetVar(Call)
 
 			pushad
@@ -1919,7 +1898,7 @@ namespace ShadowFacts
 	{
 		_hhSetVar(Retn, 0x0040794A);
 		__asm
-		{	
+		{
 			pushad
 			push	edx
 			push	esi
@@ -1937,13 +1916,13 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x00407961);
 		_hhSetVar(Call, 0x007D6900);
 		__asm
-		{	
+		{
 			pushad
 			push	ecx
 			call	ShadowRenderTasks::HandleSelfShadowing
 			test	al, al
 			jz		SKIP
-			
+
 			popad
 			call	_hhGetVar(Call)
 			jmp		EXIT
@@ -1953,7 +1932,6 @@ namespace ShadowFacts
 		EXIT:
 			jmp		_hhGetVar(Retn)
 		}
-		
 	}
 
 	#define _hhName	RenderShadowMap
@@ -1962,7 +1940,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x007D4E8E);
 		_hhSetVar(Call, 0x0070C0B0);
 		__asm
-		{	
+		{
 			mov		eax, [esp + 0x18]
 			pushad
 			push	eax
@@ -1981,7 +1959,6 @@ namespace ShadowFacts
 
 			jmp		_hhGetVar(Retn)
 		}
-		
 	}
 
 	#define _hhName	PerformAuxSSLChecks
@@ -1990,7 +1967,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x0040790B);
 		_hhSetVar(Skip, 0x0040796A);
 		__asm
-		{	
+		{
 			pushad
 			push	esi
 			call	ShadowRenderTasks::PerformAuxiliaryChecks
@@ -2013,7 +1990,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x007D2401);
 		_hhSetVar(Jump, 0x007D272D);
 		__asm
-		{	
+		{
 // HACK! HACK!
 // hooking that SSL light space projection call screws with the stack in unholy ways
 // stack pointer offsets vary since the new call to the method lies inside our hook
@@ -2051,7 +2028,7 @@ namespace ShadowFacts
 	{
 		_hhSetVar(Retn, 0x007D6935);
 		__asm
-		{	
+		{
 			pushad
 			push	ecx
 			push	edi
@@ -2068,7 +2045,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x007D2835);
 		_hhSetVar(Jump, 0x007D2872);
 		__asm
-		{	
+		{
 			jp		AWAY
 			mov     ecx, [esp + 0xBC]
 
@@ -2092,7 +2069,7 @@ namespace ShadowFacts
 	_hhBegin()
 	{
 		__asm
-		{	
+		{
 			lea		ecx, ShadowMapTexturePool::Instance
 			jmp		ShadowMapTexturePool::DiscardShadowMapTexture
 		}
@@ -2102,7 +2079,7 @@ namespace ShadowFacts
 	_hhBegin()
 	{
 		__asm
-		{	
+		{
 			lea		ecx, ShadowMapTexturePool::Instance
 			jmp		ShadowMapTexturePool::HandleShadowPass
 		}
@@ -2113,7 +2090,7 @@ namespace ShadowFacts
 	{
 		_hhSetVar(Retn, 0x007D4765);
 		__asm
-		{	
+		{
 			lea		ecx, ShadowMapTexturePool::Instance
 			push	ebx
 			call	ShadowMapTexturePool::GetShadowMapTexture
@@ -2128,15 +2105,14 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x0040EAB1);
 		_hhSetVar(Call, 0x00406950);
 		__asm
-		{	
+		{
 			call	_hhGetVar(Call)
 
 			lea		ecx, ShadowMapTexturePool::Instance
-			call	ShadowMapTexturePool::Initialize	
-			
+			call	ShadowMapTexturePool::Initialize
+
 			jmp		_hhGetVar(Retn)
 		}
-		
 	}
 
 	#define _hhName	BlacklistTreeNode
@@ -2145,7 +2121,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x00561194);
 		_hhSetVar(Call, 0x005640E0);
 		__asm
-		{	
+		{
 			call	_hhGetVar(Call)
 
 			pushad
@@ -2208,14 +2184,13 @@ namespace ShadowFacts
 		}
 	}
 
-
 	#define _hhName	SSLTraceCullingA
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x007D6410);
 		_hhSetVar(Call, 0x007D34C0);
 		__asm
-		{	
+		{
 			call	_hhGetVar(Call)
 
 			pushad
@@ -2236,7 +2211,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x007D647F);
 		_hhSetVar(Call, 0x0047DA70);
 		__asm
-		{	
+		{
 			call	_hhGetVar(Call)
 
 			pushad
@@ -2256,7 +2231,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x007D6496);
 		_hhSetVar(Call, 0x007415E0);
 		__asm
-		{	
+		{
 			call	_hhGetVar(Call)
 
 			pushad
@@ -2266,7 +2241,7 @@ namespace ShadowFacts
 			push	ebp
 			call	TraceSLLCulling
 			popad
-			
+
 			jmp		_hhGetVar(Retn)
 		}
 	}
@@ -2277,7 +2252,7 @@ namespace ShadowFacts
 		_hhSetVar(Retn, 0x007D651C);
 		_hhSetVar(Call, 0x007D5B20);
 		__asm
-		{	
+		{
 			call	_hhGetVar(Call)
 
 			pushad
@@ -2295,31 +2270,27 @@ namespace ShadowFacts
 	_DefineHookHdlr(SSLTraceCullingB, 0x007D647A);
 	_DefineHookHdlr(SSLTraceCullingC, 0x007D6491);
 	_DefineHookHdlr(SSLTraceCullingD, 0x007D6517);
-#endif 
+#endif
 
 #if 0
 	_DeclareMemHdlr(TestHook4, "");
-	_DefineHookHdlr(TestHook4, 0x0049885B);
+	_DefineHookHdlr(TestHook4, 0x00483194);
 
 	void __stdcall FixRange(void)
 	{
-		UInt32* pshader1 = (UInt32*)0x00B42F48;
-		UInt32* pshader2 = (UInt32*)0x00B42D74;
-		UInt8* useps3shader = (UInt8*)0x00B42EA5;
-
-		*pshader1 = *pshader2 = 7;
-		*useps3shader = 1;
+		BSRenderedTexture* CanopyPass = (*BSTextureManager::Singleton)->GetDefaultRenderTarget(14);
+		cdeclCall<void>(0x007A9CD0, CanopyPass->renderedTexture);
 	}
 
-	
 	#define _hhName	TestHook4
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x00498860);
-		_hhSetVar(Call, 0x007B45F0);
+		_hhSetVar(Retn, 0x00483199);
+		_hhSetVar(Call, 0x00441850);
 
 		__asm
-		{	
+		{
+			call	_hhGetVar(Call)
 			pushad
 			call FixRange
 			popad
@@ -2399,6 +2370,4 @@ namespace ShadowFacts
 		ShadowReceiverExParams::Instance.Initialize();
 		ShadowRenderTasks::Initialize();
 	}
-
-
 }

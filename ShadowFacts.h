@@ -5,7 +5,6 @@
 // the outer part of a shadow is called the penumbra!
 namespace ShadowFacts
 {
-
 // auxiliary checks are performed after the light space projection stage as opposed to shadow caster queuing stage
 // this will keep the SSL state synchronized with the current frame's but will also force delinquents to take up a slot in the queue
 #define DEFERRED_SSL_AUXCHECKS			0
@@ -54,7 +53,6 @@ namespace ShadowFacts
 		bool							Actor;
 		bool							UnderWater;
 
-
 		ShadowSceneLight*				CreateShadowSceneLight(ShadowSceneNode* Root);
 		bool							GetIsLargeObject(void) const;
 
@@ -87,7 +85,6 @@ namespace ShadowFacts
 			virtual void			AcceptLeaf(NiAVObject* Object);
 		};
 
-		
 		CasterListT						Casters;
 		ShadowSceneNode*				Root;
 
@@ -104,7 +101,7 @@ namespace ShadowFacts
 
 	typedef	Utilities::FilePathINIParamList		PathSubstringListT;
 	typedef Utilities::IntegerINIParamList		ObjectTypeListT;
-	
+
 	class ShadowExclusionParameters
 	{
 	protected:
@@ -138,7 +135,7 @@ namespace ShadowFacts
 			kParamType_Exterior = 1,
 
 			kParamType__MAX,
-		};		
+		};
 
 		ParameterData								Parameters[kParamType__MAX];
 
@@ -217,7 +214,6 @@ namespace ShadowFacts
 		static bool GetFlag(NiAVObject* Node, UInt32 Flag);
 		static void SetFlag(NiAVObject* Node, UInt32 Flag, bool State);
 	};
-	
 
 	// the regular CastsShadows flag will be used on non-light refs to indicate the opposite
 	enum
@@ -233,7 +229,7 @@ namespace ShadowFacts
 		virtual bool								GetAllowedInterior(NiNode* Node, BSXFlags* xFlags) const;
 		virtual bool								GetAllowedExterior(NiNode* Node, BSXFlags* xFlags) const;
 
-		virtual const char*							GetDescription(void) const;		
+		virtual const char*							GetDescription(void) const;
 	public:
 		virtual ~MainShadowExParams();
 
@@ -296,7 +292,6 @@ namespace ShadowFacts
 		virtual bool			AcceptBranch(NiNode* Node);
 		virtual void			AcceptLeaf(NiAVObject* Object);
 	};
-
 
 	class ShadowMapTexturePool
 	{
@@ -383,9 +378,6 @@ namespace ShadowFacts
 		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, NiNode* Node, float BoundRadius);		// return true to allow
 		static bool __stdcall						GetCanHaveDirectionalShadow(ShadowSceneLight* Source);
 	};
-
-	
-
 
 	_DeclareMemHdlr(EnumerateFadeNodes, "render unto Oblivion...");
 	_DeclareMemHdlr(RenderShadowsProlog, "");

@@ -21,7 +21,7 @@ namespace ShadowSundries
 				{
 					// not a light reference, perform switcheroo
 					// all refs cast shadows by default, so we'll use reverse-logic to evaluate the bit
-					// ergo, when the cast shadows flag is set, don't cast shadows
+					// ergo don't cast shadows when the cast shadows flag is set
 					SetDlgItemText(Dialog, 1687, "Doesn't Cast Shadow");
 					SetWindowPos(GetDlgItem(Dialog, 1687), HWND_BOTTOM, 0, 0, 120, 15, SWP_NOMOVE|SWP_NOZORDER);
 				}
@@ -33,7 +33,7 @@ namespace ShadowSundries
 		{
 			_hhSetVar(Retn, 0x005498E3);
 			__asm
-			{	
+			{
 				pushad
 				push	eax
 				push	edi
@@ -92,12 +92,12 @@ namespace ShadowSundries
 						BSBound* xBounds = (BSBound*)Utilities::GetNiExtraDataByName(Node, "BBX");
 						if (xBounds)
 						{
-							FORMAT_STR(Bounds, "Bounds[ C[%f,%f,%f] E[%f,%f,%f] ]", 
-								xBounds->center.x, 
-								xBounds->center.y, 
-								xBounds->center.z, 
-								xBounds->extents.x, 
-								xBounds->extents.y, 
+							FORMAT_STR(Bounds, "Bounds[ C[%f,%f,%f] E[%f,%f,%f] ]",
+								xBounds->center.x,
+								xBounds->center.y,
+								xBounds->center.z,
+								xBounds->extents.x,
+								xBounds->extents.y,
 								xBounds->extents.z);
 						}
 					}
@@ -129,7 +129,7 @@ namespace ShadowSundries
 		{
 			_hhSetVar(Retn, 0x00582910);
 			__asm
-			{	
+			{
 				pushad
 				push	edi
 				push	eax
@@ -145,7 +145,7 @@ namespace ShadowSundries
 		{
 			_hhSetVar(Retn, 0x0057CA48);
 			__asm
-			{	
+			{
 				pushad
 				push	esi
 				push	eax
@@ -172,9 +172,9 @@ namespace ShadowSundries
 			_hhSetVar(Retn, 0x00498860);
 			_hhSetVar(Call, 0x007B45F0);
 			__asm
-			{	
+			{
 				call	_hhGetVar(Call)
-				
+
 				pushad
 				call	ForceSM3Shaders
 				popad
@@ -208,17 +208,6 @@ namespace ShadowSundries
 		SelfShadowExParams::Instance.RefreshParameters();
 		ShadowReceiverExParams::Instance.RefreshParameters();
 		ShadowRenderTasks::RefreshMiscPathLists();
-
-		if (Settings::kActorsReceiveAllShadows().i)
-		{
-			_MemHdlr(CullCellActorNodeA).WriteUInt8(1);
-			_MemHdlr(CullCellActorNodeB).WriteUInt8(0xEB);
-		}
-		else
-		{
-			_MemHdlr(CullCellActorNodeA).WriteUInt8(0);
-			_MemHdlr(CullCellActorNodeB).WriteUInt8(0x75);
-		}
 
 		ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
 		Utilities::NiNodeChildrenWalker Walker((NiNode*)RootNode->m_children.data[3]);
@@ -338,7 +327,7 @@ namespace ShadowSundries
 					ShadowLight->sourceLight->m_worldTranslate.z,
 					Utilities::GetDistance(ShadowLight->sourceLight, Node),
 					LOSCheck);
-			}	
+			}
 
 			Console_Print("========================================================================================");
 			Console_Print(" ");
@@ -397,7 +386,6 @@ namespace ShadowSundries
 			va_start(Args, Format);
 			vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
 			va_end(Args);
-
 
 			_MESSAGE("SDR[%08X %s]: %s", kDebugSelection->refID,
 				(kDebugSelection->niNode ? kDebugSelection->niNode->m_pcName : "<null>"),

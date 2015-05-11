@@ -2,7 +2,6 @@
 
 #include "shadeMeInternals.h"
 
-
 namespace ShadowFigures
 {
 	class ShadowRenderConstantRegistry;
@@ -37,7 +36,6 @@ namespace ShadowFigures
 		void								ResetDefault(void);
 	};
 
-	
 	class ShadowRenderConstantRegistry
 	{
 		struct ValuePair
@@ -67,7 +65,6 @@ namespace ShadowFigures
 		void									UpdateConstants(void);		// switches b'ween the two sets of values depending upon the cell type
 	};
 
-
 	class ShadowRenderConstantHotSwapper
 	{
 		class Swapper
@@ -85,7 +82,6 @@ namespace ShadowFigures
 		static void __stdcall					HandleLightProjectionStage(ShadowSceneLight* Source, void* AuxParam);
 		static void __stdcall					HandleShadowMapRenderStage(ShadowSceneLight* Source, void* AuxParam);
 	};
-
 
 	_DeclareMemHdlr(SwapLightProjectionStageConstants, "per-caster shadow render constants");
 	_DeclareMemHdlr(FixSSLLightSpaceProjectionStack, "fixup the stack");

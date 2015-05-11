@@ -96,7 +96,7 @@ extern "C"
 
 			_MESSAGE("You get a shadow! He gets a shadow! EVERYBDY GETZ SHADOZZZ!!\n\n");
 		}
-		
+
 		gLog.Indent();
 		return true;
 	}

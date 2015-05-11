@@ -47,7 +47,7 @@ public:
 	virtual ~shadeMeINIManager();
 
 	virtual void							Initialize(const char* INIPath, void* Parameter);
-	
+
 	static shadeMeINIManager				Instance;
 };
 
@@ -160,7 +160,7 @@ public:
 	struct Unk0C
 	{								//			initialized to
 		UInt8			unk00;		// 00		1
-		UInt8			pad00[3];	
+		UInt8			pad00[3];
 		UInt32			unk04;		// 04		2
 		UInt32			unk08;		// 08		0
 		SInt32			unk0C;		// 0C		-1
@@ -168,22 +168,22 @@ public:
 		UInt32			unk14;		// 14		16
 		UInt32			unk18;		// 18		3
 		UInt8			unk1C;		// 1C		8
-		UInt8			pad1C[3];	
+		UInt8			pad1C[3];
 		UInt32			unk20;		// 20		19
 		UInt32			unk24;		// 24		5
 		UInt8			unk28;		// 28		0
 		UInt8			unk29;		// 29		1
-		UInt8			pad2A[2];	
+		UInt8			pad2A[2];
 		UInt32			unk2C;		// 2C		19
 		UInt32			unk30;		// 30		5
 		UInt8			unk34;		// 34		0
 		UInt8			unk35;		// 35		1
-		UInt8			pad36[2];	
+		UInt8			pad36[2];
 		UInt32			unk38;		// 38		19
 		UInt32			unk3C;		// 3C		5
 		UInt8			unk40;		// 40		0
 		UInt8			unk41;		// 41		1
-		UInt8			pad42[2];	
+		UInt8			pad42[2];
 	};
 
 	//void*							vtbl;			// 00
@@ -193,7 +193,7 @@ public:
 	UInt32							unk50;			// 50
 	UInt32							unk54;			// 54
 	UInt32							surfaceWidth;	// 58
-	UInt32							surfaceHeight;	// 5C	
+	UInt32							surfaceHeight;	// 5C
 };
 
 // 64
@@ -223,7 +223,7 @@ public:
 	UInt8												unkFC;
 	UInt8												unkFCPad[3];
 	NiPointLight*										sourceLight;// 100 - parent light
-	UInt8												unk104;	
+	UInt8												unk104;
 	UInt8												unk104Pad[3];
 	NiVector3											unk108;		// sourceLight->m_worldTranslate
 	BSRenderedTexture*									shadowMap;	// 114 - shadow map texture
@@ -289,13 +289,14 @@ public:
 	void											DiscardShadowMap(BSRenderedTexture* Texture);
 	void											ReserveShadowMaps(UInt32 Count);
 
+	BSRenderedTexture*								GetDefaultRenderTarget(UInt32 Type);
+
 	static BSTextureManager*						CreateInstance(void);
 	void											DeleteInstance(void);
 
 	static BSTextureManager**						Singleton;
 };
 STATIC_ASSERT(sizeof(BSTextureManager) == 0x48);
-
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
 typedef std::vector<BSFadeNode*>				FadeNodeListT;
@@ -305,7 +306,6 @@ typedef std::vector<NiNode*>					NiNodeListT;
 class BSTreeNode : public NiNode
 {
 public:
-	
 };
 
 namespace Utilities
@@ -401,7 +401,7 @@ namespace Utilities
 	public:
 		IntegerINIParamList(const char* Delimiters = " ,");
 		virtual ~IntegerINIParamList();
-		
+
 		virtual void			Dump(void) const;
 	};
 
@@ -412,7 +412,7 @@ namespace Utilities
 	public:
 		FilePathINIParamList(const char* Delimiters = ",");
 		virtual ~FilePathINIParamList();
-		
+
 		virtual void			Dump(void) const;
 	};
 

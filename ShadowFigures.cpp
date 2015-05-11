@@ -11,7 +11,7 @@
 namespace ShadowFigures
 {
 	// these constants seem to have no discernible effect
-	//	DEF_SRC(SRC_A3D8E8, true, 0.01, 0x007D4860 + 2);	
+	//	DEF_SRC(SRC_A3D8E8, true, 0.01, 0x007D4860 + 2);
 	//	DEF_SRC(SRC_A91288, true, -0.01, 0x007D4877 + 2);
 	//	DEF_SRC(SRC_B258D0, false, 1.0, 0x007D48B2 + 1);
 	//	DEF_SRC(SRC_B258D4, false, 0, 0x007D48B7 + 2);
@@ -24,11 +24,11 @@ namespace ShadowFigures
 	//	DEF_SRC(SRC_A3D0C0, true, 2.0, 0x007D511A + 2);		SRC_A3D0C0.AddPatchLocation(0x007D5161 + 2);
 	//	DEF_SRC(SMRC_A2FC68, true, 0.0, 0x007D24E5 + 2);
 	//	DEF_SRC(SMRC_A2FC70, true, 1000.0, 0x007D28D2 + 2);
-	
+
 	// ====================================================
 	// Shadow Map Render Stage
 	// ====================================================
-	DEF_SRC(SRC_A30068, true, 0.05, 0x007D4740 + 2);	
+	DEF_SRC(SRC_A30068, true, 0.05, 0x007D4740 + 2);
 	DEF_SRC(SRC_B258E8, false, 0, 0x007D4811 + 2);
 	DEF_SRC(SRC_B258EC, false, 0, 0x007D4823 + 2);
 	DEF_SRC(SRC_B258F0, false, 1.0, 0x007D4833 + 2);
@@ -45,7 +45,6 @@ namespace ShadowFigures
 	DEF_SRC(SMRC_A3F3A0, true, 6.0, 0x007D2D94 + 2);
 	DEF_SRC(SMRC_A91270, true, 0.4, 0x007D2DB2 + 2);
 	DEF_SRC(SMRC_A91268, true, 0.8, 0x007D2DC8 + 2);		// shadow darkness?
-
 
 	ShadowRenderConstant::ShadowRenderConstant( const char* Name, bool Wide, long double DefaultValue, UInt32 PrimaryPatchLocation ) :
 		Wide(Wide),
@@ -121,7 +120,6 @@ namespace ShadowFigures
 			return Data.f;
 	}
 
-
 	const char* ShadowRenderConstantRegistry::kINIPath = "Data\\OBSE\\Plugins\\ShadowRenderConstants.ini";
 
 	ShadowRenderConstantRegistry::ShadowRenderConstantRegistry() :
@@ -172,7 +170,7 @@ namespace ShadowFigures
 			DataStore[&SMRC_A38618].Exterior = 30;
 			DataStore[&SMRC_A38618].Interior = 30;
 			DataStore[&SMRC_A3F3A0].Exterior = 10;
-			
+
 			Save();
 		}
 	}
@@ -257,7 +255,6 @@ namespace ShadowFigures
 		Reset = true;
 	}
 
-
 	void __stdcall ShadowRenderConstantHotSwapper::HandleLightProjectionStage( ShadowSceneLight* Source, void* AuxParam )
 	{
 		SME_ASSERT(Source);
@@ -273,7 +270,7 @@ namespace ShadowFigures
 		{
 			ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.push_back(Source);
 		}
-		
+
 		for (ShadowLightListT::iterator Itr = ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.begin();
 										Itr != ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.end();
 										Itr++)
@@ -353,14 +350,12 @@ namespace ShadowFigures
 				SamplingScale.Swap(NewSampScale);
 				SHADOW_DEBUG(Object, "Changed Sampling Scale Multiplier to %f", NewSampScale);
 			}
-			
+
 			thisCall<void>(0x007D46C0, Source, AuxParam);
 		}
 		else
 			thisCall<void>(0x007D46C0, Source, AuxParam);
 	}
-
-
 
 	_DefineHookHdlr(SwapLightProjectionStageConstants, 0x004078FA);
 	_DefineHookHdlr(SwapShadowMapRenderStageConstants, 0x007D59D2);
@@ -374,7 +369,7 @@ namespace ShadowFigures
 	{
 		_hhSetVar(Retn, 0x00407906);
 		__asm
-		{	
+		{
 			mov		[eax + 0x8], edi
 			mov		ecx, esi
 
@@ -394,7 +389,7 @@ namespace ShadowFigures
 	{
 		_hhSetVar(Retn, 0x007D59D8);
 		__asm
-		{	
+		{
 			pushad
 			push	eax
 			push	ecx
@@ -404,7 +399,6 @@ namespace ShadowFigures
 			jmp		_hhGetVar(Retn)
 		}
 	}
-
 
 	void Patch( void )
 	{
@@ -423,5 +417,4 @@ namespace ShadowFigures
 	{
 		ShadowRenderConstantRegistry::GetSingleton()->Load();
 	}
-
 }
