@@ -60,7 +60,6 @@ namespace Settings
 	extern SME::INI::INISetting				kNoInteriorSunShadows;
 	extern SME::INI::INISetting				kActorsReceiveAllShadows;
 	extern SME::INI::INISetting				kNightTimeMoonShadows;
-	extern SME::INI::INISetting				kLightSourceMaxDistance;
 
 	extern SME::INI::INISetting				kLargeObjectHigherPriority;
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;

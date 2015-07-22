@@ -69,18 +69,6 @@ namespace ShadowFacts
 	{
 		typedef std::vector<ShadowCaster>		CasterListT;
 
-		class ShadowCasterEnumerator : public Utilities::NiNodeChildVisitor
-		{
-		protected:
-			CasterListT*			Casters;
-		public:
-			ShadowCasterEnumerator(CasterListT* OutList);
-			virtual ~ShadowCasterEnumerator();
-
-			virtual bool			AcceptBranch(NiNode* Node);
-			virtual void			AcceptLeaf(NiAVObject* Object);
-		};
-
 		CasterListT						Casters;
 		ShadowSceneNode*				Root;
 
@@ -346,8 +334,8 @@ namespace ShadowFacts
 		static bool									PerformShadowLightSourceCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
 		static bool									PerformLightLOSCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
 
-		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
-		static bool __stdcall						GetCanHaveDirectionalShadow(ShadowSceneLight* Source);
+		static bool __stdcall						ReactsToSmallLights(ShadowSceneLight* Source);
+		static bool __stdcall						CanHaveDirectionalShadow(ShadowSceneLight* Source);
 
 		enum
 		{
@@ -374,9 +362,10 @@ namespace ShadowFacts
 		static void	__stdcall						HandleLightProjectionProlog(ShadowSceneLight* Source);
 		static void	__stdcall						HandleLightProjectionEpilog(ShadowSceneLight* Source);
 
-		static bool __stdcall						HandleLightProjectionStage1(ShadowSceneLight* Source, ShadowSceneLight* SceneLight);	// check scene light distance
-		static bool __stdcall						HandleLightProjectionStage2(ShadowSceneLight* Source, int ActiveLights);	// check for active lights and if the occluder reacts to them
-		static bool __stdcall						HandleLightProjectionStage3(ShadowSceneLight* Source);	// check if directional source is allowed
+													// check for active lights and if the occluder reacts to them
+		static bool __stdcall						HandleLightProjectionStage1(ShadowSceneLight* Source, int ActiveLights);
+													// check if directional source is allowed
+		static bool __stdcall						HandleLightProjectionStage2(ShadowSceneLight* Source);
 
 		static void __stdcall						QueueShadowOccluders(UInt32 MaxShadowCount);
 		static bool	__stdcall						HandleSelfShadowing(ShadowSceneLight* Caster);		// return true to allow
@@ -384,11 +373,11 @@ namespace ShadowFacts
 		static void __stdcall						HandleShadowReceiverLightingPropertyUpdate(ShadowSceneLight* Source, NiNode* Receiver);
 		static void __stdcall						HandleTreeModelLoad(BSTreeNode* Node);
 
-		static bool									GetCanBeLargeObject(NiNode* Node);
-		static bool									GetIsLargeObject(NiNode* Node);
+		static bool									CanBeLargeObject(NiNode* Node);
+		static bool									IsLargeObject(NiNode* Node);
 		static bool	__stdcall						PerformAuxiliaryChecks(ShadowSceneLight* Source);
-		static bool									GetHasPlayerLOS(TESObjectREFR* Object, NiNode* Node, float Distance);
-		static bool									GetCanReceiveShadow(NiNode* Node);
+		static bool									HasPlayerLOS(TESObjectREFR* Object, NiNode* Node, float Distance);
+		static bool									CanReceiveShadow(NiNode* Node);
 		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, NiNode* Node, float BoundRadius);		// return true to allow
 	};
 
@@ -411,7 +400,6 @@ namespace ShadowFacts
 	_DeclareMemHdlr(BlacklistTreeNode, "");
 	_DeclareMemHdlr(TrifleSupportPatch, "compatibility patch for Trifle's first person shadows");
 	_DeclareMemHdlr(ShadowSceneLightCtor, "");
-	_DeclareMemHdlr(LightSourceProjectDistCheck, "");
 	_DeclareMemHdlr(CalculateProjectionProlog, "");
 	_DeclareMemHdlr(CalculateProjectionEpilog, "");
 

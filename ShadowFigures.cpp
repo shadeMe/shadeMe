@@ -375,7 +375,6 @@ namespace ShadowFigures
 			popad
 
 			add		esp, 0xC		// restore the stack pointer
-
 			jmp		_hhGetVar(Retn)
 		}
 	}

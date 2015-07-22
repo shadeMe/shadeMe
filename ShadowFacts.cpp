@@ -170,10 +170,6 @@ namespace ShadowFacts
 		{
 			SHADOW_DEBUG(Object, "Failed Shadow Count check");
 		}
-		else if (ShadowSundries::kExclusiveCaster && Object != ShadowSundries::kExclusiveCaster)
-		{
-			SHADOW_DEBUG(Object, "Failed Exclusive Caster check");
-		}
 		else if (Distance < Settings::kCasterMaxDistance().f)
 		{
 			if (Actor && Settings::kForceActorShadows().i)
@@ -231,7 +227,7 @@ namespace ShadowFacts
 
 		if (Result)
 		{
-			Result = ShadowRenderTasks::GetHasPlayerLOS(Object, Node, Distance);
+			Result = ShadowRenderTasks::HasPlayerLOS(Object, Node, Distance);
 			if (Result == false)
 				SHADOW_DEBUG(Object, "Failed Player LOS check");
 		}
@@ -293,7 +289,7 @@ namespace ShadowFacts
 
 	bool ShadowCaster::GetIsLargeObject( void ) const
 	{
-		return ShadowRenderTasks::GetIsLargeObject(Node);
+		return ShadowRenderTasks::IsLargeObject(Node);
 	}
 
 	bool ShadowCaster::SortComparatorDistance( ShadowCaster& LHS, ShadowCaster& RHS )
@@ -304,72 +300,6 @@ namespace ShadowFacts
 	bool ShadowCaster::SortComparatorBoundRadius( ShadowCaster& LHS, ShadowCaster& RHS )
 	{
 		return LHS.BoundRadius > RHS.BoundRadius;
-	}
-
-	ShadowSceneProc::ShadowCasterEnumerator::ShadowCasterEnumerator( ShadowSceneProc::CasterListT* OutList ):
-		Casters(OutList)
-	{
-		SME_ASSERT(OutList);
-	}
-
-	ShadowSceneProc::ShadowCasterEnumerator::~ShadowCasterEnumerator()
-	{
-		;//
-	}
-
-	bool ShadowSceneProc::ShadowCasterEnumerator::AcceptBranch( NiNode* Node )
-	{
-		bool Result = true;
-
-		TESObjectREFR* ObjRef = Utilities::GetNodeObjectRef(Node);
-		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
-		BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
-
-		if (TreeNode)
-			Result = false;
-		else if (FadeNode)
-		{
-			Result = false;
-
-			if (FadeNode->IsCulled() == false)
-			{
-				if (ObjRef && ObjRef->baseForm && ObjRef->refID != 0x14)
-				{
-					if (FadeNode->m_kWorldBound.radius > 0.f)
-					{
-						if ((ObjRef->flags & kTESFormSpecialFlag_DoesntCastShadow) == false)
-						{
-							// we allocate a BSXFlags extra data at instantiation
-							if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontCastShadow) == false)
-							{
-								Casters->push_back(ShadowCaster(FadeNode, ObjRef));
-								SHADOW_DEBUG(ObjRef, "Added to Scene Caster List");
-							}
-							else SHADOW_DEBUG(ObjRef, "Failed BSXFlag DoesntCastShadow check");
-						}
-						else SHADOW_DEBUG(ObjRef, "Failed TESForm DoesntCastShadow check");
-					}
-					else SHADOW_DEBUG(ObjRef, "Failed Non-Zero Bounds check");
-				}
-				else
-				{
-					if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
-						_MESSAGE("ShadowCasterEnumerator::AcceptBranch - Skipped non-ref %s", Node->m_pcName);
-				}
-			}
-			else
-			{
-				if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
-					_MESSAGE("ShadowCasterEnumerator::AcceptBranch - Skipped culled node %s", Node->m_pcName);
-			}
-		}
-
-		return Result;
-	}
-
-	void ShadowSceneProc::ShadowCasterEnumerator::AcceptLeaf( NiAVObject* Object )
-	{
-		;//
 	}
 
 	ShadowSceneProc::ShadowSceneProc( ShadowSceneNode* Root ) :
@@ -409,8 +339,12 @@ namespace ShadowFacts
 								// we allocate a BSXFlags extra data at instantiation
 								if (BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kDontCastShadow) == false)
 								{
-									Casters.push_back(ShadowCaster(Node, Object));
-									SHADOW_DEBUG(Object, "Added to Scene Caster List");
+									if (ShadowSundries::kExclusiveCaster == NULL || Object == ShadowSundries::kExclusiveCaster)
+									{
+										Casters.push_back(ShadowCaster(Node, Object));
+										SHADOW_DEBUG(Object, "Added to Scene Caster List");
+									}
+									else SHADOW_DEBUG(Object, "Failed Exclusive Caster check");
 								}
 								else SHADOW_DEBUG(Object, "Failed BSXFlag DoesntCastShadow check");
 							}
@@ -428,13 +362,6 @@ namespace ShadowFacts
 	{
 		Casters.push_back(ShadowCaster(Utilities::GetPlayerNode(), *g_thePlayer));
 
-#if 0
-		// walking the scenegraph is the easiest but it doesn't seem very reliable
-		// actors (other refs too?) randomly go missing during traversal
-		// ### investigate and determine if it's a bug in the traversal code
-		Utilities::NiNodeChildrenWalker Walker((NiNode*)Root->m_children.data[3]);			// traverse ObjectLODRoot node
-		Walker.Walk(&ShadowCasterEnumerator(&Casters));
-#else
 		// we'll walk the exterior cell grid/current interior cell
 		if (TES::GetSingleton()->currentInteriorCell)
 			ProcessCell(TES::GetSingleton()->currentInteriorCell);
@@ -452,7 +379,6 @@ namespace ShadowFacts
 				}
 			}
 		}
-#endif
 	}
 
 	void ShadowSceneProc::CleanupSceneCasters( ShadowLightListT* ValidCasters ) const
@@ -531,7 +457,7 @@ namespace ShadowFacts
 				if (Itr->GetIsLargeObject() == false)
 					break;
 
-				if (ShadowRenderTasks::GetCanBeLargeObject(Itr->Node))
+				if (ShadowRenderTasks::CanBeLargeObject(Itr->Node))
 				{
 					ShadowSceneLight* NewSSL = NULL;
 					if (Itr->Queue(Root, &CasterCount, &NewSSL) == true)
@@ -899,7 +825,7 @@ namespace ShadowFacts
 		if (FadeNode)
 		{
 			TESObjectREFR* Object = Utilities::GetNodeObjectRef(FadeNode);
-			if (FadeNode->IsCulled() == false && Object && Object->parentCell && ShadowRenderTasks::GetCanReceiveShadow(FadeNode) == false)
+			if (FadeNode->IsCulled() == false && Object && Object->parentCell && ShadowRenderTasks::CanReceiveShadow(FadeNode) == false)
 			{
 				SHADOW_DEBUG(Object, "Queued for Shadow Receiver culling");
 				NonReceivers->push_back(FadeNode);
@@ -1238,14 +1164,14 @@ namespace ShadowFacts
 			Source->showDebug = 0;
 	}
 
-	bool ShadowRenderTasks::GetCanBeLargeObject( NiNode* Node )
+	bool ShadowRenderTasks::CanBeLargeObject( NiNode* Node )
 	{
 		SME_ASSERT(Node);
 
 		return BSXFlagsSpecialFlags::GetFlag(Node, BSXFlagsSpecialFlags::kCannotBeLargeObject) == false;
 	}
 
-	bool ShadowRenderTasks::GetIsLargeObject( NiNode* Node )
+	bool ShadowRenderTasks::IsLargeObject( NiNode* Node )
 	{
 		SME_ASSERT(Node);
 
@@ -1369,17 +1295,17 @@ namespace ShadowFacts
 		}
 	}
 
-	bool __stdcall ShadowRenderTasks::GetReactsToSmallLights( ShadowSceneLight* Source )
+	bool __stdcall ShadowRenderTasks::ReactsToSmallLights( ShadowSceneLight* Source )
 	{
 		SME_ASSERT(Source);
 
-		if (TES::GetSingleton()->currentInteriorCell == NULL && GetIsLargeObject(Source->sourceNode) && Settings::kLargeObjectSunShadowsOnly().i)
+		if (TES::GetSingleton()->currentInteriorCell == NULL && IsLargeObject(Source->sourceNode) && Settings::kLargeObjectSunShadowsOnly().i)
 			return false;
 		else
 			return true;
 	}
 
-	bool ShadowRenderTasks::GetHasPlayerLOS( TESObjectREFR* Object, NiNode* Node, float Distance )
+	bool ShadowRenderTasks::HasPlayerLOS( TESObjectREFR* Object, NiNode* Node, float Distance )
 	{
 		SME_ASSERT(Object && Node);
 
@@ -1419,7 +1345,7 @@ namespace ShadowFacts
 		if (FadeNode)
 		{
 			TESObjectREFR* Object = Utilities::GetNodeObjectRef(FadeNode);
-			if (FadeNode->IsCulled() == false && (Settings::kReceiverEnableExclusionParams().i == 0 || GetCanReceiveShadow(FadeNode)))
+			if (FadeNode->IsCulled() == false && (Settings::kReceiverEnableExclusionParams().i == 0 || CanReceiveShadow(FadeNode)))
 			{
 				thisCall<void>(0x007D59E0, Source, Receiver);
 				SHADOW_DEBUG(Object, "Updating Geometry for Self Shadow");
@@ -1461,7 +1387,7 @@ namespace ShadowFacts
 		}
 	}
 
-	bool ShadowRenderTasks::GetCanReceiveShadow( NiNode* Node )
+	bool ShadowRenderTasks::CanReceiveShadow( NiNode* Node )
 	{
 		SME_ASSERT(Node);
 
@@ -1505,7 +1431,7 @@ namespace ShadowFacts
 		return Result;
 	}
 
-	bool __stdcall ShadowRenderTasks::GetCanHaveDirectionalShadow( ShadowSceneLight* Source )
+	bool __stdcall ShadowRenderTasks::CanHaveDirectionalShadow( ShadowSceneLight* Source )
 	{
 		SME_ASSERT(Source && Source->sourceNode);
 
@@ -1565,7 +1491,7 @@ namespace ShadowFacts
 		{
 			if (BSXFlagsSpecialFlags::GetFlag(Source->sourceNode, BSXFlagsSpecialFlags::kDontPerformLOSCheck) == false)
 			{
-				if (GetIsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
+				if (IsLargeObject(Source->sourceNode) == false || Settings::kLightLOSSkipLargeObjects().i == 0)
 				{
 					if (Object->IsActor() == false || Settings::kLightLOSSkipActors().i == 0)
 					{
@@ -1645,21 +1571,7 @@ namespace ShadowFacts
 		}
 	}
 
-	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage1(ShadowSceneLight* Source, ShadowSceneLight* SceneLight)
-	{
-		// check the distance b'ween the occluder and the scene light
-		// if it's not too far, queue it for stage 2
-		SME_ASSERT(SceneLight && Source);
-		SME_ASSERT(Source->sourceLight && SceneLight->sourceLight);
-
-		float Distance = Utilities::GetDistance((Vector3*)&Source->sourceNode->m_worldTranslate, (Vector3*)&SceneLight->sourceLight->m_worldTranslate);
-		if (Distance < Settings::kLightSourceMaxDistance().f)
-			return true;
-		else
-			return false;
-	}
-
-	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage2(ShadowSceneLight* Source, int ActiveLights)
+	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage1(ShadowSceneLight* Source, int ActiveLights)
 	{
 		// update extra flags and check if source reacts to small lights/has any active lights
 		SME_ASSERT(Source);
@@ -1668,7 +1580,7 @@ namespace ShadowFacts
 		if (Utilities::GetNodeActiveLights(Source->sourceNode, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_NonShadowCasters) == 0)
 			Source->unkFCPad[0] |= kSSLExtraFlag_NoActiveLights;
 
-		bool Result = GetReactsToSmallLights(Source);
+		bool Result = ReactsToSmallLights(Source);
 
 		if (Result == false)
 			Source->unkFCPad[0] |= kSSLExtraFlag_DisallowSmallLights;
@@ -1682,12 +1594,12 @@ namespace ShadowFacts
 		return Result;
 	}
 
-	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage3(ShadowSceneLight* Source)
+	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage2(ShadowSceneLight* Source)
 	{
 		// update extra flags and check if the main directional/sub/moon light is allowed
 		SME_ASSERT(Source);
 
-		if (GetCanHaveDirectionalShadow(Source) == false)
+		if (CanHaveDirectionalShadow(Source) == false)
 		{
 			Source->unkFCPad[0] |= kSSLExtraFlag_DisallowDirectionalLight;
 			return false;
@@ -1907,7 +1819,6 @@ namespace ShadowFacts
 	_DefineHookHdlr(BlacklistTreeNode, 0x0056118F);
 	_DefinePatchHdlrWithBuffer(TrifleSupportPatch, 0x00407684, 5, 0xE8, 0x57, 0xF7, 0x3B, 0x0);
 	_DefineHookHdlr(ShadowSceneLightCtor, 0x007D6122);
-	_DefineHookHdlr(LightSourceProjectDistCheck, 0x007D23A0);
 	_DefineHookHdlr(CalculateProjectionProlog, 0x007D22AD);
 	_DefineHookHdlr(CalculateProjectionEpilog, 0x007D2DF2);
 
@@ -2057,7 +1968,7 @@ namespace ShadowFacts
 			pushad
 			push	edi
 			push	eax
-			call	ShadowRenderTasks::HandleLightProjectionStage2
+			call	ShadowRenderTasks::HandleLightProjectionStage1
 			test	al, al
 			jz		SKIP
 
@@ -2102,7 +2013,7 @@ namespace ShadowFacts
 			mov		eax, [esp + 0x48]
 			pushad
 			push	eax
-			call	ShadowRenderTasks::HandleLightProjectionStage3
+			call	ShadowRenderTasks::HandleLightProjectionStage2
 			test	al, al
 			jz		SKIP
 
@@ -2198,58 +2109,6 @@ namespace ShadowFacts
 			popad
 
 			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	#define _hhName	LightSourceProjectDistCheck
-	_hhBegin()
-	{
-		_hhSetVar(GetSceneRoot, 0x007B4280);
-		_hhSetVar(GetSceneLight, 0x007C62D0);
-		_hhSetVar(Exit, 0x007D23C0);
-		__asm
-		{
-			// the fellow that wrote the original used a single variable for the loop counter and the active light count
-			// if the org condition fails, it ends up looping perpetually (was probabaly an assert that was removed in the release build)
-			// anyway, since we add additional checks to this stage, we need to use a different loop counter
-			// we settle for EBP as it holds the NULL pointer passed as the function's argument (which is not gonna be used in any event)
-			xor		ebp, ebp
-			mov		ebx, [esp + 0x48]
-		ANFANG:
-			cmp		[eax + 0xF4], 0
-			jnz		AWAY
-
-			pushad
-			push	eax
-			push	ebx
-			call	ShadowRenderTasks::HandleLightProjectionStage1
-			test	al, al
-			jz		SKIP
-
-			popad
-
-			// valid scene light, increment light counter
-			add		edi, 1
-		SKIP:
-			popad
-		AWAY:
-			// increment loop counter and get the next scene light
-			add		ebp, 1
-			push	0
-			call	_hhGetVar(GetSceneRoot)
-			add		esp, 0x4
-			mov		ecx, eax
-			push	ebp
-			call	_hhGetVar(GetSceneLight)
-			test	eax, eax
-			jz		VERLASSEN
-			jmp		ANFANG
-		VERLASSEN:
-			// reset registers
-			xor		ebx, ebx
-			xor		ebp, ebp
-
-			jmp		_hhGetVar(Exit)
 		}
 	}
 
@@ -2477,7 +2336,6 @@ namespace ShadowFacts
 		_MemHdlr(CheckDirectionalLightSource).WriteJump();
 		_MemHdlr(BlacklistTreeNode).WriteJump();
 		_MemHdlr(ShadowSceneLightCtor).WriteJump();
-	//	_MemHdlr(LightSourceProjectDistCheck).WriteJump();
 		_MemHdlr(CalculateProjectionProlog).WriteJump();
 		_MemHdlr(CalculateProjectionEpilog).WriteJump();
 

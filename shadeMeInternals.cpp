@@ -26,7 +26,6 @@ namespace Settings
 	SME::INI::INISetting			kNoInteriorSunShadows("ValidateInteriorLightSources", "Shadows::General", "Prevents arbitrary sun shadows", (SInt32)1);
 	SME::INI::INISetting			kActorsReceiveAllShadows("ActorsReceiveAllShadows", "Shadows::General", "Actors are valid shadow receivers", (SInt32)1);
 	SME::INI::INISetting			kNightTimeMoonShadows("NightTimeMoonShadows", "Shadows::General", "Moons are shadow casting lights", (SInt32)0);
-	SME::INI::INISetting			kLightSourceMaxDistance("LightSourceMaxDistance", "Shadows::General", "Maximum distance b'ween the light source and the occluder", (float)750.f);
 
 	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
 																"Large objects are rendered before smaller ones", (SInt32)0);
@@ -136,7 +135,6 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kNoInteriorSunShadows);
 	RegisterSetting(&Settings::kActorsReceiveAllShadows);
 	RegisterSetting(&Settings::kNightTimeMoonShadows);
-	RegisterSetting(&Settings::kLightSourceMaxDistance);
 
 	RegisterSetting(&Settings::kLargeObjectHigherPriority);
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
