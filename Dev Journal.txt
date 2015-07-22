@@ -1,4 +1,2 @@
 To Do
 =====
-> Look into the dark shadow issue - precision or LOD?
-	> Could have something to do with how the render passes are accumulated; see BSShaderAccumulator & co.

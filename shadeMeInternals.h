@@ -90,10 +90,6 @@ namespace Settings
 	extern SME::INI::INISetting				kSelfExcludedPathInterior;
 	extern SME::INI::INISetting				kSelfExcludedPathExterior;
 
-	extern SME::INI::INISetting				kSelfPerformFogCheck;
-	extern SME::INI::INISetting				kSelfEnableDistanceToggle;
-	extern SME::INI::INISetting				kSelfMaxDistance;
-
 	extern SME::INI::INISetting				kReceiverExcludedTypesInterior;
 	extern SME::INI::INISetting				kReceiverExcludedTypesExterior;
 

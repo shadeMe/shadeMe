@@ -12,7 +12,6 @@ void OBSEMessageHandler(OBSEMessagingInterface::Message* Msg)
 	{
 	case OBSEMessagingInterface::kMessage_PostPostLoad:
 		{
-#if DEFERRED_SSL_AUXCHECKS == 0
 			if (Interfaces::kOBSE)
 			{
 				if (Interfaces::kOBSE->GetPluginLoaded("Trifle"))
@@ -22,7 +21,6 @@ void OBSEMessageHandler(OBSEMessagingInterface::Message* Msg)
 					ShadowFacts::_MemHdlr(TrifleSupportPatch).WriteBuffer();
 				}
 			}
-#endif
 		}
 
 		break;

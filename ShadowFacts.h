@@ -318,6 +318,7 @@ namespace ShadowFacts
 	{
 	public:
 		static ShadowLightListT						LightProjectionUpdateQueue;
+		static const float							ShadowDepthBias;
 	private:
 		static PathSubstringListT					BackFaceIncludePaths;
 		static PathSubstringListT					LargeObjectExcludePaths;
@@ -402,6 +403,7 @@ namespace ShadowFacts
 	_DeclareMemHdlr(ShadowSceneLightCtor, "");
 	_DeclareMemHdlr(CalculateProjectionProlog, "");
 	_DeclareMemHdlr(CalculateProjectionEpilog, "");
+	_DeclareMemHdlr(ShadowLightShaderDepthBias, "");
 
 	void Patch(void);
 	void Initialize(void);

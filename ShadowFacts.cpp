@@ -381,55 +381,6 @@ namespace ShadowFacts
 		}
 	}
 
-	void ShadowSceneProc::CleanupSceneCasters( ShadowLightListT* ValidCasters ) const
-	{
-		SME_ASSERT(ValidCasters);
-
-		ShadowLightListT Delinquents;
-		for (NiTPointerList<ShadowSceneLight>::Node* Itr = Root->shadowCasters.start; Itr && Itr->data; Itr = Itr->next)
-		{
-			ShadowSceneLight* ShadowLight = Itr->data;
-			if (ShadowLight->sourceNode)
-			{
-				if (std::find(ValidCasters->begin(), ValidCasters->end(), ShadowLight) == ValidCasters->end())
-				{
-					// not a valid caster, finalize for removal
-					Delinquents.push_back(ShadowLight);
-
-					thisCall<void>(0x007C77C0, Root, ShadowLight);
-
-					for (NiTPointerList<NiTriBasedGeom>::Node* Itr = ShadowLight->unkE4.start; Itr && Itr->data; Itr = Itr->next)
-					{
-						BSShaderLightingProperty* LightingProperty = NI_CAST(Utilities::GetNiPropertyByID(Itr->data, 0x4), BSShaderLightingProperty);
-						if (LightingProperty)
-						{
-							LightingProperty->lastRenderPassState = 0;
-						}
-					}
-
-					// ### FIX repeated additive application of shadow maps
-				}
-			}
-		}
-
-		// walk through the valid nodes and increment the ref count on each ShadowSceneLight to prevent it from being freed
-		for (ShadowLightListT::iterator Itr = ValidCasters->begin(); Itr != ValidCasters->end(); Itr++)
-			(*Itr)->m_uiRefCount++;
-
-		// clear the list
-		thisCall<void>(0x00573880, &Root->shadowCasters);
-
-		// finally, re-add the buggers
-		for (ShadowLightListT::iterator Itr = ValidCasters->begin(); Itr != ValidCasters->end(); Itr++)
-		{
-			ShadowSceneLight* Light = *Itr;
-			thisCall<void>(0x007C16B0, &Root->shadowCasters, &Light);
-		}
-
-		Root->unk108 = Root->unk10C = Root->shadowCasters.start;
-		SME_ASSERT(Root->shadowCasters.numItems == ValidCasters->size());
-	}
-
 	void ShadowSceneProc::Execute( UInt32 MaxShadowCount )
 	{
 		std::string Buffer;
@@ -537,9 +488,6 @@ namespace ShadowFacts
 					break;
 			}
 		}
-
-		// ### buggy, causes shadow maps to be reapplied on receivers additively on interior/exterior switch
-		// CleanupSceneCasters(&ValidSSLs);
 
 		gLog.Outdent();
 	}
@@ -919,9 +867,8 @@ namespace ShadowFacts
 		return SetFlag(Utilities::GetBSXFlags(Node), Flag, State);
 	}
 
-#if DEFERRED_SSL_AUXCHECKS == 0
 	ShadowLightListT			ShadowRenderTasks::LightProjectionUpdateQueue;
-#endif
+	const float					ShadowRenderTasks::ShadowDepthBias = -0.000001;
 	PathSubstringListT			ShadowRenderTasks::BackFaceIncludePaths;
 	PathSubstringListT			ShadowRenderTasks::LargeObjectExcludePaths;
 	PathSubstringListT			ShadowRenderTasks::LightLOSCheckExcludePaths;
@@ -1090,35 +1037,7 @@ namespace ShadowFacts
 		if (Object)
 		{
 			if (SelfShadowExParams::Instance.GetAllowed(Node, Object))
-			{
-				BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
-				float Distance = Utilities::GetDistanceFromPlayer(Node);
-
-				if (Fog && Settings::kSelfPerformFogCheck().i && Object->parentCell && Object->parentCell->IsInterior() == false)
-				{
-					// ### what exactly am I doing here?
-					float FogStart = Fog->fogStart;
-					float FogEnd = Fog->fogEnd;
-					float Delta = FogEnd - FogStart;
-					if (FogStart < 0)
-						Delta = FogEnd + FogStart;
-
-					if (Distance < Delta)
-						Result = true;
-					else SHADOW_DEBUG(Object, "Failed SelfShadow Fog check");
-				}
-				else
-					Result = true;
-
-				if (Result)
-				{
-					if (Settings::kSelfEnableDistanceToggle().i && Distance > Settings::kSelfMaxDistance().f)
-					{
-						Result = false;
-						SHADOW_DEBUG(Object, "Failed SelfShadow Distance Toggle check");
-					}
-				}
-			}
+				Result = true;
 			else SHADOW_DEBUG(Object, "Failed SelfShadowExParams check");
 		}
 		else
@@ -1615,9 +1534,7 @@ namespace ShadowFacts
 		SME_ASSERT(TexturePool[kPool_Tier1] == NULL);
 
 		for (int i = kPool_Tier1; i < kPool__MAX; i++)
-		{
 			TexturePool[i] = BSTextureManager::CreateInstance();
-		}
 	}
 
 	void ShadowMapTexturePool::Reset( void )
@@ -1626,9 +1543,7 @@ namespace ShadowFacts
 		{
 			BSTextureManager* Instance = TexturePool[i];
 			if (Instance)
-			{
 				Instance->DeleteInstance();
-			}
 
 			TexturePool[i] = NULL;
 		}
@@ -1778,9 +1693,7 @@ namespace ShadowFacts
 		if (Fallback)
 		{
 			for (int i = kPool_Tier1; i < kPool__MAX; i++)
-			{
 				TexturePool[i]->DiscardShadowMap(Texture);
-			}
 
 			(*BSTextureManager::Singleton)->DiscardShadowMap(Texture);
 		}
@@ -1821,6 +1734,7 @@ namespace ShadowFacts
 	_DefineHookHdlr(ShadowSceneLightCtor, 0x007D6122);
 	_DefineHookHdlr(CalculateProjectionProlog, 0x007D22AD);
 	_DefineHookHdlr(CalculateProjectionEpilog, 0x007D2DF2);
+	_DefinePatchHdlr(ShadowLightShaderDepthBias, 0x007CB5D0 + 2);
 
 	#define _hhName	EnumerateFadeNodes
 	_hhBegin()
@@ -2288,7 +2202,7 @@ namespace ShadowFacts
 
 #if 0
 	_DeclareMemHdlr(TestHook4, "");
-	_DefineHookHdlr(TestHook4, 0x00483194);
+	_DefineHookHdlr(TestHook4, 0x007CB5CB);
 
 	void __stdcall FixRange(void)
 	{
@@ -2299,15 +2213,13 @@ namespace ShadowFacts
 	#define _hhName	TestHook4
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x00483199);
-		_hhSetVar(Call, 0x00441850);
-
+		_hhSetVar(Retn, 0x007CB5D6);
+		_hhSetVar(Call, 0x0076C730);
+		static const float kBias = -0.000001;
 		__asm
 		{
 			call	_hhGetVar(Call)
-			pushad
-			call FixRange
-			popad
+			fld		kBias
 			jmp		_hhGetVar(Retn)
 		}
 	}
@@ -2338,6 +2250,7 @@ namespace ShadowFacts
 		_MemHdlr(ShadowSceneLightCtor).WriteJump();
 		_MemHdlr(CalculateProjectionProlog).WriteJump();
 		_MemHdlr(CalculateProjectionEpilog).WriteJump();
+		_MemHdlr(ShadowLightShaderDepthBias).WriteUInt32((UInt32)&ShadowRenderTasks::ShadowDepthBias);
 
 		if (Settings::kActorsReceiveAllShadows().i)
 		{

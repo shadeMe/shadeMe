@@ -64,10 +64,6 @@ namespace Settings
 	SME::INI::INISetting			kSelfExcludedPathExterior("Exterior", "SelfShadows::ExcludedPaths",
 															"Meshes with these substrings in their file paths won't cast shadows", "");
 
-	SME::INI::INISetting			kSelfPerformFogCheck("PerformFogCheck", "SelfShadows::General", "Toggle self-shadowing depending upon fog distance", (SInt32)1);
-	SME::INI::INISetting			kSelfEnableDistanceToggle("EnableDistanceToggle", "SelfShadows::General", "Toggle self-shadowing depending upon distance from player", (SInt32)0);
-	SME::INI::INISetting			kSelfMaxDistance("MaxDistance", "SelfShadows::General", "Distance beyond which self-shadows are turned off", (float)2000.f);
-
 	SME::INI::INISetting			kSelfIncludePathInterior("Interior", "SelfShadows::IncludePaths",
 															"Meshes with these substrings in their file paths will ONLY cast self-shadows", "");
 	SME::INI::INISetting			kSelfIncludePathExterior("Exterior", "SelfShadows::IncludePaths",
@@ -167,10 +163,6 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 
 	RegisterSetting(&Settings::kSelfIncludePathInterior);
 	RegisterSetting(&Settings::kSelfIncludePathExterior);
-
-	RegisterSetting(&Settings::kSelfPerformFogCheck);
-	RegisterSetting(&Settings::kSelfEnableDistanceToggle);
-	RegisterSetting(&Settings::kSelfMaxDistance);
 
 	RegisterSetting(&Settings::kReceiverExcludedTypesInterior);
 	RegisterSetting(&Settings::kReceiverExcludedTypesExterior);
