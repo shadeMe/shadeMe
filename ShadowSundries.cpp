@@ -321,12 +321,25 @@ namespace ShadowSundries
 				ShadowSceneLight* ShadowLight = Itr->data;
 				bool LOSCheck = Utilities::GetLightLOS(ShadowLight->sourceLight, Ref);
 
-				Console_Print("Light @ %.0f, %.0f, %.0f ==> DIST[%.0f] LOS[%d]",
-					ShadowLight->sourceLight->m_worldTranslate.x,
-					ShadowLight->sourceLight->m_worldTranslate.y,
-					ShadowLight->sourceLight->m_worldTranslate.z,
-					Utilities::GetDistance(ShadowLight->sourceLight, Node),
-					LOSCheck);
+				Console_Print("Light @ %.0f, %.0f, %.0f | Att. = %0.f, %0.f, %0.f ==> DIST[%.0f] LOS[%d]",
+							ShadowLight->sourceLight->m_worldTranslate.x,
+							ShadowLight->sourceLight->m_worldTranslate.y,
+							ShadowLight->sourceLight->m_worldTranslate.z,
+							ShadowLight->sourceLight->m_fAtten0,
+							ShadowLight->sourceLight->m_fAtten1,
+							ShadowLight->sourceLight->m_fAtten2,
+							Utilities::GetDistance(ShadowLight->sourceLight, Node),
+							LOSCheck);
+
+				for (NiTPointerList<NiNode>::Node* j = ShadowLight->sourceLight->affectedNodes.start; j && j->data; j = j->next)
+				{
+					Console_Print("\tAffects %s  @ %.0f, %.0f, %.0f ==> DIST[%.0f]",
+								  j->data->m_pcName,
+								  j->data->m_worldTranslate.x,
+								  j->data->m_worldTranslate.y,
+								  j->data->m_worldTranslate.z,
+								  Utilities::GetDistance(ShadowLight->sourceLight, j->data));
+				}
 			}
 
 			Console_Print("========================================================================================");
@@ -343,6 +356,17 @@ namespace ShadowSundries
 		*result = 0;
 
 		kDebugSelection = InterfaceManager::GetSingleton()->debugSelection;
+
+		return true;
+	}
+
+	TESObjectREFR*			kExclusiveCaster = NULL;
+
+	static bool Help_Execute(COMMAND_ARGS)
+	{
+		*result = 0;
+
+		kExclusiveCaster = InterfaceManager::GetSingleton()->debugSelection;
 
 		return true;
 	}
@@ -373,6 +397,11 @@ namespace ShadowSundries
 			BeginTrace->execute = BeginTrace_Execute;
 			BeginTrace->numParams = ToggleShadowVolumes->numParams;
 			BeginTrace->params = ToggleShadowVolumes->params;
+
+			CommandInfo* Help = (CommandInfo*)0x00B0B740;
+			Help->longName = "SetShadowExclusiveCaster";
+			Help->shortName = "sec";
+			Help->execute = Help_Execute;
 		}
 	}
 

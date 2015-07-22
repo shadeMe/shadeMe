@@ -170,6 +170,10 @@ namespace ShadowFacts
 		{
 			SHADOW_DEBUG(Object, "Failed Shadow Count check");
 		}
+		else if (ShadowSundries::kExclusiveCaster && Object != ShadowSundries::kExclusiveCaster)
+		{
+			SHADOW_DEBUG(Object, "Failed Exclusive Caster check");
+		}
 		else if (Distance < Settings::kCasterMaxDistance().f)
 		{
 			if (Actor && Settings::kForceActorShadows().i)
@@ -189,7 +193,7 @@ namespace ShadowFacts
 					BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
 
 					// don't queue if hidden by fog
-					if (Fog == NULL || Distance < Fog->fogEnd)
+					if (Fog == NULL || Distance < Fog->fogEnd || (Object->parentCell && Object->parentCell->IsInterior()))
 					{
 						if (Actor)
 						{
@@ -239,7 +243,6 @@ namespace ShadowFacts
 				SHADOW_DEBUG(Object, "Failed Interior Heuristic check");
 		}
 
-#if DEFERRED_SSL_AUXCHECKS == 0
 		ShadowSceneLight* Existing = Utilities::GetShadowCasterLight(Node);
 		if (Result)
 		{
@@ -252,7 +255,6 @@ namespace ShadowFacts
 					ShadowRenderTasks::LightProjectionUpdateQueue.push_back(Existing);
 			}
 		}
-#endif
 
 		if (Result)
 		{
@@ -446,9 +448,7 @@ namespace ShadowFacts
 				{
 					GridCellArray::GridEntry* Data = CellGrid->GetGridEntry(i, j);
 					if (Data && Data->cell)
-					{
 						ProcessCell(Data->cell);
-					}
 				}
 			}
 		}
@@ -541,7 +541,7 @@ namespace ShadowFacts
 						if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
 						{
 							Itr->GetDescription(Buffer);
-							_MESSAGE("%s (Large Object) queued", Buffer.c_str());
+		//					_MESSAGE("%s (Large Object) queued", Buffer.c_str());
 						}
 					}
 
@@ -575,7 +575,7 @@ namespace ShadowFacts
 						if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
 						{
 							Itr->GetDescription(Buffer);
-							_MESSAGE("%s (Actor) queued", Buffer.c_str());
+		//					_MESSAGE("%s (Actor) queued", Buffer.c_str());
 						}
 					}
 
@@ -603,7 +603,7 @@ namespace ShadowFacts
 					if (ShadowSundries::kDebugSelection && Utilities::GetConsoleOpen() == false)
 					{
 						Itr->GetDescription(Buffer);
-						_MESSAGE("%s queued", Buffer.c_str());
+		//				_MESSAGE("%s queued", Buffer.c_str());
 					}
 				}
 
@@ -1001,7 +1001,7 @@ namespace ShadowFacts
 	PathSubstringListT			ShadowRenderTasks::LightLOSCheckExcludePaths;
 	PathSubstringListT			ShadowRenderTasks::InteriorHeuristicsIncludePaths;
 	PathSubstringListT			ShadowRenderTasks::InteriorHeuristicsExcludePaths;
-	const float					ShadowRenderTasks::InteriorDirectionalCheckThresholdDistance = 50.f;
+	const float					ShadowRenderTasks::DirectionalLightCheckThresholdDistance = 50.f;
 	PathSubstringListT			ShadowRenderTasks::SelfExclusiveIncludePathsExterior;
 	PathSubstringListT			ShadowRenderTasks::SelfExclusiveIncludePathsInterior;
 
@@ -1168,7 +1168,7 @@ namespace ShadowFacts
 				BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
 				float Distance = Utilities::GetDistanceFromPlayer(Node);
 
-				if (Fog && Settings::kSelfPerformFogCheck().i)
+				if (Fog && Settings::kSelfPerformFogCheck().i && Object->parentCell && Object->parentCell->IsInterior() == false)
 				{
 					// ### what exactly am I doing here?
 					float FogStart = Fog->fogStart;
@@ -1297,7 +1297,7 @@ namespace ShadowFacts
 		SelfExclusiveIncludePathsExterior.Refresh(&Settings::kSelfIncludePathExterior);
 	}
 
-	bool __stdcall ShadowRenderTasks::PerformAuxiliaryChecks( ShadowSceneLight* Source )
+	bool __stdcall ShadowRenderTasks::PerformAuxiliaryChecks(ShadowSceneLight* Source)
 	{
 		SME_ASSERT(Source);
 
@@ -1320,22 +1320,18 @@ namespace ShadowFacts
 
 				if (Result)
 				{
-					SHADOW_DEBUG(Object, "Light LOS check (L[%f, %f, %f] ==> DIST[%f])",
-								Source->sourceLight->m_worldTranslate.x,
-								Source->sourceLight->m_worldTranslate.y,
-								Source->sourceLight->m_worldTranslate.z,
-								Utilities::GetDistance(Source->sourceLight, Node));
-
-					gLog.Indent();
-
-					Result = PerformInteriorDirectionalShadowCheck(Source, Object);
-
+					Result = PerformShadowLightSourceCheck(Source, Object);
 					if (Result)
 					{
+						SHADOW_DEBUG(Object, "Light LOS/Direction check (L[%f, %f, %f] ==> DIST[%f])",
+									 Source->sourceLight->m_worldTranslate.x,
+									 Source->sourceLight->m_worldTranslate.y,
+									 Source->sourceLight->m_worldTranslate.z,
+									 Utilities::GetDistance(Source->sourceLight, Node));
+						gLog.Indent();
 						Result = PerformLightLOSCheck(Source, Object);
+						gLog.Outdent();
 					}
-
-					gLog.Outdent();
 				}
 				else SHADOW_DEBUG(Object, "Failed Prelim Exclusive Self-Shadows check");
 			}
@@ -1526,6 +1522,12 @@ namespace ShadowFacts
 			}
 		}
 
+		if (Object && Object->parentCell->IsInterior() == false && Settings::kNightTimeMoonShadows().i == 0)
+		{
+			if (TimeGlobals::GameHour() < 6.5 || TimeGlobals::GameHour() > 18.5)
+				return false;
+		}
+
 		return true;
 	}
 
@@ -1540,26 +1542,14 @@ namespace ShadowFacts
 		return true;
 	}
 
-	bool ShadowRenderTasks::PerformInteriorDirectionalShadowCheck( ShadowSceneLight* Source, TESObjectREFR* Object )
+	bool ShadowRenderTasks::PerformShadowLightSourceCheck( ShadowSceneLight* Source, TESObjectREFR* Object )
 	{
 		bool Result = true;
 
-		if (GetCanHaveDirectionalShadow(Source) == false &&
-			Source->sourceLight->m_worldTranslate.x != 0 &&
-			Source->sourceLight->m_worldTranslate.y != 0 &&
-			Source->sourceLight->m_worldTranslate.z != 0 )
+		if ((Source->unkFCPad[1] == kSSLExtraFlag_NoShadowLightSource))
 		{
-			// we estimate (rather crudely) if the source light is more or less directly above the node
-			Vector3 Buffer(*(Vector3*)&Source->sourceLight->m_worldTranslate);
-			Buffer.z = Object->posZ + 10.f;
-			float Distance = Utilities::GetDistance(&Buffer, (Vector3*)&Object->posX);
-			SHADOW_DEBUG(Object, "Adjusted Light DIST[%f]", Distance);
-
-			if (Distance < InteriorDirectionalCheckThresholdDistance)
-			{
-				SHADOW_DEBUG(Object, "Failed Interior Directional check");
-				Result = false;
-			}
+			Result = false;
+			SHADOW_DEBUG(Object, "Failed Shadow Light Source check");
 		}
 
 		return Result;
@@ -1614,6 +1604,96 @@ namespace ShadowFacts
 	{
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveInteriorShadow, true);
 		NiAVObjectSpecialFlags::SetFlag(Node, NiAVObjectSpecialFlags::kDontReceiveExteriorShadow, true);
+	}
+
+	void __stdcall ShadowRenderTasks::HandleSSLCreation(ShadowSceneLight* Light)
+	{
+		SME_ASSERT(Light);
+
+		// init padding bytes to store extra state
+		Light->unkFCPad[0] = 0;			// stores extra flags
+		Light->unkFCPad[1] = 0;			// set if culled due to no light source
+		Light->unkFCPad[2] = 0;
+	}
+
+	void __stdcall ShadowRenderTasks::HandleLightProjectionProlog(ShadowSceneLight* Source)
+	{
+		SME_ASSERT(Source);
+
+		// reset extra flags
+		Source->unkFCPad[0] = 0;
+		Source->unkFCPad[1] = 0;
+	}
+
+	void __stdcall ShadowRenderTasks::HandleLightProjectionEpilog(ShadowSceneLight* Source)
+	{
+		SME_ASSERT(Source);
+
+		// check if the projection failed and cull if necessary
+		UInt8 ExtraFlags = Source->unkFCPad[0];
+		bool Cull = false;
+
+		if ((ExtraFlags & kSSLExtraFlag_NoActiveLights) && (ExtraFlags & kSSLExtraFlag_DisallowDirectionalLight))
+			Cull = true;
+		else if ((ExtraFlags & kSSLExtraFlag_DisallowSmallLights) && (ExtraFlags & kSSLExtraFlag_DisallowDirectionalLight))
+			Cull = true;
+
+		if (Cull)
+		{
+			Source->unkFCPad[1] = kSSLExtraFlag_NoShadowLightSource;
+			SHADOW_DEBUG(Utilities::GetNodeObjectRef(Source->sourceNode), "Failed Light Projection Calc");
+		}
+	}
+
+	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage1(ShadowSceneLight* Source, ShadowSceneLight* SceneLight)
+	{
+		// check the distance b'ween the occluder and the scene light
+		// if it's not too far, queue it for stage 2
+		SME_ASSERT(SceneLight && Source);
+		SME_ASSERT(Source->sourceLight && SceneLight->sourceLight);
+
+		float Distance = Utilities::GetDistance((Vector3*)&Source->sourceNode->m_worldTranslate, (Vector3*)&SceneLight->sourceLight->m_worldTranslate);
+		if (Distance < Settings::kLightSourceMaxDistance().f)
+			return true;
+		else
+			return false;
+	}
+
+	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage2(ShadowSceneLight* Source, int ActiveLights)
+	{
+		// update extra flags and check if source reacts to small lights/has any active lights
+		SME_ASSERT(Source);
+
+		ShadowLightListT Lights;
+		if (Utilities::GetNodeActiveLights(Source->sourceNode, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_NonShadowCasters) == 0)
+			Source->unkFCPad[0] |= kSSLExtraFlag_NoActiveLights;
+
+		bool Result = GetReactsToSmallLights(Source);
+
+		if (Result == false)
+			Source->unkFCPad[0] |= kSSLExtraFlag_DisallowSmallLights;
+
+		if (ActiveLights == 0)
+		{
+			Source->unkFCPad[0] |= kSSLExtraFlag_NoActiveLights;
+			Result = false;
+		}
+
+		return Result;
+	}
+
+	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage3(ShadowSceneLight* Source)
+	{
+		// update extra flags and check if the main directional/sub/moon light is allowed
+		SME_ASSERT(Source);
+
+		if (GetCanHaveDirectionalShadow(Source) == false)
+		{
+			Source->unkFCPad[0] |= kSSLExtraFlag_DisallowDirectionalLight;
+			return false;
+		}
+		else
+			return true;
 	}
 
 	ShadowMapTexturePool			ShadowMapTexturePool::Instance;
@@ -1817,16 +1897,19 @@ namespace ShadowFacts
 	_DefineHookHdlr(UpdateGeometryLighting, 0x00407945);
 	_DefineHookHdlr(UpdateGeometryLightingSelf, 0x0040795C);
 	_DefineHookHdlr(RenderShadowMap, 0x007D4E89);
-	_DefineHookHdlr(PerformAuxSSLChecks, 0x00407906);
 	_DefineHookHdlr(CheckLargeObjectLightSource, 0x007D23F7);
 	_DefineHookHdlr(CheckShadowReceiver, 0x007D692D);
-	_DefineHookHdlr(CheckInteriorLightSource, 0x007D282C);
+	_DefineHookHdlr(CheckDirectionalLightSource, 0x007D282C);
 	_DefineHookHdlr(ShadowSceneLightGetShadowMap, 0x007D4760);
 	_DefineHookHdlr(CreateWorldSceneGraph, 0x0040EAAC);
 	_DefinePatchHdlr(CullCellActorNodeA, 0x004076C1 + 1);
 	_DefinePatchHdlr(CullCellActorNodeB, 0x004079D4);
 	_DefineHookHdlr(BlacklistTreeNode, 0x0056118F);
 	_DefinePatchHdlrWithBuffer(TrifleSupportPatch, 0x00407684, 5, 0xE8, 0x57, 0xF7, 0x3B, 0x0);
+	_DefineHookHdlr(ShadowSceneLightCtor, 0x007D6122);
+	_DefineHookHdlr(LightSourceProjectDistCheck, 0x007D23A0);
+	_DefineHookHdlr(CalculateProjectionProlog, 0x007D22AD);
+	_DefineHookHdlr(CalculateProjectionEpilog, 0x007D2DF2);
 
 	#define _hhName	EnumerateFadeNodes
 	_hhBegin()
@@ -1961,29 +2044,6 @@ namespace ShadowFacts
 		}
 	}
 
-	#define _hhName	PerformAuxSSLChecks
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x0040790B);
-		_hhSetVar(Skip, 0x0040796A);
-		__asm
-		{
-			pushad
-			push	esi
-			call	ShadowRenderTasks::PerformAuxiliaryChecks
-			test	al, al
-			jz		SKIP
-
-			popad
-			mov		ecx, [esp + 0x30]
-			push	ecx
-			jmp		_hhGetVar(Retn)
-		SKIP:
-			popad
-			jmp		_hhGetVar(Skip)
-		}
-	}
-
 	#define _hhName	CheckLargeObjectLightSource
 	_hhBegin()
 	{
@@ -1991,24 +2051,13 @@ namespace ShadowFacts
 		_hhSetVar(Jump, 0x007D272D);
 		__asm
 		{
-// HACK! HACK!
-// hooking that SSL light space projection call screws with the stack in unholy ways
-// stack pointer offsets vary since the new call to the method lies inside our hook
-#ifndef NDEBUG
-			mov		eax, [esp + 0x8]
-#else
-	#if DEFERRED_SSL_AUXCHECKS
-			mov		eax, [esp + 0x4]
-	#else
-			mov		eax, [esp + 0x8]
-			mov		eax, [eax]
-	#endif
-#endif
 			mov		[esp + 0x1C], ebx
+			mov		eax, [esp + 0x48]
 
 			pushad
+			push	edi
 			push	eax
-			call	ShadowRenderTasks::GetReactsToSmallLights
+			call	ShadowRenderTasks::HandleLightProjectionStage2
 			test	al, al
 			jz		SKIP
 
@@ -2019,6 +2068,7 @@ namespace ShadowFacts
 	SKIP:
 			popad
 	AWAY:
+
 			jmp		_hhGetVar(Jump)
 		}
 	}
@@ -2039,7 +2089,7 @@ namespace ShadowFacts
 		}
 	}
 
-	#define _hhName	CheckInteriorLightSource
+	#define _hhName	CheckDirectionalLightSource
 	_hhBegin()
 	{
 		_hhSetVar(Retn, 0x007D2835);
@@ -2052,7 +2102,7 @@ namespace ShadowFacts
 			mov		eax, [esp + 0x48]
 			pushad
 			push	eax
-			call	ShadowRenderTasks::GetCanHaveDirectionalShadow
+			call	ShadowRenderTasks::HandleLightProjectionStage3
 			test	al, al
 			jz		SKIP
 
@@ -2127,6 +2177,111 @@ namespace ShadowFacts
 			pushad
 			push	eax
 			call	ShadowRenderTasks::HandleTreeModelLoad
+			popad
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	#define _hhName	ShadowSceneLightCtor
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D6127);
+		_hhSetVar(Call, 0x00716DB0);
+		__asm
+		{
+			call	_hhGetVar(Call)
+
+			pushad
+			push	esi
+			call	ShadowRenderTasks::HandleSSLCreation
+			popad
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	#define _hhName	LightSourceProjectDistCheck
+	_hhBegin()
+	{
+		_hhSetVar(GetSceneRoot, 0x007B4280);
+		_hhSetVar(GetSceneLight, 0x007C62D0);
+		_hhSetVar(Exit, 0x007D23C0);
+		__asm
+		{
+			// the fellow that wrote the original used a single variable for the loop counter and the active light count
+			// if the org condition fails, it ends up looping perpetually (was probabaly an assert that was removed in the release build)
+			// anyway, since we add additional checks to this stage, we need to use a different loop counter
+			// we settle for EBP as it holds the NULL pointer passed as the function's argument (which is not gonna be used in any event)
+			xor		ebp, ebp
+			mov		ebx, [esp + 0x48]
+		ANFANG:
+			cmp		[eax + 0xF4], 0
+			jnz		AWAY
+
+			pushad
+			push	eax
+			push	ebx
+			call	ShadowRenderTasks::HandleLightProjectionStage1
+			test	al, al
+			jz		SKIP
+
+			popad
+
+			// valid scene light, increment light counter
+			add		edi, 1
+		SKIP:
+			popad
+		AWAY:
+			// increment loop counter and get the next scene light
+			add		ebp, 1
+			push	0
+			call	_hhGetVar(GetSceneRoot)
+			add		esp, 0x4
+			mov		ecx, eax
+			push	ebp
+			call	_hhGetVar(GetSceneLight)
+			test	eax, eax
+			jz		VERLASSEN
+			jmp		ANFANG
+		VERLASSEN:
+			// reset registers
+			xor		ebx, ebx
+			xor		ebp, ebp
+
+			jmp		_hhGetVar(Exit)
+		}
+	}
+
+	#define _hhName	CalculateProjectionProlog
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D22B3);
+		__asm
+		{
+			mov		esi, ecx
+			mov		[esp + 0x48], esi
+
+			pushad
+			push	esi
+			call	ShadowRenderTasks::HandleLightProjectionProlog
+			popad
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	#define _hhName	CalculateProjectionEpilog
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x007D2DF8);
+		__asm
+		{
+			mov		eax, [esi + 0x100]
+
+			pushad
+			push	esi
+			call	ShadowRenderTasks::HandleLightProjectionEpilog
 			popad
 
 			jmp		_hhGetVar(Retn)
@@ -2317,14 +2472,14 @@ namespace ShadowFacts
 		_MemHdlr(UpdateGeometryLighting).WriteJump();
 		_MemHdlr(UpdateGeometryLightingSelf).WriteJump();
 		_MemHdlr(RenderShadowMap).WriteJump();
-
-#if DEFERRED_SSL_AUXCHECKS
-		_MemHdlr(PerformAuxSSLChecks).WriteJump();
-#endif
 		_MemHdlr(CheckLargeObjectLightSource).WriteJump();
 		_MemHdlr(CheckShadowReceiver).WriteJump();
-		_MemHdlr(CheckInteriorLightSource).WriteJump();
+		_MemHdlr(CheckDirectionalLightSource).WriteJump();
 		_MemHdlr(BlacklistTreeNode).WriteJump();
+		_MemHdlr(ShadowSceneLightCtor).WriteJump();
+	//	_MemHdlr(LightSourceProjectDistCheck).WriteJump();
+		_MemHdlr(CalculateProjectionProlog).WriteJump();
+		_MemHdlr(CalculateProjectionEpilog).WriteJump();
 
 		if (Settings::kActorsReceiveAllShadows().i)
 		{

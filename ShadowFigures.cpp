@@ -259,7 +259,6 @@ namespace ShadowFigures
 	{
 		SME_ASSERT(Source);
 
-#if DEFERRED_SSL_AUXCHECKS == 0
 		// the SSL light projection stage method is an utter bastard with a really weird stack frame (bloody compiler optimizations!)
 		// this essentially limits us to calling the function under very specific conditions, i.e., this wrapper works for some reason
 		// so we'll use this bugger to force update unqueued caster SSLs that failed their aux checks
@@ -276,7 +275,6 @@ namespace ShadowFigures
 										Itr++)
 		{
 			Source = *Itr;
-#endif
 
 			NiNode* Node = Source->sourceNode;
 			TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
@@ -321,13 +319,10 @@ namespace ShadowFigures
 			}
 			else
 				thisCall<void>(0x007D2280, Source, AuxParam);
-
-#if DEFERRED_SSL_AUXCHECKS == 0
 		}
 
 		// clear the queue as it's populated every single frame
 		ShadowFacts::ShadowRenderTasks::LightProjectionUpdateQueue.clear();
-#endif
 	}
 
 	void __stdcall ShadowRenderConstantHotSwapper::HandleShadowMapRenderStage( ShadowSceneLight* Source, void* AuxParam )
@@ -380,6 +375,7 @@ namespace ShadowFigures
 			popad
 
 			add		esp, 0xC		// restore the stack pointer
+
 			jmp		_hhGetVar(Retn)
 		}
 	}

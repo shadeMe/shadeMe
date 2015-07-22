@@ -5,10 +5,6 @@
 // the outer part of a shadow is called the penumbra!
 namespace ShadowFacts
 {
-// auxiliary checks are performed after the light space projection stage as opposed to shadow caster queuing stage
-// this will keep the SSL state synchronized with the current frame's but will also force delinquents to take up a slot in the queue
-#define DEFERRED_SSL_AUXCHECKS			0
-
 	class ShadowCaster;
 
 	class ShadowCasterCountTable
@@ -333,24 +329,34 @@ namespace ShadowFacts
 	class ShadowRenderTasks
 	{
 	public:
-#if DEFERRED_SSL_AUXCHECKS == 0
 		static ShadowLightListT						LightProjectionUpdateQueue;
-#endif
 	private:
 		static PathSubstringListT					BackFaceIncludePaths;
 		static PathSubstringListT					LargeObjectExcludePaths;
 		static PathSubstringListT					LightLOSCheckExcludePaths;
 		static PathSubstringListT					InteriorHeuristicsIncludePaths;
 		static PathSubstringListT					InteriorHeuristicsExcludePaths;
-		static const float							InteriorDirectionalCheckThresholdDistance;
+		static const float							DirectionalLightCheckThresholdDistance;
 		static PathSubstringListT					SelfExclusiveIncludePathsInterior;
 		static PathSubstringListT					SelfExclusiveIncludePathsExterior;
 
 		static void									ToggleBackFaceCulling(bool State);
 		static void									PerformModelLoadTask(NiNode* Node, BSXFlags* xFlags);
 		static bool									PerformExclusiveSelfShadowCheck(NiNode* Node, TESObjectREFR* Object);
-		static bool									PerformInteriorDirectionalShadowCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
+		static bool									PerformShadowLightSourceCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
 		static bool									PerformLightLOSCheck(ShadowSceneLight* Source, TESObjectREFR* Object);
+
+		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
+		static bool __stdcall						GetCanHaveDirectionalShadow(ShadowSceneLight* Source);
+
+		enum
+		{
+			kSSLExtraFlag_NoActiveLights			= 1 << 0,		// no active scene lights within casting distance
+			kSSLExtraFlag_DisallowSmallLights		= 1 << 1,
+			kSSLExtraFlag_DisallowDirectionalLight	= 1 << 2,
+
+			kSSLExtraFlag_NoShadowLightSource		= 1 << 3,
+		};
 	public:
 		static void									Initialize(void);
 		static void									RefreshMiscPathLists(void);
@@ -358,10 +364,19 @@ namespace ShadowFacts
 		static void									HandleMainProlog(void);
 		static void									HandleMainEpilog(void);
 
+		static void	__stdcall						HandleSSLCreation(ShadowSceneLight* Light);
+
 		static void	__stdcall						HandleShadowMapRenderingProlog(NiNode* Node, ShadowSceneLight* Source);
 		static void	__stdcall						HandleShadowMapRenderingEpilog(NiNode* Node, ShadowSceneLight* Source);
 
 		static void	__stdcall						HandleShadowLightUpdateReceiver(ShadowSceneLight* Source, NiNode* SceneGraph);
+
+		static void	__stdcall						HandleLightProjectionProlog(ShadowSceneLight* Source);
+		static void	__stdcall						HandleLightProjectionEpilog(ShadowSceneLight* Source);
+
+		static bool __stdcall						HandleLightProjectionStage1(ShadowSceneLight* Source, ShadowSceneLight* SceneLight);	// check scene light distance
+		static bool __stdcall						HandleLightProjectionStage2(ShadowSceneLight* Source, int ActiveLights);	// check for active lights and if the occluder reacts to them
+		static bool __stdcall						HandleLightProjectionStage3(ShadowSceneLight* Source);	// check if directional source is allowed
 
 		static void __stdcall						QueueShadowOccluders(UInt32 MaxShadowCount);
 		static bool	__stdcall						HandleSelfShadowing(ShadowSceneLight* Caster);		// return true to allow
@@ -373,10 +388,8 @@ namespace ShadowFacts
 		static bool									GetIsLargeObject(NiNode* Node);
 		static bool	__stdcall						PerformAuxiliaryChecks(ShadowSceneLight* Source);
 		static bool									GetHasPlayerLOS(TESObjectREFR* Object, NiNode* Node, float Distance);
-		static bool __stdcall						GetReactsToSmallLights(ShadowSceneLight* Source);
 		static bool									GetCanReceiveShadow(NiNode* Node);
 		static bool									RunInteriorHeuristicGauntlet(TESObjectREFR* Caster, NiNode* Node, float BoundRadius);		// return true to allow
-		static bool __stdcall						GetCanHaveDirectionalShadow(ShadowSceneLight* Source);
 	};
 
 	_DeclareMemHdlr(EnumerateFadeNodes, "render unto Oblivion...");
@@ -386,10 +399,9 @@ namespace ShadowFacts
 	_DeclareMemHdlr(UpdateGeometryLighting, "");
 	_DeclareMemHdlr(UpdateGeometryLightingSelf, "selective self-shadowing support");
 	_DeclareMemHdlr(RenderShadowMap, "");
-	_DeclareMemHdlr(PerformAuxSSLChecks, "");
 	_DeclareMemHdlr(CheckLargeObjectLightSource, "prevents large objects from being affected by small light sources (z.B magic projectiles, torches, etc)");
 	_DeclareMemHdlr(CheckShadowReceiver, "");
-	_DeclareMemHdlr(CheckInteriorLightSource, "");
+	_DeclareMemHdlr(CheckDirectionalLightSource, "");
 	_DeclareMemHdlr(TextureManagerDiscardShadowMap, "");
 	_DeclareMemHdlr(TextureManagerReserveShadowMaps, "");
 	_DeclareMemHdlr(ShadowSceneLightGetShadowMap, "");
@@ -398,6 +410,10 @@ namespace ShadowFacts
 	_DeclareMemHdlr(CullCellActorNodeB, "");
 	_DeclareMemHdlr(BlacklistTreeNode, "");
 	_DeclareMemHdlr(TrifleSupportPatch, "compatibility patch for Trifle's first person shadows");
+	_DeclareMemHdlr(ShadowSceneLightCtor, "");
+	_DeclareMemHdlr(LightSourceProjectDistCheck, "");
+	_DeclareMemHdlr(CalculateProjectionProlog, "");
+	_DeclareMemHdlr(CalculateProjectionEpilog, "");
 
 	void Patch(void);
 	void Initialize(void);

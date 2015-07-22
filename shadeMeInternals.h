@@ -59,6 +59,8 @@ namespace Settings
 	extern SME::INI::INISetting				kForceActorShadows;
 	extern SME::INI::INISetting				kNoInteriorSunShadows;
 	extern SME::INI::INISetting				kActorsReceiveAllShadows;
+	extern SME::INI::INISetting				kNightTimeMoonShadows;
+	extern SME::INI::INISetting				kLightSourceMaxDistance;
 
 	extern SME::INI::INISetting				kLargeObjectHigherPriority;
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;
@@ -206,6 +208,14 @@ public:
 	UInt32							unk60;			// 60
 };
 
+// 64
+struct BVIntersectionData
+{
+	NiPlane							planes[6];				// 00
+	UInt32							intersections;			// 60 - bit field, mask = 0x3F (6 bits)
+};
+STATIC_ASSERT(sizeof(BVIntersectionData) == 0x64);
+
 // 220
 class ShadowSceneLight : public NiNode
 {
@@ -241,14 +251,14 @@ public:
 	NiTPointerList<NiTriBasedGeom>::Node*				unk144;		// points to the fence trishape
 	NiPointer<NiTriShape>								unk148;		// name set as "fence"
 	NiCamera*											unk14C;		// used when performing LOS checks/frustum culling
-	NiVector4											unk150[6];
-	UInt32												unk1B0;		// first six bits are checked and set when updating receiver geometry
-	UInt32												unk1B4[27];
+	BVIntersectionData									unk150;		// used when updating shadow receiver geometry
+	BVIntersectionData									unk1B4;
+	UInt32												unk218;
+	UInt32												unk21C;
 };
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceLight) == 0x100);
 STATIC_ASSERT(offsetof(ShadowSceneLight, sourceNode) == 0x130);
 STATIC_ASSERT(offsetof(ShadowSceneLight, unk150) == 0x150);
-STATIC_ASSERT(offsetof(ShadowSceneLight, unk1B0) == 0x1B0);
 STATIC_ASSERT(sizeof(ShadowSceneLight) == 0x220);
 
 // 24

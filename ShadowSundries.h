@@ -5,6 +5,7 @@
 namespace ShadowSundries
 {
 	extern TESObjectREFR*		kDebugSelection;
+	extern TESObjectREFR*		kExclusiveCaster;
 
 	namespace EditorSupport
 	{
