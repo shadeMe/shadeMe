@@ -203,6 +203,23 @@ public:
 	UInt32							unk60;			// 60
 };
 
+// BSShaderProperty::RenderPass
+// 10
+class BSRenderPassData
+{
+public:
+	NiGeometry*				geom;		// 00
+	UInt16					type;		// 04
+	UInt8					isFPass;	// 06
+	UInt8					unk07;		// 07 - init to 0
+	UInt8					unk08;		// 08 - size of unk0C array
+	UInt8					unk09;		// 09
+	UInt16					pad0A;
+	ShadowSceneLight**		unk0C;		// 0C
+
+	const char*				GetRenderPassName();
+};
+
 // 64
 struct BVIntersectionData
 {

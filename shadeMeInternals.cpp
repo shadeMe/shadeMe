@@ -702,3 +702,8 @@ namespace Utilities
 			return TESWeather::kType_None;
 	}
 }
+
+const char* BSRenderPassData::GetRenderPassName()
+{
+	return cdeclCall<const char*>(0x007B4920, type);
+}

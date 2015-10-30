@@ -1034,7 +1034,7 @@ namespace ShadowFacts
 		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
 		bool Result = false;
 
-		if (Object)
+		if (Object && Object->parentCell)
 		{
 			if (SelfShadowExParams::Instance.GetAllowed(Node, Object))
 				Result = true;
@@ -1312,7 +1312,7 @@ namespace ShadowFacts
 
 		bool Result = true;
 		TESObjectREFR* Object = Utilities::GetNodeObjectRef(Node);
-		if (Object)
+		if (Object && Object->parentCell)
 		{
 			Result = ShadowReceiverExParams::Instance.GetAllowed(Node, Object);
 			if (Result)
@@ -2202,24 +2202,135 @@ namespace ShadowFacts
 
 #if 0
 	_DeclareMemHdlr(TestHook4, "");
-	_DefineHookHdlr(TestHook4, 0x007CB5CB);
+	_DefineHookHdlr(TestHook4, 0x007A9845);
 
-	void __stdcall FixRange(void)
+	bool __stdcall CheckRenderPass(void)
 	{
-		BSRenderedTexture* CanopyPass = (*BSTextureManager::Singleton)->GetDefaultRenderTarget(14);
-		cdeclCall<void>(0x007A9CD0, CanopyPass->renderedTexture);
+		static NiGeometry* Buffer = NULL;
+		static int CasterCounter = 0, LastCounter = 0;
+		BSRenderPassData* Current = *(BSRenderPassData**)0x00B42EB8;
+		bool Render = true;
+
+		NiNode* Parent = (NiNode*)Current->geom->m_parent;
+		if (Current->type >= 375 && Current->type <= 378)
+		{
+			if (Buffer != Current->geom)
+			{
+	//			if (CasterCounter != LastCounter)
+	//				_MESSAGE("Mismatch in caster counter! Expected = %d, Found = %d", CasterCounter, LastCounter);
+
+				Buffer = Current->geom;
+	//			ShadowLightListT Lights;
+	//			CasterCounter = Utilities::GetNodeActiveLights(Parent, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_ShadowCasters);
+				LastCounter = 0;
+
+	//			_MESSAGE("PASS = %s | GEOM = %s | PARENT = %s | Casters = %d",
+	//					 Current->GetRenderPassName(), Current->geom->m_pcName, Parent->m_pcName, CasterCounter);
+			}
+			else if (ShadowSundries::kDebugSelection)
+				Render = false;
+
+	//		gLog.Indent();
+			if (Current->unk08)
+			{
+				LastCounter += Current->unk08;
+	//			if (Current->unk08 > 1)
+	//				_MESSAGE("SHADOW PASS: %d casters...", Current->unk08);
+
+				for (int i = 0; i < Current->unk08; i++)
+				{
+					ShadowSceneLight* Light = Current->unk0C[i];
+	//				_MESSAGE("Caster = %s %s", Light->sourceNode->m_pcName, (Render == false ? "(SKIP)" : ""));
+				}
+			}
+
+	//		gLog.Outdent();
+		}
+
+		return Render;
 	}
 
 	#define _hhName	TestHook4
 	_hhBegin()
 	{
-		_hhSetVar(Retn, 0x007CB5D6);
-		_hhSetVar(Call, 0x0076C730);
-		static const float kBias = -0.000001;
+		_hhSetVar(Retn, 0x007A984A);
+		_hhSetVar(Skip, 0x007A98C3);
+		_hhSetVar(Call, 0x00707530);
 		__asm
 		{
 			call	_hhGetVar(Call)
-			fld		kBias
+			pushad
+			call	CheckRenderPass
+			test	al, al
+			jz		SKIP
+			popad
+			jmp		_hhGetVar(Retn)
+		SKIP:
+			popad
+			jmp		_hhGetVar(Skip)
+		}
+	}
+
+	void __stdcall TagMainPass(bool start)
+	{
+		if (start)
+		{
+			_MESSAGE("BEGIN MAIN PASS===========================================================================");
+			gLog.Indent();
+		}
+		else
+		{
+			_MESSAGE("==========================================================================END MAIN PASS");
+			gLog.Outdent();
+		}
+	}
+
+	_DeclareMemHdlr(TestHook5, "");
+	_DefineHookHdlr(TestHook5, 0x0040CCD3);
+	#define _hhName	TestHook5
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x0040CCD8);
+		_hhSetVar(Call, 0x0070C0B0);
+		__asm
+		{
+			pushad
+			push 1
+			call	TagMainPass
+			popad
+
+			call	_hhGetVar(Call)
+
+			pushad
+			push 0
+			call	TagMainPass
+			popad
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
+	_DeclareMemHdlr(TestHook6, "");
+	_DefineHookHdlr(TestHook6, 0x0040CE48);
+	#define _hhName	TestHook6
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x0040CE4D);
+		_hhSetVar(Call, 0x0070C0B0);
+		__asm
+		{
+			pushad
+			push 1
+			call	TagMainPass
+			popad
+			// render player FP node
+			call	_hhGetVar(Call)
+
+			pushad
+			push 0
+			call	TagMainPass
+			popad
+
 			jmp		_hhGetVar(Retn)
 		}
 	}
@@ -2235,6 +2346,8 @@ namespace ShadowFacts
 
 #if 0
 		_MemHdlr(TestHook4).WriteJump();
+		_MemHdlr(TestHook5).WriteJump();
+	//	_MemHdlr(TestHook6).WriteJump();
 #endif
 		_MemHdlr(EnumerateFadeNodes).WriteJump();
 		_MemHdlr(RenderShadowsProlog).WriteJump();
