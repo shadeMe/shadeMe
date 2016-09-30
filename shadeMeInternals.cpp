@@ -486,9 +486,7 @@ namespace Utilities
 		gLog.Indent();
 
 		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
-		{
 			_MESSAGE("%d", *Itr);
-		}
 
 		gLog.Outdent();
 	}
@@ -516,9 +514,7 @@ namespace Utilities
 		gLog.Indent();
 
 		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
-		{
 			_MESSAGE("%s", Itr->c_str());
-		}
 
 		gLog.Outdent();
 	}

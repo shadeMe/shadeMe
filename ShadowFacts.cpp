@@ -1515,7 +1515,7 @@ namespace ShadowFacts
 
 	bool __stdcall ShadowRenderTasks::HandleLightProjectionStage2(ShadowSceneLight* Source)
 	{
-		// update extra flags and check if the main directional/sub/moon light is allowed
+		// update extra flags and check if the main directional/sun/moon light is allowed
 		SME_ASSERT(Source);
 
 		if (CanHaveDirectionalShadow(Source) == false)

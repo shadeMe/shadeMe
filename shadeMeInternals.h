@@ -380,9 +380,7 @@ namespace Utilities
 			while (Parser.NextToken(CurrentArg) != -1)
 			{
 				if (CurrentArg.length())
-				{
 					HandleParam(CurrentArg.c_str());
-				}
 			}
 		}
 
