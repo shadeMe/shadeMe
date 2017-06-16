@@ -1,6 +1,6 @@
 #include "shadeMeInternals.h"
-
-#pragma warning(disable: 4005 4748)
+#include "ShadowExtraData.h"
+#include "Utilities.h"
 
 namespace Interfaces
 {
@@ -114,8 +114,11 @@ namespace Settings
 	SME::INI::INISetting			kMaxCountMiscItem("MiscItem", "Shadows::MaxCount", "", (SInt32)-1);
 	SME::INI::INISetting			kMaxCountAlchemyItem("AlchemyItem", "Shadows::MaxCount", "", (SInt32)5);
 	SME::INI::INISetting			kMaxCountEquipment("Equipment", "Shadows::MaxCount", "", (SInt32)-1);
+	SME::INI::INISetting			kMaxCountClusters("Clusters", "Shadows::MaxCount", "", (SInt32)-1);
 
-	SME::INI::INISetting			kMiscForceSM3RenderPath("ForceSM3RenderPath", "Misc::Renderer", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringExcludePath("ExcludePaths", "Shadows::Clustering", "Blacklist", "");
+	SME::INI::INISetting			kClusteringMaxBoundRadius("MaxBoundRadius", "Shadows::Clustering", "", 5000.f);
+	SME::INI::INISetting			kClusteringMaxDistance("MaxDistance", "Shadows::Clustering", "", 1024.f);
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -207,8 +210,12 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMaxCountMiscItem);
 	RegisterSetting(&Settings::kMaxCountAlchemyItem);
 	RegisterSetting(&Settings::kMaxCountEquipment);
+	RegisterSetting(&Settings::kMaxCountClusters);
 
-	RegisterSetting(&Settings::kMiscForceSM3RenderPath);
+	RegisterSetting(&Settings::kClusteringExcludePath);
+	RegisterSetting(&Settings::kClusteringMaxBoundRadius);
+	RegisterSetting(&Settings::kClusteringMaxDistance);
+
 
 	Save();
 }
@@ -218,3 +225,55 @@ shadeMeINIManager::~shadeMeINIManager()
 	;//
 }
 
+TESObjectREFR*		ShadowDebugger::kDebugSelection = nullptr;
+
+void ShadowDebugger::Log(ShadowExtraData* xData, const char* Format, ...)
+{
+	if (Utilities::GetConsoleOpen())
+		return;
+
+	if (kDebugSelection)
+	{
+		if (xData->IsReference() && xData->D->Reference->Form == kDebugSelection)
+		{
+			char Buffer[0x1000] = { 0 };
+
+			va_list Args;
+			va_start(Args, Format);
+			vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
+			va_end(Args);
+
+			_MESSAGE("SDR[%08X %s]: %s", kDebugSelection->refID,
+				(kDebugSelection->niNode ? kDebugSelection->niNode->m_pcName : "<null>"),
+					 Buffer);
+		}
+	}
+}
+
+void ShadowDebugger::Log(const char* Format, ...)
+{
+	if (Utilities::GetConsoleOpen())
+		return;
+
+	if (kDebugSelection)
+	{
+		char Buffer[0x1000] = { 0 };
+
+		va_list Args;
+		va_start(Args, Format);
+		vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
+		va_end(Args);
+
+		_MESSAGE("%s", Buffer);
+	}
+}
+
+void ShadowDebugger::SetDebugSelection(TESObjectREFR* Ref /*= nullptr*/)
+{
+	kDebugSelection = Ref;
+}
+
+TESObjectREFR* ShadowDebugger::GetDebugSelection()
+{
+	return kDebugSelection;
+}

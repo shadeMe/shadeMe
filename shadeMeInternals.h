@@ -141,8 +141,13 @@ namespace Settings
 	extern SME::INI::INISetting				kMaxCountMiscItem;			// includes keys
 	extern SME::INI::INISetting				kMaxCountAlchemyItem;
 	extern SME::INI::INISetting				kMaxCountEquipment;			// includes armor, weapon, clothing, ammo
+	extern SME::INI::INISetting				kMaxCountClusters;
 
-	extern SME::INI::INISetting				kMiscForceSM3RenderPath;
+	extern SME::INI::INISetting				kClusteringExcludePath;
+	extern SME::INI::INISetting				kClusteringMaxBoundRadius;
+	extern SME::INI::INISetting				kClusteringMaxDistance;
+
+
 }
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
@@ -157,3 +162,16 @@ enum
 {
 	kTESFormSpecialFlag_DoesntCastShadow = TESForm::kFormFlags_CastShadows,
 };
+
+class ShadowDebugger
+{
+	static TESObjectREFR*			kDebugSelection;
+public:
+	static void						Log(ShadowExtraData* xData, const char* Format, ...);
+	static void						Log(const char* Format, ...);
+
+	static void						SetDebugSelection(TESObjectREFR* Ref = nullptr);
+	static TESObjectREFR*			GetDebugSelection();
+};
+
+#define SHADOW_DEBUG(xdata, ...)	ShadowDebugger::Log(xdata, ##__VA_ARGS__)

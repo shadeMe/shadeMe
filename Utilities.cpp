@@ -2,6 +2,8 @@
 #include "BoundsCalculator.h"
 #include "ShadowExtraData.h"
 
+#pragma warning(disable: 4005 4748)
+
 namespace Utilities
 {
 	bool Bitfield::Get(UInt32 Flag) const
@@ -15,6 +17,16 @@ namespace Utilities
 			this->Flags |= Flag;
 		else
 			this->Flags &= ~Flag;
+	}
+
+	UInt32 Bitfield::GetRaw() const
+	{
+		return Flags;
+	}
+
+	void Bitfield::SetRaw(UInt32 Flag) const
+	{
+		Flags = Flag;
 	}
 
 	void IntegerINIParamList::HandleParam(const char* Param)
@@ -199,6 +211,14 @@ namespace Utilities
 		SME_ASSERT(ThirdPersonNode);
 
 		return GetDistance(ThirdPersonNode, Source);
+	}
+
+	float GetDistanceFromPlayer(Vector3* Source)
+	{
+		NiNode* ThirdPersonNode = thisCall<NiNode*>(0x00660110, *g_thePlayer, false);
+		SME_ASSERT(ThirdPersonNode);
+
+		return GetDistance((Vector3*)&ThirdPersonNode->m_worldTranslate, Source);
 	}
 
 	bool GetAbovePlayer(TESObjectREFR* Ref, float Threshold)
@@ -403,6 +423,13 @@ namespace Utilities
 
 
 
+	float GetDistance(TESObjectREFR* Source, TESObjectREFR* Destination)
+	{
+		SME_ASSERT(Source && Destination);
+
+		return GetDistance((Vector3*)&Source->posX, (Vector3*)&Destination->posX);
+	}
+
 	NiProperty* GetNiPropertyByID(NiAVObject* Source, UInt8 ID)
 	{
 		SME_ASSERT(Source);
@@ -519,34 +546,34 @@ namespace Utilities
 				return Itr->data;
 		}
 
-		return NULL;
+		return nullptr;
 	}
 
 	BSXFlags* GetBSXFlags(NiAVObject* Source, bool Allocate /*= false*/)
 	{
-		BSXFlags* xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(Source, "BSX");
-		if (xFlags == NULL && Allocate)
+		auto xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(Source, "BSX");
+		if (xFlags == nullptr && Allocate)
 		{
 			xFlags = (BSXFlags*)FormHeap_Allocate(0x10);
 			thisCall<void>(0x006FA820, xFlags);
-			thisCall<void>(0x006FF8A0, Source, xFlags);
+			AddNiExtraData(Source, xFlags);
 		}
 
 		return xFlags;
 	}
 
-	bool GetConsoleOpen(void)
+	bool GetConsoleOpen()
 	{
 		return *((UInt8*)0x00B33415) != 0;
 	}
 
 	TESObjectREFR* GetNodeObjectRef(NiAVObject* Source)
 	{
-		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source, "REF");
+		auto xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source, "REF");
 		if (xRef)
 			return xRef->refr;
 		else
-			return NULL;
+			return nullptr;
 	}
 
 	BSFadeNode* GetPlayerNode(bool FirstPerson /*= false*/)
@@ -554,9 +581,26 @@ namespace Utilities
 		return thisCall<BSFadeNode*>(0x00660110, *g_thePlayer, FirstPerson);
 	}
 
-	ShadowSceneNode* GetShadowSceneNode(void)
+	ShadowSceneNode* GetShadowSceneNode()
 	{
 		return cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
+	}
+
+	bool GetUnderwater(TESObjectREFR* Ref)
+	{
+		SME_ASSERT(Ref && Ref->parentCell);
+
+		if (Ref->parentCell->HasWater())
+		{
+			auto xWaterHeight = (ExtraWaterHeight*)Ref->parentCell->extraData.GetByType(kExtraData_WaterHeight);
+			if (xWaterHeight)
+			{
+				if (Ref->posZ < xWaterHeight->waterHeight)
+					return true;
+			}
+		}
+
+		return false;
 	}
 
 	enum
@@ -582,6 +626,56 @@ namespace Utilities
 		else
 			return TESWeather::kType_None;
 	}
+
+	void AddNiExtraData(NiAVObject* Object, NiExtraData* xData)
+	{
+		thisCall<void>(0x006FF8A0, Object, xData);
+	}
+
+	void AddNiNodeChild(NiNode* To, NiAVObject* Child, bool Update)
+	{
+		thisVirtualCall<void>(0x84, To, Child);
+		if (Update)
+			UpdateAVObject(To);
+	}
+
+	void UpdateAVObject(NiAVObject* Object)
+	{
+		thisCall<void>(0x00707370, Object, 0.f, 0);
+	}
+
+	void InitializePropertyState(NiAVObject* Object)
+	{
+		thisCall<void>(0x00707610, Object);
+	}
+
+	void UpdateDynamicEffectState(NiNode* Object)
+	{
+		thisCall<void>(0x00707980, Object);
+	}
+
+	NiNode* CreateNiNode(int InitSize /*= 0*/)
+	{
+		auto Out = (NiNode*)FormHeap_Allocate(sizeof(NiNode));
+		thisCall<void>(0x0070B780, Out, InitSize);
+		return Out;
+	}
+
+	double TESObjectREFCoverTreePoint::distance(const TESObjectREFCoverTreePoint& p) const
+	{
+		return GetDistance((Vector3*)&Ref->posX, (Vector3*)&p.Ref->posX);
+	}
+
+	bool TESObjectREFCoverTreePoint::operator==(const TESObjectREFCoverTreePoint& p) const
+	{
+		return Ref == p.Ref;
+	}
+
+	TESObjectREFR* TESObjectREFCoverTreePoint::operator()() const
+	{
+		return Ref;
+	}
+
 }
 
 namespace FilterData
@@ -593,6 +687,7 @@ namespace FilterData
 	Utilities::PathSubstringListT   InteriorHeuristicsExcludePaths;
 	Utilities::PathSubstringListT   SelfExclusiveIncludePathsExterior;
 	Utilities::PathSubstringListT   SelfExclusiveIncludePathsInterior;
+	Utilities::PathSubstringListT	ClusteringExcludePaths;
 
 	MainShadowExParams		MainShadowExParams::Instance;
 
@@ -750,6 +845,7 @@ namespace FilterData
 				Flags.Set(ShadowExtraData::ReferenceFlags::kAllowInteriorHeuristics, false);
 				Flags.Set(ShadowExtraData::ReferenceFlags::kOnlySelfShadowInterior, false);
 				Flags.Set(ShadowExtraData::ReferenceFlags::kOnlySelfShadowExterior, false);
+				Flags.Set(ShadowExtraData::ReferenceFlags::kDontCluster, false);
 
 				for (const auto& Itr : BackFaceIncludePaths())
 				{
@@ -816,6 +912,15 @@ namespace FilterData
 						break;
 					}
 				}
+
+				for (const auto& Itr : ClusteringExcludePaths())
+				{
+					if (NodeName.find(Itr) != std::string::npos)
+					{
+						Flags.Set(ShadowExtraData::ReferenceFlags::kDontCluster, true);
+						break;
+					}
+				}
 			}
 		}
 	}
@@ -853,6 +958,10 @@ namespace FilterData
 		_MESSAGE("Loading exterior self-shadow-only whitelist...");
 		SelfExclusiveIncludePathsExterior.Refresh(&Settings::kSelfIncludePathExterior);
 		SelfExclusiveIncludePathsExterior.Dump();
+
+		_MESSAGE("Loading exterior clustering blacklist...");
+		ClusteringExcludePaths.Refresh(&Settings::kClusteringExcludePath);
+		ClusteringExcludePaths.Dump();
 	}
 
 	void ReloadMiscPathLists()
@@ -864,5 +973,6 @@ namespace FilterData
 		InteriorHeuristicsExcludePaths.Refresh(&Settings::kInteriorHeuristicsExcludePath);
 		SelfExclusiveIncludePathsInterior.Refresh(&Settings::kSelfIncludePathInterior);
 		SelfExclusiveIncludePathsExterior.Refresh(&Settings::kSelfIncludePathExterior);
+		ClusteringExcludePaths.Refresh(&Settings::kClusteringExcludePath);
 	}
 }

@@ -7,36 +7,7 @@ namespace ShadowFacts
 {
 	class ShadowCaster;
 
-	class ShadowCasterCountTable
-	{
-		enum
-		{
-			kMaxShadows_Actor		= 0,
-			kMaxShadows_Book,
-			kMaxShadows_Flora,
-			kMaxShadows_Ingredient,
-			kMaxShadows_MiscItem,
-			kMaxShadows_AlchemyItem,
-			kMaxShadows_Equipment,
-
-			kMaxShadows__MAX
-		};
-
-		UInt32							Current[kMaxShadows__MAX];
-		UInt32							ValidatedShadowCount;
-		UInt32							MaxSceneShadowCount;
-
-		UInt32*							GetCurrentCount(UInt8 Type);
-		SInt32							GetMaxCount(UInt8 Type) const;
-	public:
-		ShadowCasterCountTable(UInt32 MaxSceneShadows);
-		~ShadowCasterCountTable();
-
-		bool							ValidateCount(ShadowCaster* Caster);		// returns true if max count was not exceeded
-		void							IncrementCount(ShadowCaster* Caster);		// increments current count for the caster's type
-
-		bool							GetSceneSaturated(void) const;				// returns true if the total number of shadows in the scene has been reached
-	};
+	
 
 	class ShadowCaster
 	{
@@ -87,26 +58,7 @@ namespace ShadowFacts
 
 
 
-	class ShadowReceiverValidator : public Utilities::NiNodeChildVisitor
-	{
-	protected:
-		NiNodeListT*			NonReceivers;
-	public:
-		ShadowReceiverValidator(NiNodeListT* OutList);
-		virtual ~ShadowReceiverValidator();
 
-		virtual bool			AcceptBranch(NiNode* Node);
-		virtual void			AcceptLeaf(NiAVObject* Object);
-	};
-
-	class FadeNodeShadowFlagUpdater: public Utilities::NiNodeChildVisitor
-	{
-	public:
-		virtual ~FadeNodeShadowFlagUpdater();
-
-		virtual bool			AcceptBranch(NiNode* Node);
-		virtual void			AcceptLeaf(NiAVObject* Object);
-	};
 
 
 

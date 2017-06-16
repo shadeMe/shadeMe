@@ -40,7 +40,10 @@ public:
 			kOnlySelfShadowExterior			= 1 << 11,
 
 			kClustered						= 1 << 12,			// set when the reference is a part of a shadow cluster
+			kDontCluster					= 1 << 13,
 		};
+
+		bool			IsClustered() const;
 	};
 
 	// for cell nodes
@@ -61,11 +64,20 @@ public:
 		enum
 		{
 			kInitialized	= 1 << 0,
-			kCellNode		= 1 << 1,			// cleared for reference/BSFadeNodes
+			kRefNode		= 1 << 1,
+			kCellNode		= 1 << 2,
+			kClusterNode	= 1 << 3,
 		};
 
 		bool			IsInitialized() const;
+
+		bool			IsRefNode() const;
 		bool			IsCellNode() const;
+		bool			IsClusterNode() const;
+
+		void			SetRefNode();
+		void			SetCellNode();
+		void			SetClusterNode();
 	};
 
 	class BSXFlagsWrapper
@@ -115,10 +127,10 @@ public:
 
 	struct ClusterData
 	{
-		NiNode*				Node;
-		FadeNodeListT		Children;
+		NiNode*					Node;
+		Vector3					Center;
 
-		ClusterData(NiNode* )
+		ClusterData(NiNode* Node);
 	};
 
 	struct Data
@@ -126,21 +138,35 @@ public:
 		StateFlags							Flags;
 		std::unique_ptr<ReferenceData>		Reference;
 		std::unique_ptr<CellData>			Cell;
+		std::unique_ptr<ClusterData>		Cluster;
 
-		Data() : Flags(), Reference(), Cell() {}
+		Data() : Flags(), Reference(), Cell(), Cluster() {}
 	};
 
 	Data*			D;
 
 	void			Initialize(TESObjectREFR* R);
 	void			Initialize(TESObjectCELL* C);
+	void			Initialize(NiNode* ClusterRoot);
 
 	bool			IsInitialized() const;
 	bool			IsReference() const;
 	bool			IsCell() const;
+	bool			IsCluster() const;
 
 	Data&			operator()() const;
 
+	ReferenceData*	GetRef() const;
+	CellData*		GetCell() const;
+	ClusterData*	GetCluster() const;
+
+	NiNode*			GetParentNode() const;
+
 	static ShadowExtraData*		Create();
 	static ShadowExtraData*		Get(NiAVObject* Object);
+};
+
+class ShadowClusterData
+{
+
 };

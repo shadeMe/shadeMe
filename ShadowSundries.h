@@ -24,4 +24,3 @@ namespace ShadowSundries
 	void Patch(bool Editor);
 }
 
-#define SHADOW_DEBUG(ref, ...)		if (##ref == ShadowSundries::kDebugSelection) { ShadowSundries::WriteShadowDebug(##__VA_ARGS__); }

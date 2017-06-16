@@ -11,6 +11,9 @@ namespace Utilities
 
 		bool			Get(UInt32 Flag) const;
 		void			Set(UInt32 Flag, bool State);
+
+		UInt32			GetRaw() const;
+		void			SetRaw(UInt32 Flag) const;
 	};
 
 	template <typename T>
@@ -150,12 +153,14 @@ namespace Utilities
 	};
 
 	float				GetDistanceFromPlayer(NiAVObject* Source);
+	float				GetDistanceFromPlayer(Vector3* Source);
 	bool				GetPlayerHasLOS(TESObjectREFR* Target, bool HighAccuracy = false);	// slow
 	bool				GetLightLOS(NiAVObject* Light, TESObjectREFR* Target);				// slower and more hacky
 	bool				GetAbovePlayer(TESObjectREFR* Ref, float Threshold);
 	bool				GetBelowPlayer(TESObjectREFR* Ref, float Threshold);
-	bool				GetConsoleOpen(void);
-	ShadowSceneNode*	GetShadowSceneNode(void);
+	bool				GetConsoleOpen();
+	ShadowSceneNode*	GetShadowSceneNode();
+	bool				GetUnderwater(TESObjectREFR* Ref);
 
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
 	NiExtraData*		GetNiExtraDataByName(NiAVObject* Source, const char* Name);
@@ -163,10 +168,17 @@ namespace Utilities
 	UInt32				GetNodeActiveLights(NiNode* Source, ShadowLightListT* OutList, UInt32 Params);
 	BSFadeNode*			GetPlayerNode(bool FirstPerson = false);
 	UInt8				GetWeatherClassification(TESWeather* Weather);
+	void				AddNiExtraData(NiAVObject* Object, NiExtraData* xData);
+	void				AddNiNodeChild(NiNode* To, NiAVObject* Child, bool Update = true);
+	void				UpdateAVObject(NiAVObject* Object);
+	void				InitializePropertyState(NiAVObject* Object);
+	void				UpdateDynamicEffectState(NiNode* Object);
+	NiNode*				CreateNiNode(int InitSize = 0);
 
 	void				UpdateBounds(NiNode* Node);
 	float				GetDistance(NiAVObject* Source, NiAVObject* Destination);
 	float				GetDistance(Vector3* Source, Vector3* Destination);
+	float				GetDistance(TESObjectREFR* Source, TESObjectREFR* Destination);
 	ShadowSceneLight*	GetShadowCasterLight(NiNode* Caster);
 	BSXFlags*			GetBSXFlags(NiAVObject* Source, bool Allocate = false);
 	TESObjectREFR*		GetNodeObjectRef(NiAVObject* Source);
@@ -218,6 +230,36 @@ namespace Utilities
 		virtual void			AcceptLeaf(NiAVObject* Object);
 	};
 
+	class TESObjectREFCoverTreePoint
+	{
+		TESObjectREFR*		Ref;
+	public:
+		TESObjectREFCoverTreePoint(TESObjectREFR* Source) : Ref(Source) {}
+
+		double				distance(const TESObjectREFCoverTreePoint& p) const;
+		bool				operator==(const TESObjectREFCoverTreePoint& p) const;
+		TESObjectREFR*		operator()() const;
+	};
+
+	template <typename T>
+	class NiSmartPtr
+	{
+		T*		Source;
+	public:
+		NiSmartPtr(T* Ptr) : Source(Ptr)
+		{
+			SME_ASSERT(Source);
+			InterlockedIncrement(Source->m_uiRefCount);
+		}
+
+		~NiSmartPtr()
+		{
+			if (InterlockedDecrement(Source->m_uiRefCount) == 0)
+				thisVirtualCall<void>(0x0, Source, true);
+		}
+
+		T* operator()() const { return Source; }
+	};
 }
 
 #define NI_CAST(obj, to)					(to##*)Utilities::NiRTTI_Cast(NiRTTI_##to, obj)
@@ -284,6 +326,7 @@ namespace FilterData
 	extern Utilities::PathSubstringListT			InteriorHeuristicsExcludePaths;
 	extern Utilities::PathSubstringListT			SelfExclusiveIncludePathsInterior;
 	extern Utilities::PathSubstringListT			SelfExclusiveIncludePathsExterior;
+	extern Utilities::PathSubstringListT			ClusteringExcludePaths;
 
 	void Initialize();
 	void ReloadMiscPathLists();

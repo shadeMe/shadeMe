@@ -151,12 +151,118 @@ namespace ShadowPipeline
 		static bool									GetEnabled();
 	};
 
+	class ShadowReceiverValidator : public Utilities::NiNodeChildVisitor
+	{
+	protected:
+		NiNodeListT*			NonReceivers;
+	public:
+		ShadowReceiverValidator(NiNodeListT* OutList);
+		virtual ~ShadowReceiverValidator();
+
+		virtual bool			AcceptBranch(NiNode* Node);
+		virtual void			AcceptLeaf(NiAVObject* Object);
+	};
+
+	class FadeNodeShadowFlagUpdater : public Utilities::NiNodeChildVisitor
+	{
+	public:
+		virtual ~FadeNodeShadowFlagUpdater();
+
+		virtual bool			AcceptBranch(NiNode* Node);
+		virtual void			AcceptLeaf(NiAVObject* Object);
+	};
+
+
+
 	class Renderer
 	{
 	public:
 		static const float		ShadowDepthBias;
+
+		static bool				ReactsToSmallLights(ShadowSceneLight* SLL);
+		static bool				IsLargeObject(ShadowSceneLight* SSL);
+		static bool				HasDirectionalLight(ShadowSceneLight* SSL);
+		static bool				HasExclusiveSelfShadows(ShadowSceneLight* SSL);
+		static bool				CanReceiveShadow(ShadowSceneLight* SSL);
+		static bool				CanReceiveShadow(NiNode* Node);
 	private:
 		static const float		DirectionalLightCheckThresholdDistance;
+
+		class CasterCountTable;
+
+		class Caster
+		{
+			ShadowExtraData*	xData;
+
+			ShadowSceneLight*	CreateShadowSceneLight(ShadowSceneNode* Root);
+			bool				HasPlayerLOS(TESObjectREFR* Object, NiNode* Node, float Distance) const;
+			bool				PerformReferenceAuxiliaryChecks(ShadowSceneLight* Source) const;
+
+			bool				ValidateCluster(Renderer& Renderer) const;
+			bool				ValidateReference(Renderer& Renderer) const;
+		public:
+			Caster(NiNode* Source);
+
+			bool				Queue(Renderer& Renderer,
+									  ShadowSceneNode* Root,
+									  CasterCountTable* Count,
+									  ShadowSceneLight** OutSSL = nullptr);
+
+			bool				IsCluster() const;
+			TESObjectREFR*		GetObject() const;
+		};
+
+		class CasterCountTable
+		{
+			enum
+			{
+				kMaxShadows_Actor = 0,
+				kMaxShadows_Book,
+				kMaxShadows_Flora,
+				kMaxShadows_Ingredient,
+				kMaxShadows_MiscItem,
+				kMaxShadows_AlchemyItem,
+				kMaxShadows_Equipment,
+				kMaxShadows_Clusters,
+
+				kMaxShadows__MAX
+			};
+
+			UInt32		Current[kMaxShadows__MAX];
+			UInt32		ValidatedShadowCount;
+			UInt32		MaxSceneShadowCount;
+
+			UInt32*		GetCurrentCount(Caster* Caster);
+			SInt32		GetMaxCount(Caster* Caster) const;
+		public:
+			CasterCountTable(UInt32 MaxSceneShadows);
+
+			bool		ValidateCount(Caster* Caster);		// returns true if max count was not exceeded
+			void		IncrementCount(Caster* Caster);		// increments current count for the caster's type
+
+			bool		GetSceneSaturated() const;			// returns true if the total number of shadows in the scene has been reached
+		};
+
+
+
+		class RenderProcess
+		{
+			static const double		kMaxClusterDistance;
+
+			using CasterListT = std::vector<Caster>;
+
+			ShadowSceneNode*	Root;
+			CasterListT			ValidCasters;
+
+			void		PreprocessCell(TESObjectCELL* Cell) const;
+			void		EnumerateCellCasters(TESObjectCELL* Cell);
+
+			void		DoClustering(ShadowExtraData* CellData) const;
+		public:
+			RenderProcess(ShadowSceneNode* Root);
+
+			void		Begin(int SearchGridSize = -1);
+		};
 
 		enum
 		{
@@ -186,6 +292,8 @@ namespace ShadowPipeline
 
 		void			Handler_ShadowPass_End();
 
+		static void		ToggleBackfaceCulling(bool State);
+
 		struct Constants
 		{
 			RenderConstant SRC_A30068;
@@ -209,8 +317,12 @@ namespace ShadowPipeline
 		RenderConstantManager			ConstantManager;
 		Constants						ShadowConstants;
 		ShadowLightListT				LightProjectionUpdateQueue;
+		bool							BackfaceCullingEnabled;
 
 		void							UpdateConstants();
 	public:
+
+		void							Initialize();
+		void							QueueForLightProjection(ShadowSceneLight* Source);
 	};
 }

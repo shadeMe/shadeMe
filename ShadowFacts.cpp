@@ -6,117 +6,7 @@
 
 namespace ShadowFacts
 {
-	UInt32* ShadowCasterCountTable::GetCurrentCount( UInt8 Type )
-	{
-		switch (Type)
-		{
-		case kFormType_NPC:
-		case kFormType_Creature:
-			return &Current[kMaxShadows_Actor];
-		case kFormType_Book:
-			return &Current[kMaxShadows_Book];
-		case kFormType_Flora:
-			return &Current[kMaxShadows_Flora];
-		case kFormType_Ingredient:
-		case kFormType_SigilStone:
-		case kFormType_SoulGem:
-			return &Current[kMaxShadows_Ingredient];
-		case kFormType_Misc:
-		case kFormType_Key:
-			return &Current[kMaxShadows_MiscItem];
-		case kFormType_AlchemyItem:
-			return &Current[kMaxShadows_AlchemyItem];
-		case kFormType_Ammo:
-		case kFormType_Armor:
-		case kFormType_Clothing:
-		case kFormType_Weapon:
-			return &Current[kMaxShadows_Equipment];
-		default:
-			return NULL;
-		}
-	}
-
-	SInt32 ShadowCasterCountTable::GetMaxCount( UInt8 Type ) const
-	{
-		switch (Type)
-		{
-		case kFormType_NPC:
-		case kFormType_Creature:
-			return Settings::kMaxCountActor().i;
-		case kFormType_Book:
-			return Settings::kMaxCountBook().i;
-		case kFormType_Flora:
-			return Settings::kMaxCountFlora().i;
-		case kFormType_Ingredient:
-		case kFormType_SigilStone:
-		case kFormType_SoulGem:
-			return Settings::kMaxCountIngredient().i;
-		case kFormType_Misc:
-		case kFormType_Key:
-			return Settings::kMaxCountMiscItem().i;
-		case kFormType_AlchemyItem:
-			return Settings::kMaxCountAlchemyItem().i;
-		case kFormType_Ammo:
-		case kFormType_Armor:
-		case kFormType_Clothing:
-		case kFormType_Weapon:
-			return Settings::kMaxCountEquipment().i;
-		default:
-			return -1;
-		}
-	}
-
-	ShadowCasterCountTable::ShadowCasterCountTable(UInt32 MaxSceneShadows)
-	{
-		MaxSceneShadowCount = MaxSceneShadows;
-		ValidatedShadowCount = 0;
-
-		for (int i = 0; i < kMaxShadows__MAX; i++)
-			Current[i] = 0;
-	}
-
-	ShadowCasterCountTable::~ShadowCasterCountTable()
-	{
-		;//
-	}
-
-	bool ShadowCasterCountTable::ValidateCount( ShadowCaster* Caster )
-	{
-		SME_ASSERT(Caster);
-
-		UInt8 Type = Caster->GetObject()->baseForm->typeID;
-		UInt32* CurrentCount = GetCurrentCount(Type);
-		SInt32 MaxCount = GetMaxCount(Type);
-
-		if (MaxCount >= 0 && CurrentCount)
-		{
-			if ((*CurrentCount) + 1 > MaxCount)
-				return false;
-		}
-
-		return true;
-	}
-
-	bool ShadowCasterCountTable::GetSceneSaturated( void ) const
-	{
-		if (ValidatedShadowCount >= MaxSceneShadowCount)
-			return true;
-		else
-			return false;
-	}
-
-	void ShadowCasterCountTable::IncrementCount( ShadowCaster* Caster )
-	{
-		SME_ASSERT(Caster);
-
-		UInt8 Type = Caster->GetObject()->baseForm->typeID;
-		UInt32* CurrentCount = GetCurrentCount(Type);
-
-		if (CurrentCount)
-			(*CurrentCount)++;
-
-		ValidatedShadowCount++;
-	}
+	
 
 	ShadowCaster::ShadowCaster( NiNode* Node, TESObjectREFR* Object ) :
 		Node(Node),
@@ -508,69 +398,7 @@ namespace ShadowFacts
 	}
 
 
-	ShadowReceiverValidator::ShadowReceiverValidator( NiNodeListT* OutList ) :
-		NonReceivers(OutList)
-	{
-		SME_ASSERT(OutList);
-	}
 
-	ShadowReceiverValidator::~ShadowReceiverValidator()
-	{
-		;//
-	}
-
-	bool ShadowReceiverValidator::AcceptBranch( NiNode* Node )
-	{
-		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
-		BSTreeNode* TreeNode = NI_CAST(Node, BSTreeNode);
-
-		if (FadeNode)
-		{
-			TESObjectREFR* Object = Utilities::GetNodeObjectRef(FadeNode);
-			if (FadeNode->IsCulled() == false && Object && Object->parentCell && ShadowRenderTasks::CanReceiveShadow(FadeNode) == false)
-			{
-				SHADOW_DEBUG(Object, "Queued for Shadow Receiver culling");
-				NonReceivers->push_back(FadeNode);
-			}
-
-			return false;
-		}
-		else if (TreeNode && TreeNode->IsCulled() == false)
-		{
-			// we don't like trees...
-			NonReceivers->push_back(TreeNode);
-			return false;
-		}
-
-		return true;
-	}
-
-	void ShadowReceiverValidator::AcceptLeaf( NiAVObject* Object )
-	{
-		;//
-	}
-
-	FadeNodeShadowFlagUpdater::~FadeNodeShadowFlagUpdater()
-	{
-		;//
-	}
-
-	bool FadeNodeShadowFlagUpdater::AcceptBranch( NiNode* Node )
-	{
-		BSFadeNode* FadeNode = NI_CAST(Node, BSFadeNode);
-		if (FadeNode)
-		{
-			ShadowRenderTasks::HandleModelLoad(FadeNode, false);
-			return false;
-		}
-
-		return true;
-	}
-
-	void FadeNodeShadowFlagUpdater::AcceptLeaf( NiAVObject* Object )
-	{
-		;//
-	}
 
 	bool NiAVObjectSpecialFlags::GetFlag( NiAVObject* Node, UInt16 Flag )
 	{
@@ -632,13 +460,7 @@ namespace ShadowFacts
 	PathSubstringListT			ShadowRenderTasks::SelfExclusiveIncludePathsExterior;
 	PathSubstringListT			ShadowRenderTasks::SelfExclusiveIncludePathsInterior;
 
-	void ShadowRenderTasks::ToggleBackFaceCulling(bool State)
-	{
-		if (State)
-			(*g_renderer)->device->SetRenderState(D3DRS_CULLMODE, D3DCULL_CW);
-		else
-			(*g_renderer)->device->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
-	}
+	
 
 	void ShadowRenderTasks::PerformModelLoadTask(NiNode* Node, BSXFlags* xFlags)
 	{
