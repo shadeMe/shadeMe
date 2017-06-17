@@ -1,6 +1,5 @@
 #include "ShadowPipeline.h"
 #include "ShadowExtraData.h"
-#include "Utilities.h"
 #include "CoverTree.h"
 
 #define DEF_SRC(name, ...)					name(STRINGIZE2(name), ##__VA_ARGS__##)
@@ -242,6 +241,8 @@ namespace ShadowPipeline
 		Manager.SetExteriorValue(&SMRC_A3F3A0, 10);
 		Manager.SetInteriorValue(&SMRC_A38618, 30);
 	}
+
+	PipelineStages					PipelineStages::Instance;
 
 	ShadowMapTexturePool			ShadowMapTexturePool::Instance;
 
@@ -507,6 +508,9 @@ namespace ShadowPipeline
 		;//
 	}
 
+	Renderer		Renderer::Instance;
+	const float		Renderer::ShadowDepthBias = -0.000001;
+
 	ShadowSceneLight* Renderer::Caster::CreateShadowSceneLight(ShadowSceneNode* Root)
 	{
 		auto Node = xData->GetParentNode();
@@ -529,7 +533,6 @@ namespace ShadowPipeline
 		SME_ASSERT(ThisLight);
 		return ThisLight;
 	}
-
 
 	bool Renderer::Caster::HasPlayerLOS(TESObjectREFR* Object, NiNode* Node, float Distance) const
 	{
@@ -558,6 +561,7 @@ namespace ShadowPipeline
 			}
 		}
 
+		return true;
 	}
 
 	bool Renderer::Caster::PerformReferenceAuxiliaryChecks(ShadowSceneLight* Source) const
@@ -653,12 +657,11 @@ namespace ShadowPipeline
 		bool Result = false;
 
 		// ### do we need to check anything beyond distance?
-		float Distance = Utilities::GetDistanceFromPlayer(&xData->GetCluster()->Center);
-		if (Distance < Settings::kCasterMaxDistance().f)
+		if (DistanceFromPlayer < Settings::kCasterMaxDistance().f)
 		{
 			Result = true;
 		}
-		else SHADOW_DEBUG(xData, "Failed Distance check (%f)", Distance);
+		else SHADOW_DEBUG(xData, "Failed Distance check (%f)", DistanceFromPlayer);
 
 		return Result;
 	}
@@ -669,76 +672,65 @@ namespace ShadowPipeline
 		bool SkipPlayerLOSChecks = false;
 
 		auto Node = xData->GetParentNode();
-		float Distance = Utilities::GetDistanceFromPlayer(Node);
 		float BoundRadius = Node->m_kWorldBound.radius;
-		auto Object = GetObject();
+		auto Object = GetRef();
 		bool Actor = Object->IsActor();
 
-		if (Distance < Settings::kCasterMaxDistance().f)
+		if (BoundRadius >= Settings::kObjectTier1BoundRadius().f)
 		{
-			if (Actor && Settings::kForceActorShadows().i)
+			bool Underwater = false;
+			if ((Object->parentCell->HasWater()))
 			{
-				Result = true;
-				SkipPlayerLOSChecks = true;
-				SHADOW_DEBUG(xData, "Forced Actor shadow");
-			}
-			else if (BoundRadius >= Settings::kObjectTier1BoundRadius().f)
-			{
-				bool Underwater = false;
-				if ((Object->parentCell->HasWater()))
+				ExtraWaterHeight* xWaterHeight = (ExtraWaterHeight*)Object->parentCell->extraData.GetByType(kExtraData_WaterHeight);
+				if (xWaterHeight)
 				{
-					ExtraWaterHeight* xWaterHeight = (ExtraWaterHeight*)Object->parentCell->extraData.GetByType(kExtraData_WaterHeight);
-					if (xWaterHeight)
+					if (Node->m_worldTranslate.z < xWaterHeight->waterHeight)
+						Underwater = true;
+				}
+			}
+
+			if (Underwater == false)
+			{
+				BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
+
+				// don't queue if hidden by fog
+				if (Fog == NULL || DistanceFromPlayer < Fog->fogEnd || (Object->parentCell && Object->parentCell->IsInterior()))
+				{
+					if (Actor)
 					{
-						if (Node->m_worldTranslate.z < xWaterHeight->waterHeight)
-							Underwater = true;
+						TESObjectREFR* Horse = thisVirtualCall<TESObjectREFR*>(0x380, Object);
+						UInt32 Refraction = thisCall<UInt32>(0x005E9670, Object);
+						UInt32 Invisibility = thisVirtualCall<UInt32>(0x284, Object, kActorVal_Invisibility);
+						UInt32 SleepingState = thisVirtualCall<UInt32>(0x18C, Object);
+						TESCreature* Creature = OBLIVION_CAST(Object->baseForm, TESForm, TESCreature);
+						bool CreatureCheck = (Creature == NULL || (Creature->actorBaseData.flags & TESActorBaseData::kCreatureFlag_NoShadow) == false);
+
+						if (Horse == NULL &&		// when not on horseback
+							Refraction == 0 &&		// zero refraction
+							Invisibility == 0 &&	// zero invisibility
+							SleepingState != 4 &&	// not sitting/sleeping
+							CreatureCheck)			// creature has shadow
+						{
+							Result = true;
+						}
+						else SHADOW_DEBUG(xData, "Failed Actor checks");
+					}
+					else
+					{
+						if (FilterData::MainShadowExParams::Instance.GetAllowed(*xData))
+							Result = true;
+						else SHADOW_DEBUG(xData, "Failed MainShadowExParams check");
 					}
 				}
-
-				if (Underwater == false)
-				{
-					BSFogProperty* Fog = TES::GetSingleton()->fogProperty;
-
-					// don't queue if hidden by fog
-					if (Fog == NULL || Distance < Fog->fogEnd || (Object->parentCell && Object->parentCell->IsInterior()))
-					{
-						if (Actor)
-						{
-							TESObjectREFR* Horse = thisVirtualCall<TESObjectREFR*>(0x380, Object);
-							UInt32 Refraction = thisCall<UInt32>(0x005E9670, Object);
-							UInt32 Invisibility = thisVirtualCall<UInt32>(0x284, Object, kActorVal_Invisibility);
-							UInt32 SleepingState = thisVirtualCall<UInt32>(0x18C, Object);
-							TESCreature* Creature = OBLIVION_CAST(Object->baseForm, TESForm, TESCreature);
-							bool CreatureCheck = (Creature == NULL || (Creature->actorBaseData.flags & TESActorBaseData::kCreatureFlag_NoShadow) == false);
-
-							if (Horse == NULL &&		// when not on horseback
-								Refraction == 0 &&		// zero refraction
-								Invisibility == 0 &&	// zero invisibility
-								SleepingState != 4 &&	// not sitting/sleeping
-								CreatureCheck)			// creature has shadow
-							{
-								Result = true;
-							}
-							else SHADOW_DEBUG(xData, "Failed Actor checks");
-						}
-						else
-						{
-							if (FilterData::MainShadowExParams::Instance.GetAllowed(*xData))
-								Result = true;
-							else SHADOW_DEBUG(xData, "Failed MainShadowExParams check");
-						}
-					}
-					else SHADOW_DEBUG(xData, "Failed Fog check (%f > %f)", Distance, Fog->fogEnd);
-				}
-				else SHADOW_DEBUG(xData, "Failed Underwater check");
+				else SHADOW_DEBUG(xData, "Failed Fog check (%f > %f)", DistanceFromPlayer, Fog->fogEnd);
 			}
-			else SHADOW_DEBUG(xData, "Failed Bound Radius check (%f)", BoundRadius);
+			else SHADOW_DEBUG(xData, "Failed Underwater check");
 		}
-		else SHADOW_DEBUG(xData, "Failed Distance check (%f)", Distance);
+		else SHADOW_DEBUG(xData, "Failed Bound Radius check (%f)", BoundRadius);
 
 		if (Result && !SkipPlayerLOSChecks)
 		{
-			Result = HasPlayerLOS(Object, Node, Distance);
+			Result = HasPlayerLOS(Object, Node, DistanceFromPlayer);
 			if (Result == false)
 				SHADOW_DEBUG(xData, "Failed Player LOS check");
 		}
@@ -783,6 +775,11 @@ namespace ShadowPipeline
 		xData = ShadowExtraData::Get(Source);
 		SME_ASSERT(xData && xData->IsInitialized());
 		SME_ASSERT(xData->IsReference() || xData->IsCluster());
+
+		if (xData->IsCluster())
+			DistanceFromPlayer = Utilities::GetDistanceFromPlayer(&xData->GetCluster()->Center);
+		else
+			DistanceFromPlayer = Utilities::GetDistanceFromPlayer(xData->GetParentNode());
 	}
 
 	bool Renderer::Caster::Queue(Renderer& Renderer,
@@ -822,17 +819,32 @@ namespace ShadowPipeline
 		return xData->IsCluster();
 	}
 
-	TESObjectREFR* Renderer::Caster::GetObject() const
+	TESObjectREFR* Renderer::Caster::GetRef() const
 	{
 		SME_ASSERT(xData->IsReference());
 		return xData->GetRef()->Form;
+	}
+
+	float Renderer::Caster::GetBoundRadius() const
+	{
+		return xData->GetParentNode()->m_kWorldBound.radius;
+	}
+
+	NiNode* Renderer::Caster::GetNode() const
+	{
+		return xData->GetParentNode();
+	}
+
+	float Renderer::Caster::GetDistanceFromPlayer() const
+	{
+		return DistanceFromPlayer;
 	}
 
 	UInt32* Renderer::CasterCountTable::GetCurrentCount(Caster* Caster)
 	{
 		if (Caster->IsCluster())
 			return &Current[kMaxShadows_Clusters];
-		else switch (Caster->GetObject()->baseForm->typeID)
+		else switch (Caster->GetRef()->baseForm->typeID)
 		{
 		case kFormType_NPC:
 		case kFormType_Creature:
@@ -864,7 +876,7 @@ namespace ShadowPipeline
 	{
 		if (Caster->IsCluster())
 			return Settings::kMaxCountClusters().i;
-		else switch (Caster->GetObject()->baseForm->typeID)
+		else switch (Caster->GetRef()->baseForm->typeID)
 		{
 		case kFormType_NPC:
 		case kFormType_Creature:
@@ -938,6 +950,20 @@ namespace ShadowPipeline
 
 	const double Renderer::RenderProcess::kMaxClusterDistance = 4096 + 4;		// cell side + some epsilon
 
+	void Renderer::RenderProcess::ProcessPlayerCharacter()
+	{
+		auto PCNode = Utilities::GetPlayerNode();
+		auto RefData = ShadowExtraData::Get(PCNode);
+		if (RefData == nullptr)
+		{
+			RefData = ShadowExtraData::Create();
+			RefData->Initialize(*g_thePlayer);
+			Utilities::AddNiExtraData(PCNode, RefData);
+		}
+
+		ValidCasters.push_back(PCNode);
+	}
+
 	void Renderer::RenderProcess::PreprocessCell(TESObjectCELL* Cell) const
 	{
 		SME_ASSERT(Cell && Cell->processLevel == TESObjectCELL::kCellProcessLevel_Active);
@@ -951,13 +977,17 @@ namespace ShadowPipeline
 			CellData->Initialize(Cell);
 			Utilities::AddNiExtraData(CellNode, CellData);
 		}
+		else
+			SME_ASSERT(CellData->IsInitialized());
 
 		for (auto Itr = &Cell->objectList; Itr && Itr->Info(); Itr = Itr->Next())
 		{
 			auto Ref = Itr->Info();
-			if (Ref->niNode == nullptr)
+			if (Ref->refID == 0x14)		// the player character is handled elsewhere
 				continue;
 			else if (Ref->baseForm->typeID == kFormType_Tree)
+				continue;
+			else if (NI_CAST(Ref->niNode, BSFadeNode) == nullptr)
 				continue;
 
 			auto RefData = ShadowExtraData::Get(Ref->niNode);
@@ -967,21 +997,73 @@ namespace ShadowPipeline
 				RefData->Initialize(Ref);
 				Utilities::AddNiExtraData(Ref->niNode, RefData);
 			}
+			else if (RefData->IsInitialized() == false)
+			{
+				// the instance was cloned from another ref's node, fill it up with the current node's data
+				RefData->Initialize(Ref);
+			}
 		}
 
-		// perform static clustering if it hasn't been done already
-		if (CellData->GetCell()->Flags.IsClustered() == false)
-			DoClustering(CellData);
+		// perform static clustering for exteriors if it hasn't been done already
+		if (Cell->IsInterior() == false)
+		{
+			if (Settings::kClusteringEnable().i && CellData->GetCell()->Flags.IsClustered() == false)
+				DoClustering(CellData);
+		}
 
 		// ### anything else?
 	}
 
 	void Renderer::RenderProcess::EnumerateCellCasters(TESObjectCELL* Cell)
 	{
-		// enumerate clusters first
+		auto xData = ShadowExtraData::Get(Cell->niNode);
 
+		for (auto Itr : xData->GetCell()->Clusters)
+			ValidCasters.push_back(Itr);
+
+		for (auto Itr = &Cell->objectList; Itr && Itr->refr; Itr = Itr->next)
+		{
+			TESObjectREFR* Object = Itr->refr;
+			if (Object->niNode && Object->refID != 0x14)
+			{
+				auto xData = ShadowExtraData::Get(Object->niNode);
+				if (xData)
+				{
+					auto FadeNode = xData->GetRef()->Node;
+					if (FadeNode->m_kWorldBound.radius > 0.f)
+					{
+						if ((Object->flags & kTESFormSpecialFlag_DoesntCastShadow) == false)
+						{
+							// we allocate a BSXFlags extra data at instantiation
+							if (xData->GetRef()->BSX.CanCastShadow())
+							{
+								if (xData->GetRef()->Flags.IsClustered() == false)
+								{
+									Caster NewCaster(FadeNode);
+									if (NewCaster.GetDistanceFromPlayer() < Settings::kCasterMaxDistance().f)
+									{
+										if (ShadowDebugger::GetExclusiveCaster() == nullptr || Object == ShadowDebugger::GetExclusiveCaster())
+										{
+											ValidCasters.push_back(NewCaster);
+											SHADOW_DEBUG(xData, "Added to Scene Caster List");
+										}
+										else SHADOW_DEBUG(xData, "Failed Exclusive Caster check");
+									}
+									else SHADOW_DEBUG(xData, "Failed Distance check (%f)", NewCaster.GetDistanceFromPlayer());
+								}
+								else SHADOW_DEBUG(xData, "Failed Clustered check");
+							}
+							else SHADOW_DEBUG(xData, "Failed BSXFlag DoesntCastShadow check");
+						}
+						else SHADOW_DEBUG(xData, "Failed TESForm DoesntCastShadow check");
+					}
+					else SHADOW_DEBUG(xData, "Failed Non-Zero Bounds check");
+				}
+			}
+		}
 	}
 
+#pragma optimize("", off)
 	void Renderer::RenderProcess::DoClustering(ShadowExtraData* CellData) const
 	{
 		SME_ASSERT(CellData->GetCell()->Flags.IsClustered() == false);
@@ -993,8 +1075,9 @@ namespace ShadowPipeline
 			auto Quad = (NiNode*)CellNode->m_children.data[i];
 			auto StaticNode = (NiNode*)Quad->m_children.data[TESObjectCELL::kQuadSubnode_StaticObject];
 
-			CoverTree<Utilities::TESObjectREFCoverTreePoint> NeighbourAccum(kMaxClusterDistance);
-			std::vector<TESObjectREFR*> AuxAccum;	// stores references yet to be clustered
+			// ### allocating containers on the stack in this method causes data corruption for some reason (in the release build)
+			auto NeighbourAccum(std::make_unique<CoverTree<Utilities::TESObjectREFCoverTreePoint>>(kMaxClusterDistance));
+			auto AuxAccum(std::make_unique<std::vector<TESObjectREFR*>>());		// stores references yet to be clustered
 
 			int ClusterCount = 0, ClusterableRefs = 0;
 
@@ -1002,7 +1085,7 @@ namespace ShadowPipeline
 			for (int j = 0; j < StaticNode->m_children.numObjs; j++)
 			{
 				auto RefNode = NI_CAST(StaticNode->m_children.data[j], BSFadeNode);	// implicitly skips BSTreeNodes
-				if (RefNode)
+				if (RefNode && RefNode->m_kWorldBound.radius > 0)
 				{
 					auto xData = ShadowExtraData::Get(RefNode);
 					SME_ASSERT(xData);
@@ -1010,17 +1093,19 @@ namespace ShadowPipeline
 
 					auto Ref = xData->GetRef()->Form;
 					if (Ref->IsPersistent() == false &&
+						xData->GetRef()->BSX.CanCastShadow() &&
+						(Ref->flags & kTESFormSpecialFlag_DoesntCastShadow) == false &&
 						xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCluster) == false)
 					{
-						NeighbourAccum.insert(xData->GetRef()->Form);
-						AuxAccum.push_back(xData->GetRef()->Form);
+						NeighbourAccum->insert(xData->GetRef()->Form);
+						AuxAccum->push_back(xData->GetRef()->Form);
 						ClusterableRefs++;
 					}
 				}
 			}
 
 			// sort the queue on world bound radius in descending order
-			std::sort(AuxAccum.begin(), AuxAccum.end(), [](const TESObjectREFR*& LHS, const TESObjectREFR*& RHS) -> bool {
+			std::sort(AuxAccum->begin(), AuxAccum->end(), [](const TESObjectREFR* LHS, const TESObjectREFR* RHS) -> bool {
 				return LHS->niNode->m_kWorldBound.radius > RHS->niNode->m_kWorldBound.radius;
 			});
 
@@ -1030,46 +1115,54 @@ namespace ShadowPipeline
 			//		> all refs have been clustered
 			for (int j = 0; j < kMaxIterations; j++)
 			{
-				if (AuxAccum.empty())
+				if (AuxAccum->empty())
 					break;		// all refs have been clustered
 
 				// cluster the smallest items first
-				auto Pivot = AuxAccum.at(AuxAccum.size() - 1);
+				auto Pivot = AuxAccum->at(AuxAccum->size() - 1);
 				SME_ASSERT(ShadowExtraData::Get(Pivot->niNode)->GetRef()->Flags.IsClustered() == false);
 
-				auto Closest(NeighbourAccum.kNearestNeighbors(Pivot, ClusterableRefs - 1));
+				auto Closest(std::make_unique<std::vector<Utilities::TESObjectREFCoverTreePoint>>());
+				NeighbourAccum->kNearestNeighbors(Pivot, ClusterableRefs - 1, *Closest);
 				int ValidNeighbours = 0;
 
 				// create and init cluster node
 				Utilities::NiSmartPtr<NiNode> ClusterNode(Utilities::CreateNiNode());
 				auto ClusterData = ShadowExtraData::Create();
 				ClusterData->Initialize(ClusterNode());
+				ClusterData->GetCluster()->Quad = i;
 				Utilities::AddNiExtraData(ClusterNode(), ClusterData);
+				Utilities::SetNiObjectName(ClusterNode(), "%s (%d,%d) Quad %d",
+										   CellData->GetCell()->Form->GetFullName()->name.m_data,
+										   CellData->GetCell()->Form->coords->x,
+										   CellData->GetCell()->Form->coords->y,
+										   i);
 
-				for (const auto& Point : Closest)
+				for (const auto& Point : *Closest)
 				{
-					if (Point() == Pivot)
+					auto Potential = Point();
+					if (Potential == Pivot)
 						continue;
 
 					if (ClusterNode()->m_kWorldBound.radius > Settings::kClusteringMaxBoundRadius().f)
 						break;
 
-					auto NeighbourXData = ShadowExtraData::Get(Point()->niNode)->GetRef();
-					if (NeighbourXData->Flags.IsClustered() == false)
+					auto NeighbourXData = ShadowExtraData::Get(Potential->niNode);
+					if (NeighbourXData->GetRef()->Flags.IsClustered() == false)
 					{
-						if (Utilities::GetDistance(Pivot, Point()) < Settings::kClusteringMaxDistance().f)
+						if (Utilities::GetDistance(Pivot, Potential) < Settings::kClusteringMaxDistance().f)
 						{
 							ValidNeighbours++;
 							// marks as clustered and add to the cluster node
-							NeighbourXData->Flags.Set(ShadowExtraData::ReferenceFlags::kClustered, true);
-							Utilities::AddNiNodeChild(ClusterNode(), Point()->niNode);
-							Utilities::InitializePropertyState(Point()->niNode);
-							Utilities::UpdateDynamicEffectState(Point()->niNode);
+							NeighbourXData->GetRef()->Flags.Set(ShadowExtraData::ReferenceFlags::kClustered, true);
+							Utilities::AddNiNodeChild(ClusterNode(), Potential->niNode);
+							Utilities::InitializePropertyState(Potential->niNode);
+							Utilities::UpdateDynamicEffectState(Potential->niNode);
 
 							// remove from the aux accum
-							auto AuxAccumItr = std::find(AuxAccum.begin(), AuxAccum.end(), Point());
-							SME_ASSERT(AuxAccumItr != AuxAccum.end());
-							AuxAccum.erase(AuxAccumItr);
+							auto AuxAccumItr = std::find(AuxAccum->begin(), AuxAccum->end(), Potential);
+							SME_ASSERT(AuxAccumItr != AuxAccum->end());
+							AuxAccum->erase(AuxAccumItr);
 
 							ClusterData->GetCluster()->Center += (Vector3&)Point()->posX;
 						}
@@ -1085,29 +1178,118 @@ namespace ShadowPipeline
 					Utilities::UpdateDynamicEffectState(ClusterNode());
 
 					ClusterData->GetCluster()->Center.Scale(1 / (float)ValidNeighbours);
+					CellData->GetCell()->Clusters.push_back(ClusterNode());
 				}
 			}
 		}
 
 		CellData->GetCell()->Flags.Set(ShadowExtraData::CellFlags::kClustered, true);
 	}
+#pragma optimize("", on)
 
-	Renderer::RenderProcess::RenderProcess(ShadowSceneNode* Root)
+	Renderer::RenderProcess::RenderProcess(ShadowSceneNode* Root) :
+		Root(Root),
+		ValidCasters()
 	{
-
+		SME_ASSERT(Root && Root->m_children.data[3]);
 	}
 
-	void Renderer::RenderProcess::Begin(int SearchGridSize /*= -1*/)
+	void Renderer::RenderProcess::Begin(Renderer& Renderer, int MaxShadowCount, int SearchGridSize /*= -1*/)
 	{
+		ShadowLightListT ValidSSLs;
+		CasterCountTable CasterCount(MaxShadowCount);
 
+		ValidCasters.clear();
+		ValidCasters.reserve(MaxShadowCount);
+		ValidSSLs.reserve(MaxShadowCount);
+
+		ShadowDebugger::Log("Executing ShadowSceneProc...");
+		gLog.Indent();
+		{
+			ProcessPlayerCharacter();
+
+			if (TES::GetSingleton()->currentInteriorCell)
+			{
+				PreprocessCell(TES::GetSingleton()->currentInteriorCell);
+				EnumerateCellCasters(TES::GetSingleton()->currentInteriorCell);
+			}
+			else
+			{
+				GridCellArray* CellGrid = TES::GetSingleton()->gridCellArray;
+				if (SearchGridSize < 0 || SearchGridSize > CellGrid->size)
+					SearchGridSize = CellGrid->size;
+
+				for (int i = 0; i < SearchGridSize; i++)
+				{
+					for (int j = 0; j < SearchGridSize; j++)
+					{
+						GridCellArray::GridEntry* Data = CellGrid->GetGridEntry(i, j);
+						if (Data && Data->cell)
+						{
+							PreprocessCell(Data->cell);
+							EnumerateCellCasters(Data->cell);
+						}
+					}
+				}
+			}
+
+			// queueing order: player > clusters > large objects > actors > everything else (on distance)
+			std::sort(ValidCasters.begin(), ValidCasters.end(), [](const Caster& LHS, const Caster& RHS) -> bool {
+				if (LHS.IsCluster() && !RHS.IsCluster())
+					return true;
+				else if (!LHS.IsCluster() && RHS.IsCluster())
+					return false;
+				else if (!LHS.IsCluster() && !RHS.IsCluster())
+				{
+					bool LHSLO = LHS.GetBoundRadius() > Settings::kObjectTier6BoundRadius().f;
+					bool RHSLO = RHS.GetBoundRadius() > Settings::kObjectTier6BoundRadius().f;
+
+					if (LHSLO && !RHSLO)
+						return true;
+					else if (!LHSLO && RHSLO)
+						return false;
+					else if (!LHSLO && !RHSLO)
+					{
+						bool LHSActor = LHS.GetRef()->IsActor();
+						bool RHSActor = RHS.GetRef()->IsActor();
+
+						if (LHSActor && !RHSActor)
+							return true;
+						else if (!LHSActor && RHSActor)
+							return false;
+					}
+				}
+
+				return LHS.GetDistanceFromPlayer() < RHS.GetDistanceFromPlayer();
+			});
+
+			for (auto& Itr : ValidCasters)
+			{
+				if (Itr.IsCluster())
+					ShadowDebugger::Log("Cluster D[%f] BR[%f] [%s]", Itr.GetDistanceFromPlayer(), Itr.GetBoundRadius(), Itr.GetNode()->m_pcName);
+				else
+					ShadowDebugger::Log("Caster %08X D[%f] BR[%f] [%s]", Itr.GetRef()->refID, Itr.GetDistanceFromPlayer(), Itr.GetBoundRadius(), Itr.GetNode()->m_pcName);
+
+				ShadowSceneLight* NewSSL = nullptr;
+				if (Itr.Queue(Renderer, Root, &CasterCount, &NewSSL))
+					ValidSSLs.push_back(NewSSL);
+
+				if (CasterCount.GetSceneSaturated())
+					break;
+			}
+		}
+		gLog.Outdent();
 	}
 
 
-	void Renderer::Handler_ShadowPass_Begin()
+
+	void Renderer::Handler_ShadowPass_Begin(void*)
 	{
+		SME_ASSERT(ShadowPassInProgress == false);
 		ShadowDebugger::Log("============================= BEGIN SHADOW RENDER MAIN ROUTINE =============================================");
 
 		UpdateConstants();
+		ShadowPassInProgress = true;
 	}
 
 	void Renderer::Handler_QueueShadowCasters(int MaxShadowCount)
@@ -1130,9 +1312,8 @@ namespace ShadowPipeline
 		ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
 		if (RootNode)
 		{
-			// #### skip trees (casting and receiving)
-			ShadowSceneProc SceneProc(RootNode);
-			SceneProc.Execute(MaxShadowCount);
+			RenderProcess Process(RootNode);
+			Process.Begin(*this, MaxShadowCount);
 		}
 	}
 
@@ -1327,7 +1508,9 @@ namespace ShadowPipeline
 		if (FadeNode)
 		{
 			auto xData = ShadowExtraData::Get(FadeNode);
-			if (FadeNode->IsCulled() == false && (Settings::kReceiverEnableExclusionParams().i == 0 || CanReceiveShadow(FadeNode)))
+			if (xData == nullptr)
+				thisCall<void>(0x007D59E0, SSL, Receiver);
+			else if (FadeNode->IsCulled() == false && (Settings::kReceiverEnableExclusionParams().i == 0 || CanReceiveShadow(FadeNode)))
 			{
 				thisCall<void>(0x007D59E0, SSL, Receiver);
 				SHADOW_DEBUG(xData, "Updating Geometry for Self Shadow");
@@ -1386,14 +1569,17 @@ namespace ShadowPipeline
 			SHADOW_DEBUG(ShadowExtraData::Get(SSL->sourceNode), "Changed Sampling Scale Multiplier to %f", NewSampScale);
 		}
 
+		ShadowMapRenderSource = SSL;
 		thisCall<void>(0x007D46C0, SSL, Throwaway);
+		ShadowMapRenderSource = nullptr;
 	}
 
-	void Renderer::Handler_ShadowMapRender_Begin(ShadowSceneLight* SSL)
+	void Renderer::Handler_ShadowMapRender_Begin(void*)
 	{
 		SME_ASSERT(BackfaceCullingEnabled == false);
+		SME_ASSERT(ShadowMapRenderSource);
 
-		auto xData = ShadowExtraData::Get(SSL->sourceNode);
+		auto xData = ShadowExtraData::Get(ShadowMapRenderSource->sourceNode);
 		if (xData->IsReference() && xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kRenderBackFacesToShadowMap))
 		{
 			BackfaceCullingEnabled = true;
@@ -1401,8 +1587,10 @@ namespace ShadowPipeline
 		}
 	}
 
-	void Renderer::Handler_ShadowMapRender_End(ShadowSceneLight* SSL)
+	void Renderer::Handler_ShadowMapRender_End(void*)
 	{
+		SME_ASSERT(ShadowMapRenderSource);
+
 		if (BackfaceCullingEnabled)
 		{
 			BackfaceCullingEnabled = false;
@@ -1411,20 +1599,23 @@ namespace ShadowPipeline
 
 		if (Settings::kEnableDebugShader().i)
 		{
-			auto xData = ShadowExtraData::Get(SSL->sourceNode);
+			auto xData = ShadowExtraData::Get(ShadowMapRenderSource->sourceNode);
 			auto DebugSel = ShadowDebugger::GetDebugSelection();
 			if (DebugSel == nullptr || (xData->IsReference() && xData->GetRef()->Form == DebugSel))
-				SSL->showDebug = 1;
+				ShadowMapRenderSource->showDebug = 1;
 			else
-				SSL->showDebug = 0;
+				ShadowMapRenderSource->showDebug = 0;
 		}
 		else
-			SSL->showDebug = 0;
+			ShadowMapRenderSource->showDebug = 0;
 	}
 
-	void Renderer::Handler_ShadowPass_End()
+	void Renderer::Handler_ShadowPass_End(void*)
 	{
+		SME_ASSERT(ShadowPassInProgress);
 		ShadowDebugger::Log("============================= END SHADOW RENDER MAIN ROUTINE ===============================================\n");
+
+		ShadowPassInProgress = false;
 	}
 
 	void Renderer::ToggleBackfaceCulling(bool State)
@@ -1548,9 +1739,63 @@ namespace ShadowPipeline
 		}
 	}
 
+	Renderer::Renderer() :
+		ConstantManager(),
+		ShadowConstants(ConstantManager),
+		LightProjectionUpdateQueue(),
+		BackfaceCullingEnabled(false),
+		ShadowPassInProgress(false),
+		ShadowMapRenderSource(nullptr)
+	{
+	}
+
 	void Renderer::Initialize()
 	{
 		ConstantManager.Initialize();
+
+		PipelineStages::Instance.ShadowPass_Begin.SetHandler(std::bind(&Renderer::Handler_ShadowPass_Begin, this,
+																	   std::placeholders::_1));
+		PipelineStages::Instance.QueueShadowCasters.SetHandler(std::bind(&Renderer::Handler_QueueShadowCasters, this,
+																		 std::placeholders::_1));
+		PipelineStages::Instance.LightProjection_Wrapper.SetHandler(std::bind(&Renderer::Handler_LightProjection_Wrapper, this,
+																			  std::placeholders::_1, std::placeholders::_2));
+		PipelineStages::Instance.LightProjection_Begin.SetHandler(std::bind(&Renderer::Handler_LightProjection_Begin, this,
+																			std::placeholders::_1));
+		PipelineStages::Instance.LightProjection_CheckActiveLights.SetHandler(std::bind(&Renderer::Handler_LightProjection_CheckActiveLights, this,
+																						std::placeholders::_1, std::placeholders::_2));
+		PipelineStages::Instance.LightProjection_CheckDirectionalSource.SetHandler(std::bind(&Renderer::Handler_LightProjection_CheckDirectionalSource, this,
+																							 std::placeholders::_1));
+		PipelineStages::Instance.LightProjection_End.SetHandler(std::bind(&Renderer::Handler_LightProjection_End, this,
+																		  std::placeholders::_1));
+		PipelineStages::Instance.UpdateShadowReceiver_World.SetHandler(std::bind(&Renderer::Handler_UpdateShadowReceiver_World, this,
+																				 std::placeholders::_1, std::placeholders::_2));
+		PipelineStages::Instance.UpdateShadowReceiver_Self.SetHandler(std::bind(&Renderer::Handler_UpdateShadowReceiver_Self, this,
+																				std::placeholders::_1));
+		PipelineStages::Instance.UpdateShadowReceiver_UpdateLightingProperty.SetHandler(std::bind(&Renderer::Handler_UpdateShadowReceiver_UpdateLightingProperty, this,
+																								  std::placeholders::_1, std::placeholders::_2));
+		PipelineStages::Instance.ShadowMapRender_Wrapper.SetHandler(std::bind(&Renderer::Handler_ShadowMapRender_Wrapper, this,
+																			  std::placeholders::_1, std::placeholders::_2));
+		PipelineStages::Instance.ShadowMapRender_Begin.SetHandler(std::bind(&Renderer::Handler_ShadowMapRender_Begin, this,
+																			std::placeholders::_1));
+		PipelineStages::Instance.ShadowMapRender_End.SetHandler(std::bind(&Renderer::Handler_ShadowMapRender_End, this,
+																		  std::placeholders::_1));
+		PipelineStages::Instance.ShadowPass_End.SetHandler(std::bind(&Renderer::Handler_ShadowPass_End, this,
+																	 std::placeholders::_1));
+	}
+
+	void Renderer::QueueForLightProjection(ShadowSceneLight* Source)
+	{
+		LightProjectionUpdateQueue.push_back(Source);
+	}
+
+	void Renderer::ReloadConstants()
+	{
+		ConstantManager.Load();
+	}
+
+	bool Renderer::IsRendering() const
+	{
+		return ShadowPassInProgress;
 	}
 
 }

@@ -13,7 +13,7 @@ namespace Utilities
 		void			Set(UInt32 Flag, bool State);
 
 		UInt32			GetRaw() const;
-		void			SetRaw(UInt32 Flag) const;
+		void			SetRaw(UInt32 Flag);
 	};
 
 	template <typename T>
@@ -162,6 +162,7 @@ namespace Utilities
 	ShadowSceneNode*	GetShadowSceneNode();
 	bool				GetUnderwater(TESObjectREFR* Ref);
 
+	void				SetNiObjectName(NiObjectNET* Source, const char* Format, ...);
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);
 	NiExtraData*		GetNiExtraDataByName(NiAVObject* Source, const char* Name);
 	NiProperty*			GetNiPropertyByID(NiAVObject* Source, UInt8 ID);
@@ -249,12 +250,12 @@ namespace Utilities
 		NiSmartPtr(T* Ptr) : Source(Ptr)
 		{
 			SME_ASSERT(Source);
-			InterlockedIncrement(Source->m_uiRefCount);
+			InterlockedIncrement(&Source->m_uiRefCount);
 		}
 
 		~NiSmartPtr()
 		{
-			if (InterlockedDecrement(Source->m_uiRefCount) == 0)
+			if (InterlockedDecrement(&Source->m_uiRefCount) == 0)
 				thisVirtualCall<void>(0x0, Source, true);
 		}
 

@@ -1,5 +1,9 @@
 #include "Hooks.h"
+#include "ShadowExtraData.h"
 #include "ShadowPipeline.h"
+#include "ShadowUtilities.h"
+
+#pragma warning(disable: 4005 4748)
 
 namespace Hooks
 {
@@ -137,14 +141,14 @@ namespace Hooks
 		}
 	}
 
-	void __stdcall HandleShadowMapRenderingProlog(NiNode* Node, ShadowSceneLight* Source)
+	void __stdcall HandleShadowMapRenderingProlog(NiNode* Node)
 	{
-		ShadowPipeline::PipelineStages::Instance.ShadowMapRender_Begin.Handle(Source);
+		ShadowPipeline::PipelineStages::Instance.ShadowMapRender_Begin.Handle(nullptr);
 	}
 
-	void __stdcall HandleShadowMapRenderingEpilog(NiNode* Node, ShadowSceneLight* Source)
+	void __stdcall HandleShadowMapRenderingEpilog(NiNode* Node)
 	{
-		ShadowPipeline::PipelineStages::Instance.ShadowMapRender_End.Handle(Source);
+		ShadowPipeline::PipelineStages::Instance.ShadowMapRender_End.Handle(nullptr);
 	}
 
 	#define _hhName	RenderShadowMap
@@ -154,18 +158,14 @@ namespace Hooks
 		_hhSetVar(Call, 0x0070C0B0);
 		__asm
 		{
-			mov		eax, [esp + 0x18]
 			pushad
-			push	eax
 			push	edi
 			call	HandleShadowMapRenderingProlog
 			popad
 
 			call	_hhGetVar(Call)
 
-			mov		eax, [esp + 0x18]
 			pushad
-			push	eax
 			push	edi
 			call	HandleShadowMapRenderingEpilog
 			popad
@@ -428,8 +428,205 @@ namespace Hooks
 		}
 	}
 
-	void Patch()
+	namespace EditorSupport
 	{
+		_DefineHookHdlr(EnableCastsShadowsFlag, 0x005498DD);
+
+		void __stdcall FixupReferenceEditDialog(HWND Dialog, TESForm* BaseForm)
+		{
+			if (Dialog && BaseForm)
+			{
+				if (BaseForm->typeID != kFormType_Light)
+				{
+					// not a light reference, perform switcheroo
+					// all refs cast shadows by default, so we'll use reverse-logic to evaluate the bit
+					// ergo don't cast shadows when the cast shadows flag is set
+					SetDlgItemText(Dialog, 1687, "Doesn't Cast Shadow");
+					SetWindowPos(GetDlgItem(Dialog, 1687), HWND_BOTTOM, 0, 0, 120, 15, SWP_NOMOVE|SWP_NOZORDER);
+				}
+			}
+		}
+
+		#define _hhName	EnableCastsShadowsFlag
+		_hhBegin()
+		{
+			_hhSetVar(Retn, 0x005498E3);
+			__asm
+			{
+				pushad
+				push	eax
+				push	edi
+				call	FixupReferenceEditDialog
+				popad
+
+				jmp		_hhGetVar(Retn)
+			}
+		}
+
+		void Patch( void )
+		{
+			// no other changes - the vanilla code handles the rest
+			_MemHdlr(EnableCastsShadowsFlag).WriteJump();
+		}
+	}
+
+	namespace SundrySloblock
+	{
+		_DeclareMemHdlr(ForceShaderModel3RenderPath, "");
+
+		_DefineHookHdlr(ConsoleDebugSelectionA, 0x0058290B);
+		_DefineHookHdlr(ConsoleDebugSelectionB, 0x0057CA43);
+		_DefineHookHdlr(ForceShaderModel3RenderPath, 0x0049885B);
+
+		void __stdcall UpdateDebugSelectionDesc(BSStringT* OutString, TESObjectREFR* DebugSel)
+		{
+			if (DebugSel)
+			{
+				char Buffer[0x200] = {0};
+
+				if (Settings::kEnableDetailedDebugSelection().i)
+				{
+					NiNode* Node = DebugSel->niNode;
+
+					char SpecialFlags[0x100] = {0};
+					char Bounds[0x100] = {0};
+					if (Node)
+					{
+						auto xData = ShadowExtraData::Get(Node);
+						if (xData)
+						{
+							FORMAT_STR(SpecialFlags, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
+									((DebugSel->flags & kTESFormSpecialFlag_DoesntCastShadow) ? "NoShd(REF)" : "-"),
+									   (xData->GetRef()->BSX.CanCastShadow() == false ? "NoShd(BSX)" : "-"),
+									   (xData->GetRef()->BSX.CanReceiveShadow() == false ? "NoRcv(BSX)" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kAllowInteriorHeuristics) ? "IntHeu" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kCannotBeLargeObject) ? "NoLO" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kRenderBackFacesToShadowMap) ? "BkFc" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kOnlySelfShadowInterior) ? "OlySelf(I)" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kOnlySelfShadowExterior) ? "OlySelf(E)" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCastInteriorShadow) ? "NoInt" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCastExteriorShadow) ? "NoExt" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCastInteriorSelfShadow) ? "NoInt(S)" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCastExteriorSelfShadow) ? " NoExt(S)" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontReceiveInteriorShadow) ? "NoInt(R)" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontReceiveExteriorShadow) ? "NoExt(R)" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kClustered) ? "Clust" : "-"),
+									   (xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCluster) ? "NoClust" : "-"));
+
+							BSBound* xBounds = (BSBound*)Utilities::GetNiExtraDataByName(Node, "BBX");
+							if (xBounds)
+							{
+								FORMAT_STR(Bounds, "Bounds[ C[%f,%f,%f] E[%f,%f,%f] ]",
+										   xBounds->center.x,
+										   xBounds->center.y,
+										   xBounds->center.z,
+										   xBounds->extents.x,
+										   xBounds->extents.y,
+										   xBounds->extents.z);
+							}
+						}
+					}
+
+					FORMAT_STR(Buffer, "\"%s\" (%08X) Node[%s] BndRad[%.3f]\n\nPos[%.0f,%.0f,%.0f] Dist[%.2f] Shadow flags[%s]",
+						thisCall<const char*>(0x004DA2A0, DebugSel),
+						DebugSel->refID,
+						(Node && Node->m_pcName ? Node->m_pcName : ""),
+						(Node ? Node->m_kWorldBound.radius : 0.f),
+						(Node ? Node->m_worldTranslate.x : 0.f),
+						(Node ? Node->m_worldTranslate.y : 0.f),
+						(Node ? Node->m_worldTranslate.z : 0.f),
+						(Node ? Utilities::GetDistanceFromPlayer(Node) : 0.f),
+						SpecialFlags);
+				}
+				else
+				{
+					FORMAT_STR(Buffer, "\"%s\" (%08X)",
+							thisCall<const char*>(0x004DA2A0, DebugSel),
+							DebugSel->refID);
+				}
+
+				OutString->Set(Buffer);
+			}
+		}
+
+		#define _hhName	ConsoleDebugSelectionA
+		_hhBegin()
+		{
+			_hhSetVar(Retn, 0x00582910);
+			__asm
+			{
+				pushad
+				push	edi
+				push	eax
+				call	UpdateDebugSelectionDesc
+				popad
+
+				jmp		_hhGetVar(Retn)
+			}
+		}
+
+		#define _hhName	ConsoleDebugSelectionB
+		_hhBegin()
+		{
+			_hhSetVar(Retn, 0x0057CA48);
+			__asm
+			{
+				pushad
+				push	esi
+				push	eax
+				call	UpdateDebugSelectionDesc
+				popad
+
+				jmp		_hhGetVar(Retn)
+			}
+		}
+
+		void __stdcall ForceSM3Shaders(void)
+		{
+			UInt32* PixelShaderID = (UInt32*)0x00B42F48;
+			UInt32* PixelShaderIDEx = (UInt32*)0x00B42D74;
+			UInt8* UsePS30ShaderFlag = (UInt8*)0x00B42EA5;
+
+			*PixelShaderID = *PixelShaderIDEx = 7;
+			*UsePS30ShaderFlag = 1;
+		}
+
+		#define _hhName	ForceShaderModel3RenderPath
+		_hhBegin()
+		{
+			_hhSetVar(Retn, 0x00498860);
+			_hhSetVar(Call, 0x007B45F0);
+			__asm
+			{
+				call	_hhGetVar(Call)
+
+				pushad
+				call	ForceSM3Shaders
+				popad
+
+				jmp		_hhGetVar(Retn)
+			}
+		}
+
+
+		void Patch( void )
+		{
+			_MemHdlr(ConsoleDebugSelectionA).WriteJump();
+			_MemHdlr(ConsoleDebugSelectionB).WriteJump();
+
+			TODO("Turn off after testing");
+			_MemHdlr(ForceShaderModel3RenderPath).WriteJump();
+		}
+	}
+
+	void Patch(bool Editor)
+	{
+		if (Editor)
+		{
+			EditorSupport::Patch();
+			return;
+		}
+
 		_MemHdlr(EnumerateFadeNodes).WriteJump();
 		_MemHdlr(RenderShadowsProlog).WriteJump();
 		_MemHdlr(RenderShadowsEpilog).WriteJump();
@@ -483,6 +680,21 @@ namespace Hooks
 		_MemHdlr(SwapLightProjectionStageConstants).WriteJump();
 		_MemHdlr(FixSSLLightSpaceProjectionStack).WriteUInt16(0x4);
 		_MemHdlr(SwapShadowMapRenderStageConstants).WriteJump();
+
+		for (int i = 0; i < 5; i++)
+		{
+			static const UInt32 kCallSites[5] =
+			{
+				0x0040EF4F,	0x0044570E,
+				0x00445ABF, 0x005FAA47,
+				0x00659F80
+			};
+
+			_DefinePatchHdlrWithBuffer(ShadowSceneNodeAddShadowCaster, kCallSites[i], 5, 0x83, 0xC4, 0x4, 0x90, 0x90);		// add esp, 4
+			_MemHdlr(ShadowSceneNodeAddShadowCaster).WriteBuffer();
+		}
+
+		SundrySloblock::Patch();
 	}
 
 }

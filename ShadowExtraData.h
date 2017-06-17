@@ -1,7 +1,7 @@
 #pragma once
 
 #include "shadeMeInternals.h"
-#include "Utilities.h"
+#include "ShadowUtilities.h"
 
 // stores runtime shadow state
 class ShadowExtraData : public NiExtraData
@@ -119,8 +119,8 @@ public:
 		NiNode*					Node;
 		CellFlags				Flags;
 
-		TESObjectCELL*							Form;
-		std::unique_ptr<ShadowClusterData>		ClusterData;
+		TESObjectCELL*			Form;
+		std::vector<NiNode*>	Clusters;
 
 		CellData(TESObjectCELL* Cell);
 	};
@@ -128,6 +128,8 @@ public:
 	struct ClusterData
 	{
 		NiNode*					Node;
+
+		UInt8					Quad;
 		Vector3					Center;
 
 		ClusterData(NiNode* Node);
@@ -164,9 +166,4 @@ public:
 
 	static ShadowExtraData*		Create();
 	static ShadowExtraData*		Get(NiAVObject* Object);
-};
-
-class ShadowClusterData
-{
-
 };

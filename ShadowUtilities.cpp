@@ -1,4 +1,4 @@
-﻿#include "Utilities.h"
+﻿#include "ShadowUtilities.h"
 #include "BoundsCalculator.h"
 #include "ShadowExtraData.h"
 
@@ -8,7 +8,7 @@ namespace Utilities
 {
 	bool Bitfield::Get(UInt32 Flag) const
 	{
-		return this->Flags & Flag;
+		return (this->Flags & Flag) != 0;
 	}
 
 	void Bitfield::Set(UInt32 Flag, bool State)
@@ -24,7 +24,7 @@ namespace Utilities
 		return Flags;
 	}
 
-	void Bitfield::SetRaw(UInt32 Flag) const
+	void Bitfield::SetRaw(UInt32 Flag)
 	{
 		Flags = Flag;
 	}
@@ -601,6 +601,18 @@ namespace Utilities
 		}
 
 		return false;
+	}
+
+	void SetNiObjectName(NiObjectNET* Source, const char* Format, ...)
+	{
+		char Buffer[0x200] = { 0 };
+
+		va_list Args;
+		va_start(Args, Format);
+		vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
+		va_end(Args);
+
+		thisCall<void>(0x006FF420, Source, Buffer);
 	}
 
 	enum

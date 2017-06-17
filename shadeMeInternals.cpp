@@ -1,6 +1,7 @@
 #include "shadeMeInternals.h"
 #include "ShadowExtraData.h"
-#include "Utilities.h"
+#include "ShadowPipeline.h"
+#include "ShadowUtilities.h"
 
 namespace Interfaces
 {
@@ -21,13 +22,10 @@ namespace Settings
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
 	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General",
 													"Toggle the expanded console debug selection description", (SInt32)1);
-	SME::INI::INISetting			kForceActorShadows("ForceActorShadows", "Shadows::General", "Queue actors regardless of their deficiencies", (SInt32)0);
 	SME::INI::INISetting			kNoInteriorSunShadows("ValidateInteriorLightSources", "Shadows::General", "Prevents arbitrary sun shadows", (SInt32)1);
 	SME::INI::INISetting			kActorsReceiveAllShadows("ActorsReceiveAllShadows", "Shadows::General", "Actors are valid shadow receivers", (SInt32)1);
 	SME::INI::INISetting			kNightTimeMoonShadows("NightTimeMoonShadows", "Shadows::General", "Moons are shadow casting lights", (SInt32)0);
 
-	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
-																"Large objects are rendered before smaller ones", (SInt32)0);
 	SME::INI::INISetting			kLargeObjectExcludedPath("ExcludePaths", "Shadows::LargeObjects", "Large object blacklist", "rocks\\");
 	SME::INI::INISetting			kLargeObjectSunShadowsOnly("OnlyCastSunShadows", "Shadows::LargeObjects",
 															"Large objects will not react to small light sources", (SInt32)1);
@@ -116,6 +114,7 @@ namespace Settings
 	SME::INI::INISetting			kMaxCountEquipment("Equipment", "Shadows::MaxCount", "", (SInt32)-1);
 	SME::INI::INISetting			kMaxCountClusters("Clusters", "Shadows::MaxCount", "", (SInt32)-1);
 
+	SME::INI::INISetting			kClusteringEnable("Enable", "Shadows::Clustering", "", (SInt32)1);
 	SME::INI::INISetting			kClusteringExcludePath("ExcludePaths", "Shadows::Clustering", "Blacklist", "");
 	SME::INI::INISetting			kClusteringMaxBoundRadius("MaxBoundRadius", "Shadows::Clustering", "", 5000.f);
 	SME::INI::INISetting			kClusteringMaxDistance("MaxDistance", "Shadows::Clustering", "", 1024.f);
@@ -129,12 +128,10 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kCasterMaxDistance);
 	RegisterSetting(&Settings::kEnableDebugShader);
 	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
-	RegisterSetting(&Settings::kForceActorShadows);
 	RegisterSetting(&Settings::kNoInteriorSunShadows);
 	RegisterSetting(&Settings::kActorsReceiveAllShadows);
 	RegisterSetting(&Settings::kNightTimeMoonShadows);
 
-	RegisterSetting(&Settings::kLargeObjectHigherPriority);
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
 	RegisterSetting(&Settings::kLargeObjectSunShadowsOnly);
 
@@ -212,6 +209,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMaxCountEquipment);
 	RegisterSetting(&Settings::kMaxCountClusters);
 
+	RegisterSetting(&Settings::kClusteringEnable);
 	RegisterSetting(&Settings::kClusteringExcludePath);
 	RegisterSetting(&Settings::kClusteringMaxBoundRadius);
 	RegisterSetting(&Settings::kClusteringMaxDistance);
@@ -226,6 +224,7 @@ shadeMeINIManager::~shadeMeINIManager()
 }
 
 TESObjectREFR*		ShadowDebugger::kDebugSelection = nullptr;
+TESObjectREFR*		ShadowDebugger::kExclusiveCaster = nullptr;
 
 void ShadowDebugger::Log(ShadowExtraData* xData, const char* Format, ...)
 {
@@ -276,4 +275,211 @@ void ShadowDebugger::SetDebugSelection(TESObjectREFR* Ref /*= nullptr*/)
 TESObjectREFR* ShadowDebugger::GetDebugSelection()
 {
 	return kDebugSelection;
+}
+
+void ShadowDebugger::SetExclusiveCaster(TESObjectREFR* Ref /*= nullptr*/)
+{
+	kExclusiveCaster = Ref;
+}
+
+TESObjectREFR* ShadowDebugger::GetExclusiveCaster()
+{
+	return kExclusiveCaster;
+}
+
+static bool ToggleShadowVolumes_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	_MESSAGE("Refreshing shadeMe params...");
+	gLog.Indent();
+	ShadowPipeline::Renderer::Instance.ReloadConstants();
+
+	shadeMeINIManager::Instance.Load();
+	FilterData::MainShadowExParams::Instance.RefreshParameters();
+	FilterData::SelfShadowExParams::Instance.RefreshParameters();
+	FilterData::ShadowReceiverExParams::Instance.RefreshParameters();
+	FilterData::ReloadMiscPathLists();
+
+	ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
+	Utilities::NiNodeChildrenWalker Walker((NiNode*)RootNode->m_children.data[3]);
+	Walker.Walk(&ShadowPipeline::FadeNodeShadowFlagUpdater());
+	gLog.Outdent();
+
+	return true;
+}
+
+static bool WasteMemory_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	TESObjectREFR* Ref = InterfaceManager::GetSingleton()->debugSelection;
+	if (Ref && Ref->niNode)
+	{
+		BSFadeNode* Node = NI_CAST(Ref->niNode, BSFadeNode);
+		if (Node)
+		{
+			Console_Print(" ");
+			Console_Print("Light data for Node %s ==>>", Node->m_pcName);
+			Console_Print("========================================================================================");
+
+			ShadowLightListT Lights;
+			if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_NonShadowCasters))
+			{
+				Console_Print("Active lights = %d", Lights.size());
+
+				for (ShadowLightListT::iterator Itr = Lights.begin(); Itr != Lights.end(); Itr++)
+				{
+					ShadowSceneLight* Source = *Itr;
+					bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Ref);
+
+					Console_Print("Light%s@ %0.f, %0.f, %0.f ==> DIST[%.0f] LOS[%d]", (Source->sourceLight->IsCulled() ? " (Culled) " : " "),
+								  Source->sourceLight->m_worldTranslate.x,
+								  Source->sourceLight->m_worldTranslate.y,
+								  Source->sourceLight->m_worldTranslate.z,
+								  Utilities::GetDistance(Source->sourceLight, Node),
+								  LOSCheck);
+				}
+			}
+			else
+				Console_Print("No active lights");
+
+			Console_Print("========================================================================================");
+
+			Lights.clear();
+			if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_ShadowCasters))
+			{
+				Console_Print("Shadow casters = %d", Lights.size());
+
+				for (ShadowLightListT::iterator Itr = Lights.begin(); Itr != Lights.end(); Itr++)
+				{
+					ShadowSceneLight* ShadowLight = *Itr;
+					if (ShadowLight->sourceNode)
+					{
+						if (ShadowLight->sourceNode != Node)
+						{
+							Console_Print("Node %s @ %0.f, %0.f, %0.f",
+										  ShadowLight->sourceNode->m_pcName,
+										  ShadowLight->sourceNode->m_worldTranslate.x,
+										  ShadowLight->sourceNode->m_worldTranslate.y,
+										  ShadowLight->sourceNode->m_worldTranslate.z);
+						}
+						else
+							Console_Print("Node SELF-SHADOW");
+					}
+				}
+			}
+			else
+				Console_Print("No shadow casters");
+		}
+
+		Console_Print("========================================================================================");
+
+		ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
+		ShadowSceneLight* CasterSSL = NULL;
+		for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->shadowCasters.start; Itr && Itr->data; Itr = Itr->next)
+		{
+			ShadowSceneLight* ShadowLight = Itr->data;
+			if (ShadowLight->sourceNode == Node)
+			{
+				CasterSSL = ShadowLight;
+				break;
+			}
+		}
+
+		if (CasterSSL == NULL)
+			Console_Print("No shadow caster SSL");
+		else
+		{
+			bool LOSCheck = Utilities::GetLightLOS(CasterSSL->sourceLight, Ref);
+			Console_Print("Shadow caster SSL: Active[%d] Light%s[%.0f, %.0f, %.0f] LOS[%d] Fade[%f, %f] Bnd[%.0f, %.0f]",
+						  CasterSSL->unk118 != 0xFF,
+						  CasterSSL->sourceLight->IsCulled() ? " (Culled)" : "",
+						  CasterSSL->sourceLight->m_worldTranslate.x,
+						  CasterSSL->sourceLight->m_worldTranslate.y,
+						  CasterSSL->sourceLight->m_worldTranslate.z,
+						  LOSCheck,
+						  CasterSSL->unkDC,
+						  CasterSSL->unkE0,
+						  CasterSSL->m_combinedBounds.z,
+						  CasterSSL->m_combinedBounds.radius);
+		}
+
+		Console_Print("========================================================================================");
+
+		Console_Print("Scene lights = %d", RootNode->lights.numItems);
+		for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->lights.start; Itr && Itr->data; Itr = Itr->next)
+		{
+			ShadowSceneLight* ShadowLight = Itr->data;
+			bool LOSCheck = Utilities::GetLightLOS(ShadowLight->sourceLight, Ref);
+
+			Console_Print("Light @ %.0f, %.0f, %.0f | Att. = %0.f, %0.f, %0.f ==> DIST[%.0f] LOS[%d]",
+						  ShadowLight->sourceLight->m_worldTranslate.x,
+						  ShadowLight->sourceLight->m_worldTranslate.y,
+						  ShadowLight->sourceLight->m_worldTranslate.z,
+						  ShadowLight->sourceLight->m_fAtten0,
+						  ShadowLight->sourceLight->m_fAtten1,
+						  ShadowLight->sourceLight->m_fAtten2,
+						  Utilities::GetDistance(ShadowLight->sourceLight, Node),
+						  LOSCheck);
+
+			for (NiTPointerList<NiNode>::Node* j = ShadowLight->sourceLight->affectedNodes.start; j && j->data; j = j->next)
+			{
+				Console_Print("\tAffects %s  @ %.0f, %.0f, %.0f ==> DIST[%.0f]",
+							  j->data->m_pcName,
+							  j->data->m_worldTranslate.x,
+							  j->data->m_worldTranslate.y,
+							  j->data->m_worldTranslate.z,
+							  Utilities::GetDistance(ShadowLight->sourceLight, j->data));
+			}
+		}
+
+		Console_Print("========================================================================================");
+		Console_Print(" ");
+	}
+
+	return true;
+}
+
+static bool BeginTrace_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	ShadowDebugger::SetDebugSelection(InterfaceManager::GetSingleton()->debugSelection);
+	return true;
+}
+
+static bool Help_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	ShadowDebugger::SetExclusiveCaster(InterfaceManager::GetSingleton()->debugSelection);
+	return true;
+}
+
+void ShadowDebugger::Initialize()
+{
+	CommandInfo* ToggleShadowVolumes = (CommandInfo*)0x00B0B9C0;
+	ToggleShadowVolumes->longName = "RefreshShadeMeParams";
+	ToggleShadowVolumes->shortName = "rsc";
+	ToggleShadowVolumes->execute = ToggleShadowVolumes_Execute;
+
+	CommandInfo* WasteMemory = (CommandInfo*)0x00B0C758;
+	WasteMemory->longName = "DumpShadowLightData";
+	WasteMemory->shortName = "dsd";
+	WasteMemory->execute = WasteMemory_Execute;
+	WasteMemory->numParams = ToggleShadowVolumes->numParams;
+	WasteMemory->params = ToggleShadowVolumes->params;
+
+	CommandInfo* BeginTrace = (CommandInfo*)0x00B0C618;
+	BeginTrace->longName = "SetShadowDebugRef";
+	BeginTrace->shortName = "sdr";
+	BeginTrace->execute = BeginTrace_Execute;
+	BeginTrace->numParams = ToggleShadowVolumes->numParams;
+	BeginTrace->params = ToggleShadowVolumes->params;
+
+	CommandInfo* Help = (CommandInfo*)0x00B0B740;
+	Help->longName = "SetShadowExclusiveCaster";
+	Help->shortName = "sec";
+	Help->execute = Help_Execute;
 }

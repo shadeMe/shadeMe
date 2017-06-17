@@ -1,6 +1,7 @@
 #pragma once
 
 #include "shadeMeInternals.h"
+#include "ShadowUtilities.h"
 
 namespace ShadowPipeline
 {
@@ -85,12 +86,12 @@ namespace ShadowPipeline
 		FuncT		Handler;
 	public:
 		void		SetHandler(FuncT Functor) { Handler = Functor; }
-		Ret			Handle(Args... A) { return Handler(A); }
+		Ret			Handle(Args... A) { return Handler(A...); }
 	};
 
 	struct PipelineStages
 	{
-		PipelineStageHandler<void, void>										ShadowPass_Begin;
+		PipelineStageHandler<void, void*>										ShadowPass_Begin;
 
 		PipelineStageHandler<void, int /*MaxShadowCount*/>						QueueShadowCasters;
 
@@ -105,10 +106,10 @@ namespace ShadowPipeline
 		PipelineStageHandler<void, ShadowSceneLight*, NiNode* /*Receiver*/>		UpdateShadowReceiver_UpdateLightingProperty;
 
 		PipelineStageHandler<void, ShadowSceneLight*, void* /*Throwaway*/>		ShadowMapRender_Wrapper;
-		PipelineStageHandler<void, ShadowSceneLight*>							ShadowMapRender_Begin;
-		PipelineStageHandler<void, ShadowSceneLight*>							ShadowMapRender_End;
+		PipelineStageHandler<void, void*>										ShadowMapRender_Begin;
+		PipelineStageHandler<void, void*>										ShadowMapRender_End;
 
-		PipelineStageHandler<void, void>										ShadowPass_End;
+		PipelineStageHandler<void, void*>										ShadowPass_End;
 
 
 		static PipelineStages				Instance;
@@ -186,13 +187,12 @@ namespace ShadowPipeline
 		static bool				CanReceiveShadow(ShadowSceneLight* SSL);
 		static bool				CanReceiveShadow(NiNode* Node);
 	private:
-		static const float		DirectionalLightCheckThresholdDistance;
-
 		class CasterCountTable;
 
 		class Caster
 		{
 			ShadowExtraData*	xData;
+			float				DistanceFromPlayer;
 
 			ShadowSceneLight*	CreateShadowSceneLight(ShadowSceneNode* Root);
 			bool				HasPlayerLOS(TESObjectREFR* Object, NiNode* Node, float Distance) const;
@@ -202,6 +202,7 @@ namespace ShadowPipeline
 			bool				ValidateReference(Renderer& Renderer) const;
 		public:
 			Caster(NiNode* Source);
+			inline Caster(const Caster& RHS) = default;
 
 			bool				Queue(Renderer& Renderer,
 									  ShadowSceneNode* Root,
@@ -209,7 +210,10 @@ namespace ShadowPipeline
 									  ShadowSceneLight** OutSSL = nullptr);
 
 			bool				IsCluster() const;
-			TESObjectREFR*		GetObject() const;
+			TESObjectREFR*		GetRef() const;
+			float				GetBoundRadius() const;
+			NiNode*				GetNode() const;
+			float				GetDistanceFromPlayer() const;
 		};
 
 		class CasterCountTable
@@ -254,6 +258,7 @@ namespace ShadowPipeline
 			ShadowSceneNode*	Root;
 			CasterListT			ValidCasters;
 
+			void		ProcessPlayerCharacter();
 			void		PreprocessCell(TESObjectCELL* Cell) const;
 			void		EnumerateCellCasters(TESObjectCELL* Cell);
 
@@ -261,7 +266,7 @@ namespace ShadowPipeline
 		public:
 			RenderProcess(ShadowSceneNode* Root);
 
-			void		Begin(int SearchGridSize = -1);
+			void		Begin(Renderer& Renderer, int MaxShadowCount, int SearchGridSize = -1);
 		};
 
 		enum
@@ -273,7 +278,7 @@ namespace ShadowPipeline
 			kSSLExtraFlag_NoShadowLightSource		= 1 << 3,
 		};
 
-		void			Handler_ShadowPass_Begin();
+		void			Handler_ShadowPass_Begin(void*);
 		void			Handler_QueueShadowCasters(int MaxShadowCount);
 
 		void			Handler_LightProjection_Wrapper(ShadowSceneLight* SSL, void* Throwaway);
@@ -287,10 +292,10 @@ namespace ShadowPipeline
 		void			Handler_UpdateShadowReceiver_UpdateLightingProperty(ShadowSceneLight* SSL, NiNode* Receiver);
 
 		void			Handler_ShadowMapRender_Wrapper(ShadowSceneLight* SSL, void* Throwaway);
-		void			Handler_ShadowMapRender_Begin(ShadowSceneLight* SSL);
-		void			Handler_ShadowMapRender_End(ShadowSceneLight* SSL);
+		void			Handler_ShadowMapRender_Begin(void*);
+		void			Handler_ShadowMapRender_End(void*);
 
-		void			Handler_ShadowPass_End();
+		void			Handler_ShadowPass_End(void*);
 
 		static void		ToggleBackfaceCulling(bool State);
 
@@ -317,12 +322,21 @@ namespace ShadowPipeline
 		RenderConstantManager			ConstantManager;
 		Constants						ShadowConstants;
 		ShadowLightListT				LightProjectionUpdateQueue;
+
 		bool							BackfaceCullingEnabled;
+		bool							ShadowPassInProgress;
+		ShadowSceneLight*				ShadowMapRenderSource;
 
 		void							UpdateConstants();
-	public:
 
+		Renderer();
+	public:
 		void							Initialize();
+
 		void							QueueForLightProjection(ShadowSceneLight* Source);
+		void							ReloadConstants();
+		bool							IsRendering() const;
+
+		static Renderer					Instance;
 	};
 }

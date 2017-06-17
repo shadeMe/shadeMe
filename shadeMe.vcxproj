@@ -168,15 +168,14 @@
     <ClCompile Include="..\obse\obse\NiRTTI.cpp" />
     <ClCompile Include="..\OBSE\obse\NiTypes.cpp" />
     <ClCompile Include="..\obse\obse\Script.cpp" />
+	<ClCompile Include="..\OBSE\obse\Utilities.cpp" />
     <ClCompile Include="BoundsCalculator.cpp" />
     <ClCompile Include="Hooks.cpp" />
     <ClCompile Include="ShadowExtraData.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="shadeMeInternals.cpp" />
-    <ClCompile Include="ShadowFacts.cpp" />
     <ClCompile Include="ShadowPipeline.cpp" />
-    <ClCompile Include="ShadowSundries.cpp" />
-    <ClCompile Include="Utilities.cpp" />
+    <ClCompile Include="ShadowUtilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\obse\obse\GameActorValues.h" />
@@ -211,11 +210,10 @@
     <ClInclude Include="ShadowExtraData.h" />
     <ClInclude Include="CoverTree.h" />
     <ClInclude Include="shadeMeInternals.h" />
-    <ClInclude Include="ShadowFacts.h" />
     <ClInclude Include="ShadowPipeline.h" />
-    <ClInclude Include="ShadowSundries.h" />
-    <ClInclude Include="Utilities.h" />
+    <ClInclude Include="ShadowUtilities.h" />
     <ClInclude Include="VersionInfo.h" />
+	<ClInclude Include="..\OBSE\obse\Utilities.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\obse\obse\GameRTTI_1_1.inl" />

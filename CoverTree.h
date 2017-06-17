@@ -59,6 +59,8 @@ class CoverTree
 		std::vector<Point> _points;
 	public:
 		CoverTreeNode(const Point& p);
+		~CoverTreeNode();
+
 		/**
 		* Returns the children of the node at level i. Note that this means
 		* the children exist in cover set i-1, not level i.
@@ -162,7 +164,7 @@ public:
 	* is closest to p, 1th is next, etc). It may return greater than k points
 	* if there is a tie for the kth place.
 	*/
-	std::vector<Point> kNearestNeighbors(const Point& p, const unsigned int& k) const;
+	void kNearestNeighbors(const Point& p, const unsigned int& k, std::vector<Point>& out) const;
 
 	CoverTreeNode* getRoot() const;
 
@@ -494,19 +496,19 @@ void CoverTree<Point>::remove(const Point& p)
 }
 
 template<class Point>
-std::vector<Point> CoverTree<Point>::kNearestNeighbors(const Point& p,
-													   const unsigned int& k) const
+void CoverTree<Point>::kNearestNeighbors(const Point& p,
+										 const unsigned int& k,
+										 std::vector<Point>& out) const
 {
-	if (_root == NULL) return std::vector<Point>();
+	if (_root == NULL)  return;
 	std::vector<CoverTreeNode*> v = kNearestNodes(p, k);
-	std::vector<Point> kNN;
+
 	typename std::vector<CoverTreeNode*>::const_iterator it;
 	for (it = v.begin(); it != v.end(); ++it) {
 		const std::vector<Point>& p = (*it)->getPoints();
-		kNN.insert(kNN.end(), p.begin(), p.end());
-		if (kNN.size() >= k) break;
+		out.insert(out.end(), p.begin(), p.end());
+		if (out.size() >= k) break;
 	}
-	return kNN;
 }
 
 template<class Point>
@@ -549,6 +551,12 @@ template<class Point>
 CoverTree<Point>::CoverTreeNode::CoverTreeNode(const Point& p)
 {
 	_points.push_back(p);
+}
+
+template<class Point>
+CoverTree<Point>::CoverTreeNode::~CoverTreeNode()
+{
+	_points.clear();
 }
 
 template<class Point>

@@ -1,5 +1,5 @@
 #include "ShadowExtraData.h"
-#include "Utilities.h"
+#include "ShadowUtilities.h"
 
 const char*			ShadowExtraData::kName = "SME";
 const NiRTTI		ShadowExtraData::kRTTI = { kName, (NiRTTI*)0x00B3FD44 };
@@ -193,7 +193,7 @@ ShadowExtraData::ReferenceData::ReferenceData(TESObjectREFR* Ref)
 }
 
 ShadowExtraData::CellData::CellData(TESObjectCELL* Cell) :
-	ClusterData(nullptr)
+	Clusters()
 {
 	Form = Cell;
 	Node = Cell->niNode;
@@ -204,6 +204,8 @@ ShadowExtraData::ClusterData::ClusterData(NiNode* Node) :
 	Center()
 {
 	SME_ASSERT(Node);
+
+	Quad = TESObjectCELL::kNodeChild_Quad0;
 }
 
 void ShadowExtraData::Initialize(TESObjectREFR* R)
@@ -213,10 +215,11 @@ void ShadowExtraData::Initialize(TESObjectREFR* R)
 
 	SME_ASSERT(R);
 	D->Reference = std::make_unique<ShadowExtraData::ReferenceData>(R);
-	FilterData::RefreshReferenceFilterFlags(*this);
 
 	D->Flags.SetRefNode();
 	D->Flags.Set(StateFlags::kInitialized, true);
+
+	FilterData::RefreshReferenceFilterFlags(*this);
 }
 
 void ShadowExtraData::Initialize(TESObjectCELL* C)

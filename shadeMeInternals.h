@@ -60,12 +60,10 @@ namespace Settings
 	extern SME::INI::INISetting				kCasterMaxDistance;
 	extern SME::INI::INISetting				kEnableDebugShader;
 	extern SME::INI::INISetting				kEnableDetailedDebugSelection;
-	extern SME::INI::INISetting				kForceActorShadows;
 	extern SME::INI::INISetting				kNoInteriorSunShadows;
 	extern SME::INI::INISetting				kActorsReceiveAllShadows;
 	extern SME::INI::INISetting				kNightTimeMoonShadows;
 
-	extern SME::INI::INISetting				kLargeObjectHigherPriority;
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;
 	extern SME::INI::INISetting				kLargeObjectSunShadowsOnly;
 
@@ -143,6 +141,7 @@ namespace Settings
 	extern SME::INI::INISetting				kMaxCountEquipment;			// includes armor, weapon, clothing, ammo
 	extern SME::INI::INISetting				kMaxCountClusters;
 
+	extern SME::INI::INISetting				kClusteringEnable;
 	extern SME::INI::INISetting				kClusteringExcludePath;
 	extern SME::INI::INISetting				kClusteringMaxBoundRadius;
 	extern SME::INI::INISetting				kClusteringMaxDistance;
@@ -155,7 +154,6 @@ typedef std::vector<BSFadeNode*>				FadeNodeListT;
 typedef std::vector<NiNode*>					NiNodeListT;
 
 class ShadowExtraData;
-class ShadowClusterData;
 
 // the regular CastsShadows flag will be used on non-light refs to indicate the opposite
 enum
@@ -166,12 +164,18 @@ enum
 class ShadowDebugger
 {
 	static TESObjectREFR*			kDebugSelection;
+	static TESObjectREFR*			kExclusiveCaster;
 public:
 	static void						Log(ShadowExtraData* xData, const char* Format, ...);
 	static void						Log(const char* Format, ...);
 
 	static void						SetDebugSelection(TESObjectREFR* Ref = nullptr);
 	static TESObjectREFR*			GetDebugSelection();
+
+	static void						SetExclusiveCaster(TESObjectREFR* Ref = nullptr);
+	static TESObjectREFR*			GetExclusiveCaster();
+
+	static void						Initialize();
 };
 
 #define SHADOW_DEBUG(xdata, ...)	ShadowDebugger::Log(xdata, ##__VA_ARGS__)
