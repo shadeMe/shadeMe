@@ -392,8 +392,8 @@ static bool WasteMemory_Execute(COMMAND_ARGS)
 		else
 		{
 			bool LOSCheck = Utilities::GetLightLOS(CasterSSL->sourceLight, Ref);
-			Console_Print("Shadow caster SSL: Active[%d] Light%s[%.0f, %.0f, %.0f] LOS[%d] Fade[%f, %f] Bnd[%.0f, %.0f]",
-						  CasterSSL->unk118 != 0xFF,
+			Console_Print("Shadow caster SSL: Active[%d] Light%s[%.0f, %.0f, %.0f] LOS[%d] Fade[%f, %f] Alpha[%.0f, %.0f]",
+						  CasterSSL->lightState != 0xFF,
 						  CasterSSL->sourceLight->IsCulled() ? " (Culled)" : "",
 						  CasterSSL->sourceLight->m_worldTranslate.x,
 						  CasterSSL->sourceLight->m_worldTranslate.y,
@@ -401,8 +401,8 @@ static bool WasteMemory_Execute(COMMAND_ARGS)
 						  LOSCheck,
 						  CasterSSL->unkDC,
 						  CasterSSL->unkE0,
-						  CasterSSL->m_combinedBounds.z,
-						  CasterSSL->m_combinedBounds.radius);
+						  CasterSSL->unkD4,
+						  CasterSSL->currentFadeAlpha);
 		}
 
 		Console_Print("========================================================================================");

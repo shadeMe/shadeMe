@@ -161,6 +161,7 @@ namespace Utilities
 	bool				GetConsoleOpen();
 	ShadowSceneNode*	GetShadowSceneNode();
 	bool				GetUnderwater(TESObjectREFR* Ref);
+	void				UpdateCellNodeNames(TESObjectCELL* Cell);
 
 	void				SetNiObjectName(NiObjectNET* Source, const char* Format, ...);
 	NiObjectNET*		GetNiObjectByName(NiObjectNET* Source, const char* Name);

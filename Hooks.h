@@ -27,6 +27,7 @@ namespace Hooks
 	_DeclareMemHdlr(SwapLightProjectionStageConstants, "per-caster shadow render constants");
 	_DeclareMemHdlr(FixSSLLightSpaceProjectionStack, "fixup the stack");
 	_DeclareMemHdlr(SwapShadowMapRenderStageConstants, "");
+	_DeclareMemHdlr(ShadowSceneLightPerformLOD, "");
 
 	namespace EditorSupport
 	{

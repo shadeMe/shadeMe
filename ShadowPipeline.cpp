@@ -1011,6 +1011,9 @@ namespace ShadowPipeline
 				DoClustering(CellData);
 		}
 
+		// useful for debugging
+		Utilities::UpdateCellNodeNames(Cell);
+
 		// ### anything else?
 	}
 
@@ -1044,7 +1047,7 @@ namespace ShadowPipeline
 									{
 										if (ShadowDebugger::GetExclusiveCaster() == nullptr || Object == ShadowDebugger::GetExclusiveCaster())
 										{
-											ValidCasters.push_back(NewCaster);
+									//		ValidCasters.push_back(NewCaster);
 											SHADOW_DEBUG(xData, "Added to Scene Caster List");
 										}
 										else SHADOW_DEBUG(xData, "Failed Exclusive Caster check");
@@ -1063,13 +1066,13 @@ namespace ShadowPipeline
 		}
 	}
 
-#pragma optimize("", off)
 	void Renderer::RenderProcess::DoClustering(ShadowExtraData* CellData) const
 	{
 		SME_ASSERT(CellData->GetCell()->Flags.IsClustered() == false);
 
 		// walk through all the quads and cluster statics
 		auto CellNode = CellData->GetCell()->Node;
+
 		for (int i = TESObjectCELL::kNodeChild_Quad0; i <= TESObjectCELL::kNodeChild_Quad3; i++)
 		{
 			auto Quad = (NiNode*)CellNode->m_children.data[i];
@@ -1079,7 +1082,7 @@ namespace ShadowPipeline
 			auto NeighbourAccum(std::make_unique<CoverTree<Utilities::TESObjectREFCoverTreePoint>>(kMaxClusterDistance));
 			auto AuxAccum(std::make_unique<std::vector<TESObjectREFR*>>());		// stores references yet to be clustered
 
-			int ClusterCount = 0, ClusterableRefs = 0;
+			int ClusterableRefs = 0;
 
 			// queue refs for clustering
 			for (int j = 0; j < StaticNode->m_children.numObjs; j++)
@@ -1092,13 +1095,14 @@ namespace ShadowPipeline
 					SME_ASSERT(xData->GetRef()->Flags.IsClustered() == false);
 
 					auto Ref = xData->GetRef()->Form;
-					if (Ref->IsPersistent() == false &&
+					if (Ref->parentCell && Ref->niNode &&
+						Ref->IsPersistent() == false &&
 						xData->GetRef()->BSX.CanCastShadow() &&
 						(Ref->flags & kTESFormSpecialFlag_DoesntCastShadow) == false &&
 						xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCluster) == false)
 					{
-						NeighbourAccum->insert(xData->GetRef()->Form);
-						AuxAccum->push_back(xData->GetRef()->Form);
+						NeighbourAccum->insert(Ref);
+						AuxAccum->push_back(Ref);
 						ClusterableRefs++;
 					}
 				}
@@ -1118,7 +1122,7 @@ namespace ShadowPipeline
 				if (AuxAccum->empty())
 					break;		// all refs have been clustered
 
-				// cluster the smallest items first
+								// cluster the smallest items first
 				auto Pivot = AuxAccum->at(AuxAccum->size() - 1);
 				SME_ASSERT(ShadowExtraData::Get(Pivot->niNode)->GetRef()->Flags.IsClustered() == false);
 
@@ -1132,11 +1136,7 @@ namespace ShadowPipeline
 				ClusterData->Initialize(ClusterNode());
 				ClusterData->GetCluster()->Quad = i;
 				Utilities::AddNiExtraData(ClusterNode(), ClusterData);
-				Utilities::SetNiObjectName(ClusterNode(), "%s (%d,%d) Quad %d",
-										   CellData->GetCell()->Form->GetFullName()->name.m_data,
-										   CellData->GetCell()->Form->coords->x,
-										   CellData->GetCell()->Form->coords->y,
-										   i);
+				Utilities::SetNiObjectName(ClusterNode(), "Cluster %d", j + 1);
 
 				for (const auto& Point : *Closest)
 				{
@@ -1178,6 +1178,8 @@ namespace ShadowPipeline
 					Utilities::UpdateDynamicEffectState(ClusterNode());
 
 					ClusterData->GetCluster()->Center.Scale(1 / (float)ValidNeighbours);
+					ClusterNode()->m_worldTranslate = ClusterData->GetCluster()->Center;
+
 					CellData->GetCell()->Clusters.push_back(ClusterNode());
 				}
 			}
@@ -1185,7 +1187,6 @@ namespace ShadowPipeline
 
 		CellData->GetCell()->Flags.Set(ShadowExtraData::CellFlags::kClustered, true);
 	}
-#pragma optimize("", on)
 
 	Renderer::RenderProcess::RenderProcess(ShadowSceneNode* Root) :
 		Root(Root),
@@ -1206,7 +1207,7 @@ namespace ShadowPipeline
 		ShadowDebugger::Log("Executing ShadowSceneProc...");
 		gLog.Indent();
 		{
-			ProcessPlayerCharacter();
+	//		ProcessPlayerCharacter();
 
 			if (TES::GetSingleton()->currentInteriorCell)
 			{
@@ -1280,8 +1281,6 @@ namespace ShadowPipeline
 		}
 		gLog.Outdent();
 	}
-
-
 
 	void Renderer::Handler_ShadowPass_Begin(void*)
 	{
@@ -1450,6 +1449,22 @@ namespace ShadowPipeline
 		}
 	}
 
+	void Renderer::Handler_LightLOD_Wrapper(ShadowSceneLight* SSL, void* CullProc)
+	{
+		auto xData = ShadowExtraData::Get(SSL->sourceNode);
+
+		thisCall<void>(0x007D6390, SSL, CullProc);
+
+		if (xData->IsCluster())
+		{
+			// uncull the cluster SSL after LOD checking
+			// ### figure out why it's being culled
+			SSL->currentFadeAlpha = 1.0;
+			SSL->lightState = 0;
+			SSL->sourceLight->SetCulled(false);
+		}
+	}
+
 	void Renderer::Handler_UpdateShadowReceiver_World(ShadowSceneLight* SSL, NiNode* Scenegraph)
 	{
 		SME_ASSERT(SSL && Scenegraph);
@@ -1580,10 +1595,17 @@ namespace ShadowPipeline
 		SME_ASSERT(ShadowMapRenderSource);
 
 		auto xData = ShadowExtraData::Get(ShadowMapRenderSource->sourceNode);
-		if (xData->IsReference() && xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kRenderBackFacesToShadowMap))
+		if (xData->IsCluster() ||
+			(xData->IsReference() && xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kRenderBackFacesToShadowMap)))
 		{
 			BackfaceCullingEnabled = true;
 			ToggleBackfaceCulling(true);
+		}
+
+		if (xData->IsCluster())
+		{
+			xData->GetCluster()->Node->m_localTranslate = xData->GetCluster()->Center;
+			xData->GetCluster()->Node->m_worldTranslate = xData->GetCluster()->Center;
 		}
 	}
 
@@ -1767,6 +1789,8 @@ namespace ShadowPipeline
 																							 std::placeholders::_1));
 		PipelineStages::Instance.LightProjection_End.SetHandler(std::bind(&Renderer::Handler_LightProjection_End, this,
 																		  std::placeholders::_1));
+		PipelineStages::Instance.LightLOD_Wrapper.SetHandler(std::bind(&Renderer::Handler_LightLOD_Wrapper, this,
+																	   std::placeholders::_1, std::placeholders::_2));
 		PipelineStages::Instance.UpdateShadowReceiver_World.SetHandler(std::bind(&Renderer::Handler_UpdateShadowReceiver_World, this,
 																				 std::placeholders::_1, std::placeholders::_2));
 		PipelineStages::Instance.UpdateShadowReceiver_Self.SetHandler(std::bind(&Renderer::Handler_UpdateShadowReceiver_Self, this,

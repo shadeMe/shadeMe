@@ -101,6 +101,8 @@ namespace ShadowPipeline
 		PipelineStageHandler<bool, ShadowSceneLight*>							LightProjection_CheckDirectionalSource;
 		PipelineStageHandler<void, ShadowSceneLight*>							LightProjection_End;
 
+		PipelineStageHandler<void, ShadowSceneLight*, void* /*CullProc*/>		LightLOD_Wrapper;
+
 		PipelineStageHandler<void, ShadowSceneLight*, NiNode* /*Scenegraph*/>	UpdateShadowReceiver_World;
 		PipelineStageHandler<bool, ShadowSceneLight*>							UpdateShadowReceiver_Self;
 		PipelineStageHandler<void, ShadowSceneLight*, NiNode* /*Receiver*/>		UpdateShadowReceiver_UpdateLightingProperty;
@@ -286,6 +288,8 @@ namespace ShadowPipeline
 		bool			Handler_LightProjection_CheckActiveLights(ShadowSceneLight* SSL, int ActiveLights);
 		bool			Handler_LightProjection_CheckDirectionalSource(ShadowSceneLight* SSL);
 		void			Handler_LightProjection_End(ShadowSceneLight* SSL);
+
+		void			Handler_LightLOD_Wrapper(ShadowSceneLight* SSL, void* CullProc);
 
 		void			Handler_UpdateShadowReceiver_World(ShadowSceneLight* SSL, NiNode* Scenegraph);
 		bool			Handler_UpdateShadowReceiver_Self(ShadowSceneLight* SSL);

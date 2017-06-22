@@ -519,7 +519,7 @@ namespace Utilities
 				for (NiTPointerList<ShadowSceneLight>::Node* Itr = LightingProperty->lights.start; Itr; Itr = Itr->next)
 				{
 					ShadowSceneLight* Current = Itr->data;
-					if (Current && Current->unk118 != 0xFF)
+					if (Current && Current->lightState != 0xFF)
 					{
 						if (Param == kParam_Both ||
 							(Param == kParam_NonShadowCasters && Current->unkF4 == 0) ||
@@ -601,6 +601,74 @@ namespace Utilities
 		}
 
 		return false;
+	}
+
+	void UpdateCellNodeNames(TESObjectCELL* Cell)
+	{
+		SME_ASSERT(Cell && Cell->niNode);
+
+		auto CellNode = Cell->niNode;
+		if (CellNode->m_pcName == nullptr)
+		{
+			if (Cell->IsInterior())
+				Utilities::SetNiObjectName(CellNode, "%s", Cell->GetFullName()->name.m_data);
+			else
+			{
+				Utilities::SetNiObjectName(CellNode, "%s (%d,%d)",
+										   Cell->GetFullName()->name.m_data ? Cell->GetFullName()->name.m_data : "Wilderness",
+										   Cell->coords->x,
+										   Cell->coords->y);
+			}
+
+			for (int i = 0; i < CellNode->m_children.numObjs; i++)
+			{
+				auto Child = (NiNode*)CellNode->m_children.data[i];
+				switch (i)
+				{
+				case TESObjectCELL::kNodeChild_Actor:
+					Utilities::SetNiObjectName(Child, "Actor");
+					break;
+				case TESObjectCELL::kNodeChild_Marker:
+					Utilities::SetNiObjectName(Child, "Marker");
+					break;
+				case TESObjectCELL::kNodeChild_Quad0:
+					Utilities::SetNiObjectName(Child, "Quad 1");
+					break;
+				case TESObjectCELL::kNodeChild_Quad1:
+					Utilities::SetNiObjectName(Child, "Quad 2");
+					break;
+				case TESObjectCELL::kNodeChild_Quad2:
+					Utilities::SetNiObjectName(Child, "Quad 3");
+					break;
+				case TESObjectCELL::kNodeChild_Quad3:
+					Utilities::SetNiObjectName(Child, "Quad 4");
+					break;
+				}
+
+				if (i > TESObjectCELL::kNodeChild_Marker)
+				{
+					for (int j = 0; j < Child->m_children.numObjs; j++)
+					{
+						auto QuadChild = (NiNode*)Child->m_children.data[j];
+						switch (j)
+						{
+						case TESObjectCELL::kQuadSubnode_Land:
+							Utilities::SetNiObjectName(QuadChild, "Land");
+							break;
+						case TESObjectCELL::kQuadSubnode_Water:
+							Utilities::SetNiObjectName(QuadChild, "Water");
+							break;
+						case TESObjectCELL::kQuadSubnode_StaticObject:
+							Utilities::SetNiObjectName(QuadChild, "Static Object");
+							break;
+						case TESObjectCELL::kQuadSubnode_ActiveObject:
+							Utilities::SetNiObjectName(QuadChild, "Active Object");
+							break;
+						}
+					}
+				}
+			}
+		}
 	}
 
 	void SetNiObjectName(NiObjectNET* Source, const char* Format, ...)

@@ -28,6 +28,7 @@ namespace Hooks
 	_DefineHookHdlr(SwapLightProjectionStageConstants, 0x004078FA);
 	_DefineHookHdlr(SwapShadowMapRenderStageConstants, 0x007D59D2);
 	_DefinePatchHdlr(FixSSLLightSpaceProjectionStack, 0x007D2E85 + 1);
+	_DefineHookHdlr(ShadowSceneLightPerformLOD, 0x0040790D);
 
 	void __stdcall QueueShadowOccluders(UInt32 MaxShadowCount)
 	{
@@ -428,6 +429,24 @@ namespace Hooks
 		}
 	}
 
+	void __stdcall HandleShadowLightLODStage(ShadowSceneLight* Source, NiCullingProcess* Proc)
+	{
+		ShadowPipeline::PipelineStages::Instance.LightLOD_Wrapper.Handle(Source, Proc);
+	}
+
+	#define _hhName	ShadowSceneLightPerformLOD
+	_hhBegin()
+	{
+		_hhSetVar(Retn, 0x00407912);
+		__asm
+		{
+			push	ecx
+			call	HandleShadowLightLODStage
+
+			jmp		_hhGetVar(Retn)
+		}
+	}
+
 	namespace EditorSupport
 	{
 		_DefineHookHdlr(EnableCastsShadowsFlag, 0x005498DD);
@@ -680,6 +699,7 @@ namespace Hooks
 		_MemHdlr(SwapLightProjectionStageConstants).WriteJump();
 		_MemHdlr(FixSSLLightSpaceProjectionStack).WriteUInt16(0x4);
 		_MemHdlr(SwapShadowMapRenderStageConstants).WriteJump();
+		_MemHdlr(ShadowSceneLightPerformLOD).WriteJump();
 
 		for (int i = 0; i < 5; i++)
 		{
