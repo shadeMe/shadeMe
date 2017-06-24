@@ -1030,7 +1030,7 @@ namespace ShadowPipeline
 			if (Object->niNode && Object->refID != 0x14)
 			{
 				auto xData = ShadowExtraData::Get(Object->niNode);
-				if (xData)
+				if (xData && xData->IsInitialized())
 				{
 					auto FadeNode = xData->GetRef()->Node;
 					if (FadeNode->m_kWorldBound.radius > 0.f)
@@ -1092,7 +1092,13 @@ namespace ShadowPipeline
 				{
 					auto xData = ShadowExtraData::Get(RefNode);
 					SME_ASSERT(xData);
-					SME_ASSERT(xData->GetRef()->Flags.IsClustered() == false);
+
+					if (xData->GetRef()->Flags.IsClustered())
+					{
+						// this can happen if the ref was clustered, the parent cell's node was regenerated and the ref was readded to the new cell node
+						// reset the flag and continue
+						xData->GetRef()->Flags.Set(ShadowExtraData::ReferenceFlags::kClustered, false);
+					}
 
 					auto Ref = xData->GetRef()->Form;
 					if (Ref->parentCell && Ref->niNode &&
@@ -1124,7 +1130,8 @@ namespace ShadowPipeline
 
 								// cluster the smallest items first
 				auto Pivot = AuxAccum->at(AuxAccum->size() - 1);
-				SME_ASSERT(ShadowExtraData::Get(Pivot->niNode)->GetRef()->Flags.IsClustered() == false);
+				auto PivotData = ShadowExtraData::Get(Pivot->niNode);
+				SME_ASSERT(PivotData->GetRef()->Flags.IsClustered() == false);
 
 				auto Closest(std::make_unique<std::vector<Utilities::TESObjectREFCoverTreePoint>>());
 				NeighbourAccum->kNearestNeighbors(Pivot, ClusterableRefs - 1, *Closest);
@@ -1137,6 +1144,29 @@ namespace ShadowPipeline
 				ClusterData->GetCluster()->Quad = i;
 				Utilities::AddNiExtraData(ClusterNode(), ClusterData);
 				Utilities::SetNiObjectName(ClusterNode(), "Cluster %d", j + 1);
+
+				auto AddToCluster = [&AuxAccum, &ValidNeighbours](auto ClusterXData, auto AddendXData) {
+					ValidNeighbours++;
+
+					// marks as clustered and add to the cluster node
+					AddendXData->GetRef()->Flags.Set(ShadowExtraData::ReferenceFlags::kClustered, true);
+
+					auto AddendNode = AddendXData->GetRef()->Node;
+					auto ClusterNode = ClusterXData->GetParentNode();
+					auto Addend = AddendXData->GetRef()->Form;
+
+					Utilities::AddNiNodeChild(ClusterNode, AddendNode);
+					Utilities::UpdateAVObject(AddendNode);
+					Utilities::InitializePropertyState(AddendNode);
+					Utilities::UpdateDynamicEffectState(AddendNode);
+
+					// remove from the aux accum
+					auto AuxAccumItr = std::find(AuxAccum->begin(), AuxAccum->end(), Addend);
+					SME_ASSERT(AuxAccumItr != AuxAccum->end());
+					AuxAccum->erase(AuxAccumItr);
+
+					ClusterXData->GetCluster()->Center += (Vector3&)Addend->posX;
+				};
 
 				for (const auto& Point : *Closest)
 				{
@@ -1151,31 +1181,23 @@ namespace ShadowPipeline
 					if (NeighbourXData->GetRef()->Flags.IsClustered() == false)
 					{
 						if (Utilities::GetDistance(Pivot, Potential) < Settings::kClusteringMaxDistance().f)
-						{
-							ValidNeighbours++;
-							// marks as clustered and add to the cluster node
-							NeighbourXData->GetRef()->Flags.Set(ShadowExtraData::ReferenceFlags::kClustered, true);
-							Utilities::AddNiNodeChild(ClusterNode(), Potential->niNode);
-							Utilities::InitializePropertyState(Potential->niNode);
-							Utilities::UpdateDynamicEffectState(Potential->niNode);
-
-							// remove from the aux accum
-							auto AuxAccumItr = std::find(AuxAccum->begin(), AuxAccum->end(), Potential);
-							SME_ASSERT(AuxAccumItr != AuxAccum->end());
-							AuxAccum->erase(AuxAccumItr);
-
-							ClusterData->GetCluster()->Center += (Vector3&)Point()->posX;
-						}
+							AddToCluster(ClusterData, NeighbourXData);
 					}
 				}
+
+				// add the pivot
+				if (ValidNeighbours)
+					AddToCluster(ClusterData, PivotData);
 
 				SME_ASSERT(ValidNeighbours == ClusterNode()->m_children.numObjs);
 				if (ValidNeighbours)
 				{
-					// add to the quad's static root
+					// add the cluster to the quad's static root
 					Utilities::AddNiNodeChild(StaticNode, ClusterNode());
+					Utilities::UpdateAVObject(ClusterNode());
 					Utilities::InitializePropertyState(ClusterNode());
 					Utilities::UpdateDynamicEffectState(ClusterNode());
+					Utilities::UpdateAVObject(StaticNode);
 
 					ClusterData->GetCluster()->Center.Scale(1 / (float)ValidNeighbours);
 					ClusterNode()->m_worldTranslate = ClusterData->GetCluster()->Center;
@@ -1585,7 +1607,30 @@ namespace ShadowPipeline
 		}
 
 		ShadowMapRenderSource = SSL;
+		auto xData = ShadowExtraData::Get(SSL->sourceNode);
+		if (xData->IsCluster())
+		{
+			xData->GetCluster()->Node->m_worldTranslate = xData->GetCluster()->Center;
+
+			Utilities::UpdateAVObject(xData->GetParentNode());
+			Utilities::UpdateAVObject(xData->GetParentNode()->m_parent);
+
+			xData->GetCluster()->Node->m_worldTranslate = xData->GetCluster()->Center;
+		}
+
 		thisCall<void>(0x007D46C0, SSL, Throwaway);
+
+
+		if (xData->IsCluster())
+		{
+			ZeroMemory(&xData->GetCluster()->Node->m_localTranslate, sizeof(NiVector3));
+			ZeroMemory(&xData->GetCluster()->Node->m_worldTranslate, sizeof(NiVector3));
+
+			Utilities::UpdateAVObject(xData->GetParentNode());
+			Utilities::UpdateAVObject(xData->GetParentNode()->m_parent);
+
+			xData->GetCluster()->Node->m_worldTranslate = xData->GetCluster()->Center;
+		}
 		ShadowMapRenderSource = nullptr;
 	}
 
@@ -1601,12 +1646,6 @@ namespace ShadowPipeline
 			BackfaceCullingEnabled = true;
 			ToggleBackfaceCulling(true);
 		}
-
-		if (xData->IsCluster())
-		{
-			xData->GetCluster()->Node->m_localTranslate = xData->GetCluster()->Center;
-			xData->GetCluster()->Node->m_worldTranslate = xData->GetCluster()->Center;
-		}
 	}
 
 	void Renderer::Handler_ShadowMapRender_End(void*)
@@ -1619,9 +1658,9 @@ namespace ShadowPipeline
 			ToggleBackfaceCulling(false);
 		}
 
+		auto xData = ShadowExtraData::Get(ShadowMapRenderSource->sourceNode);
 		if (Settings::kEnableDebugShader().i)
 		{
-			auto xData = ShadowExtraData::Get(ShadowMapRenderSource->sourceNode);
 			auto DebugSel = ShadowDebugger::GetDebugSelection();
 			if (DebugSel == nullptr || (xData->IsReference() && xData->GetRef()->Form == DebugSel))
 				ShadowMapRenderSource->showDebug = 1;

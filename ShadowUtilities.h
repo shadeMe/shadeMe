@@ -171,7 +171,7 @@ namespace Utilities
 	BSFadeNode*			GetPlayerNode(bool FirstPerson = false);
 	UInt8				GetWeatherClassification(TESWeather* Weather);
 	void				AddNiExtraData(NiAVObject* Object, NiExtraData* xData);
-	void				AddNiNodeChild(NiNode* To, NiAVObject* Child, bool Update = true);
+	void				AddNiNodeChild(NiNode* To, NiAVObject* Child);
 	void				UpdateAVObject(NiAVObject* Object);
 	void				InitializePropertyState(NiAVObject* Object);
 	void				UpdateDynamicEffectState(NiNode* Object);

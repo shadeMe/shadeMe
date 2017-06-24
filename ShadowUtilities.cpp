@@ -610,16 +610,6 @@ namespace Utilities
 		auto CellNode = Cell->niNode;
 		if (CellNode->m_pcName == nullptr)
 		{
-			if (Cell->IsInterior())
-				Utilities::SetNiObjectName(CellNode, "%s", Cell->GetFullName()->name.m_data);
-			else
-			{
-				Utilities::SetNiObjectName(CellNode, "%s (%d,%d)",
-										   Cell->GetFullName()->name.m_data ? Cell->GetFullName()->name.m_data : "Wilderness",
-										   Cell->coords->x,
-										   Cell->coords->y);
-			}
-
 			for (int i = 0; i < CellNode->m_children.numObjs; i++)
 			{
 				auto Child = (NiNode*)CellNode->m_children.data[i];
@@ -668,6 +658,18 @@ namespace Utilities
 					}
 				}
 			}
+
+			if (Cell->IsInterior())
+				Utilities::SetNiObjectName(CellNode, "%s", Cell->GetFullName()->name.m_data);
+			else
+			{
+				auto xData = ShadowExtraData::Get(CellNode);
+				Utilities::SetNiObjectName(CellNode, "%s (%d,%d) %s",
+										   Cell->GetFullName()->name.m_data ? Cell->GetFullName()->name.m_data : "Wilderness",
+										   Cell->coords->x,
+										   Cell->coords->y,
+										   xData && xData->GetCell()->Clusters.empty() == false ? "[C]" : "");
+			}
 		}
 	}
 
@@ -712,11 +714,9 @@ namespace Utilities
 		thisCall<void>(0x006FF8A0, Object, xData);
 	}
 
-	void AddNiNodeChild(NiNode* To, NiAVObject* Child, bool Update)
+	void AddNiNodeChild(NiNode* To, NiAVObject* Child)
 	{
 		thisVirtualCall<void>(0x84, To, Child);
-		if (Update)
-			UpdateAVObject(To);
 	}
 
 	void UpdateAVObject(NiAVObject* Object)
