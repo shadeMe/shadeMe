@@ -108,7 +108,7 @@ namespace ShadowPipeline
 		PipelineStageHandler<void, ShadowSceneLight*, NiNode* /*Receiver*/>		UpdateShadowReceiver_UpdateLightingProperty;
 
 		PipelineStageHandler<void, ShadowSceneLight*, void* /*Throwaway*/>		ShadowMapRender_Wrapper;
-		PipelineStageHandler<void, void*>										ShadowMapRender_Begin;
+		PipelineStageHandler<void, NiCamera* /*Camera*/>						ShadowMapRender_Begin;
 		PipelineStageHandler<void, void*>										ShadowMapRender_End;
 
 		PipelineStageHandler<void, void*>										ShadowPass_End;
@@ -265,6 +265,7 @@ namespace ShadowPipeline
 			void		EnumerateCellCasters(TESObjectCELL* Cell);
 
 			void		DoClustering(ShadowExtraData* CellData) const;
+			void		DoCellStaticAggregation(ShadowExtraData* CellData) const;
 		public:
 			RenderProcess(ShadowSceneNode* Root);
 
@@ -296,7 +297,7 @@ namespace ShadowPipeline
 		void			Handler_UpdateShadowReceiver_UpdateLightingProperty(ShadowSceneLight* SSL, NiNode* Receiver);
 
 		void			Handler_ShadowMapRender_Wrapper(ShadowSceneLight* SSL, void* Throwaway);
-		void			Handler_ShadowMapRender_Begin(void*);
+		void			Handler_ShadowMapRender_Begin(NiCamera* Camera);
 		void			Handler_ShadowMapRender_End(void*);
 
 		void			Handler_ShadowPass_End(void*);
@@ -305,13 +306,7 @@ namespace ShadowPipeline
 
 		struct Constants
 		{
-			RenderConstant SRC_A30068;
-			RenderConstant SRC_B258E8;
-			RenderConstant SRC_B258EC;
-			RenderConstant SRC_B258F0;
-			RenderConstant SRC_A91278;
 			RenderConstant SRC_A91280;
-			RenderConstant SRC_A2FAA0;
 			RenderConstant SRC_A6BEA0;
 			RenderConstant SMRC_A31C70;
 			RenderConstant SMRC_A3B1B8;
@@ -327,7 +322,7 @@ namespace ShadowPipeline
 		Constants						ShadowConstants;
 		ShadowLightListT				LightProjectionUpdateQueue;
 
-		bool							BackfaceCullingEnabled;
+		bool							BackfaceRenderingEnabled;
 		bool							ShadowPassInProgress;
 		ShadowSceneLight*				ShadowMapRenderSource;
 

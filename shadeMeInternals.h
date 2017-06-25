@@ -60,12 +60,9 @@ namespace Settings
 	extern SME::INI::INISetting				kCasterMaxDistance;
 	extern SME::INI::INISetting				kEnableDebugShader;
 	extern SME::INI::INISetting				kEnableDetailedDebugSelection;
-	extern SME::INI::INISetting				kNoInteriorSunShadows;
-	extern SME::INI::INISetting				kActorsReceiveAllShadows;
 	extern SME::INI::INISetting				kNightTimeMoonShadows;
 
 	extern SME::INI::INISetting				kLargeObjectExcludedPath;
-	extern SME::INI::INISetting				kLargeObjectSunShadowsOnly;
 
 	extern SME::INI::INISetting				kRenderBackfacesIncludePath;
 
@@ -76,13 +73,10 @@ namespace Settings
 	extern SME::INI::INISetting				kMainExcludedPathExterior;
 
 	extern SME::INI::INISetting				kLightLOSCheckInterior;
-	extern SME::INI::INISetting				kLightLOSCheckExterior;
-	extern SME::INI::INISetting				kLightLOSSkipLargeObjects;
 	extern SME::INI::INISetting				kLightLOSExcludedPath;
 	extern SME::INI::INISetting				kLightLOSSkipActors;
 
 	extern SME::INI::INISetting				kPlayerLOSCheckInterior;
-	extern SME::INI::INISetting				kPlayerLOSCheckExterior;
 	extern SME::INI::INISetting				kPlayerLOSCheckHighAccuracy;
 	extern SME::INI::INISetting				kPlayerLOSCheckThresholdDist;
 
@@ -139,14 +133,10 @@ namespace Settings
 	extern SME::INI::INISetting				kMaxCountMiscItem;			// includes keys
 	extern SME::INI::INISetting				kMaxCountAlchemyItem;
 	extern SME::INI::INISetting				kMaxCountEquipment;			// includes armor, weapon, clothing, ammo
-	extern SME::INI::INISetting				kMaxCountClusters;
 
 	extern SME::INI::INISetting				kClusteringEnable;
 	extern SME::INI::INISetting				kClusteringExcludePath;
-	extern SME::INI::INISetting				kClusteringMaxBoundRadius;
-	extern SME::INI::INISetting				kClusteringMaxDistance;
-
-
+	extern SME::INI::INISetting				kClusteringAllowIndividualShadows;
 }
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;

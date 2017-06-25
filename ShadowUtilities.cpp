@@ -610,7 +610,7 @@ namespace Utilities
 		auto CellNode = Cell->niNode;
 		if (CellNode->m_pcName == nullptr)
 		{
-			for (int i = 0; i < CellNode->m_children.numObjs; i++)
+			for (int i = 0; i < CellNode->m_children.numObjs && i < TESObjectCELL::kNodeChild__MAX; i++)
 			{
 				auto Child = (NiNode*)CellNode->m_children.data[i];
 				switch (i)

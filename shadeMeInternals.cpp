@@ -22,13 +22,9 @@ namespace Settings
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
 	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General",
 													"Toggle the expanded console debug selection description", (SInt32)1);
-	SME::INI::INISetting			kNoInteriorSunShadows("ValidateInteriorLightSources", "Shadows::General", "Prevents arbitrary sun shadows", (SInt32)1);
-	SME::INI::INISetting			kActorsReceiveAllShadows("ActorsReceiveAllShadows", "Shadows::General", "Actors are valid shadow receivers", (SInt32)1);
 	SME::INI::INISetting			kNightTimeMoonShadows("NightTimeMoonShadows", "Shadows::General", "Moons are shadow casting lights", (SInt32)0);
 
 	SME::INI::INISetting			kLargeObjectExcludedPath("ExcludePaths", "Shadows::LargeObjects", "Large object blacklist", "rocks\\");
-	SME::INI::INISetting			kLargeObjectSunShadowsOnly("OnlyCastSunShadows", "Shadows::LargeObjects",
-															"Large objects will not react to small light sources", (SInt32)1);
 
 	SME::INI::INISetting			kRenderBackfacesIncludePath("IncludePaths", "Shadows::BackfaceRendering", "Backface rendering whitelist", "");
 
@@ -43,13 +39,10 @@ namespace Settings
 													"");
 
 	SME::INI::INISetting			kLightLOSCheckInterior("Interior", "Shadows::LightLOSCheck", "Check source light LOS with caster", (SInt32)1);
-	SME::INI::INISetting			kLightLOSCheckExterior("Exterior", "Shadows::LightLOSCheck", "Check source light with caster", (SInt32)1);
-	SME::INI::INISetting			kLightLOSSkipLargeObjects("SkipLargeObjects", "Shadows::LightLOSCheck", "Don't perform checks on large objects", (SInt32)1);
 	SME::INI::INISetting			kLightLOSExcludedPath("ExcludePaths", "Shadows::LightLOSCheck", "Light LOS blacklist", "");
 	SME::INI::INISetting			kLightLOSSkipActors("SkipActors", "Shadows::LightLOSCheck", "Don't perform checks on actors", (SInt32)0);
 
 	SME::INI::INISetting			kPlayerLOSCheckInterior("Interior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
-	SME::INI::INISetting			kPlayerLOSCheckExterior("Exterior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kPlayerLOSCheckHighAccuracy("HighAccuracy", "Shadows::PlayerLOSCheck", "Remove the Z-delta constraint from the check", (SInt32)0);
 	SME::INI::INISetting			kPlayerLOSCheckThresholdDist("ThresholdDistance", "Shadows::PlayerLOSCheck", "", (float)200.f);
 
@@ -112,12 +105,10 @@ namespace Settings
 	SME::INI::INISetting			kMaxCountMiscItem("MiscItem", "Shadows::MaxCount", "", (SInt32)-1);
 	SME::INI::INISetting			kMaxCountAlchemyItem("AlchemyItem", "Shadows::MaxCount", "", (SInt32)5);
 	SME::INI::INISetting			kMaxCountEquipment("Equipment", "Shadows::MaxCount", "", (SInt32)-1);
-	SME::INI::INISetting			kMaxCountClusters("Clusters", "Shadows::MaxCount", "", (SInt32)-1);
 
 	SME::INI::INISetting			kClusteringEnable("Enable", "Shadows::Clustering", "", (SInt32)1);
 	SME::INI::INISetting			kClusteringExcludePath("ExcludePaths", "Shadows::Clustering", "Blacklist", "");
-	SME::INI::INISetting			kClusteringMaxBoundRadius("MaxBoundRadius", "Shadows::Clustering", "", 5000.f);
-	SME::INI::INISetting			kClusteringMaxDistance("MaxDistance", "Shadows::Clustering", "", 1024.f);
+	SME::INI::INISetting			kClusteringAllowIndividualShadows("AllowIndividualShadows", "Shadows::Clustering", "", (SInt32)1);
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -128,12 +119,9 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kCasterMaxDistance);
 	RegisterSetting(&Settings::kEnableDebugShader);
 	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
-	RegisterSetting(&Settings::kNoInteriorSunShadows);
-	RegisterSetting(&Settings::kActorsReceiveAllShadows);
 	RegisterSetting(&Settings::kNightTimeMoonShadows);
 
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
-	RegisterSetting(&Settings::kLargeObjectSunShadowsOnly);
 
 	RegisterSetting(&Settings::kRenderBackfacesIncludePath);
 
@@ -144,13 +132,10 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMainExcludedPathExterior);
 
 	RegisterSetting(&Settings::kLightLOSCheckInterior);
-	RegisterSetting(&Settings::kLightLOSCheckExterior);
-	RegisterSetting(&Settings::kLightLOSSkipLargeObjects);
 	RegisterSetting(&Settings::kLightLOSExcludedPath);
 	RegisterSetting(&Settings::kLightLOSSkipActors);
 
 	RegisterSetting(&Settings::kPlayerLOSCheckInterior);
-	RegisterSetting(&Settings::kPlayerLOSCheckExterior);
 	RegisterSetting(&Settings::kPlayerLOSCheckHighAccuracy);
 	RegisterSetting(&Settings::kPlayerLOSCheckThresholdDist);
 
@@ -207,13 +192,10 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMaxCountMiscItem);
 	RegisterSetting(&Settings::kMaxCountAlchemyItem);
 	RegisterSetting(&Settings::kMaxCountEquipment);
-	RegisterSetting(&Settings::kMaxCountClusters);
 
 	RegisterSetting(&Settings::kClusteringEnable);
 	RegisterSetting(&Settings::kClusteringExcludePath);
-	RegisterSetting(&Settings::kClusteringMaxBoundRadius);
-	RegisterSetting(&Settings::kClusteringMaxDistance);
-
+	RegisterSetting(&Settings::kClusteringAllowIndividualShadows);
 
 	Save();
 }

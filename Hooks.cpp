@@ -142,9 +142,9 @@ namespace Hooks
 		}
 	}
 
-	void __stdcall HandleShadowMapRenderingProlog(NiNode* Node)
+	void __stdcall HandleShadowMapRenderingProlog(NiNode* Node, NiCamera* Camera)
 	{
-		ShadowPipeline::PipelineStages::Instance.ShadowMapRender_Begin.Handle(nullptr);
+		ShadowPipeline::PipelineStages::Instance.ShadowMapRender_Begin.Handle(Camera);
 	}
 
 	void __stdcall HandleShadowMapRenderingEpilog(NiNode* Node)
@@ -160,6 +160,7 @@ namespace Hooks
 		__asm
 		{
 			pushad
+			push	ebx
 			push	edi
 			call	HandleShadowMapRenderingProlog
 			popad
