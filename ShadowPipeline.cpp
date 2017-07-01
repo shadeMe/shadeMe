@@ -95,14 +95,16 @@ namespace ShadowPipeline
 	{
 		_MESSAGE("Saving shadow render constants to %s...", kINIPath);
 
-		char IntBuffer[0x200] = { 0 }, ExtBuffer[0x200] = { 0 };
+		char IntBuffer[0x200] = { 0 }, ExtBuffer[0x200] = { 0 }, ClustBuffer[0x200] = { 0 };
 		for (const auto& Itr : DataStore)
 		{
 			FORMAT_STR(IntBuffer, "%f", (float)Itr.second.Interior);
 			FORMAT_STR(ExtBuffer, "%f", (float)Itr.second.Exterior);
+			FORMAT_STR(ClustBuffer, "%f", (float)Itr.second.Cluster);
 
 			WritePrivateProfileStringA("Interior", Itr.first->Name.c_str(), IntBuffer, kINIPath);
 			WritePrivateProfileStringA("Exterior", Itr.first->Name.c_str(), ExtBuffer, kINIPath);
+			WritePrivateProfileStringA("Cluster", Itr.first->Name.c_str(), ClustBuffer, kINIPath);
 		}
 	}
 
@@ -122,7 +124,7 @@ namespace ShadowPipeline
 	{
 		_MESSAGE("Loading shadow render constants from %s...", kINIPath);
 
-		char IntBuffer[0x200] = { 0 }, ExtBuffer[0x200] = { 0 };
+		char IntBuffer[0x200] = { 0 }, ExtBuffer[0x200] = { 0 }, ClustBuffer[0x200] = { 0 };
 		char Default[0x100] = { 0 };
 
 		for (auto& Itr : DataStore)
@@ -134,6 +136,10 @@ namespace ShadowPipeline
 			FORMAT_STR(Default, "%f", (float)Itr.second.Exterior);
 			GetPrivateProfileStringA("Exterior", Itr.first->Name.c_str(), Default, ExtBuffer, sizeof(ExtBuffer), kINIPath);
 			Itr.second.Exterior = atof(ExtBuffer);
+
+			FORMAT_STR(Default, "%f", (float)Itr.second.Cluster);
+			GetPrivateProfileStringA("Cluster", Itr.first->Name.c_str(), Default, ClustBuffer, sizeof(ClustBuffer), kINIPath);
+			Itr.second.Cluster = atof(ClustBuffer);
 		}
 	}
 
@@ -158,6 +164,20 @@ namespace ShadowPipeline
 	{
 		if (DataStore.count(Constant))
 			DataStore[Constant].Exterior = Val;
+	}
+
+	void RenderConstantManager::SetClusterValue(RenderConstant* Constant, double Val)
+	{
+		if (DataStore.count(Constant))
+			DataStore[Constant].Cluster = Val;
+	}
+
+	float RenderConstantManager::GetClusterValue(RenderConstant* Constant) const
+	{
+		if (DataStore.count(Constant))
+			return DataStore.at(Constant).Cluster;
+		else
+			return NAN;
 	}
 
 	void RenderConstantManager::RegisterConstant(RenderConstant* Constant)
@@ -225,6 +245,13 @@ namespace ShadowPipeline
 		Manager.SetExteriorValue(&SRC_A6BEA0, 16384);
 		Manager.SetExteriorValue(&SMRC_A38618, 30);
 		Manager.SetInteriorValue(&SMRC_A38618, 30);
+
+		Manager.SetClusterValue(&SRC_A91280, 100);
+		Manager.SetClusterValue(&SRC_A6BEA0, 16000);
+		Manager.SetClusterValue(&SMRC_A31C70, 1);
+		Manager.SetClusterValue(&SMRC_A3B1B8, 2048);
+		Manager.SetClusterValue(&SMRC_A38618, 30);
+		Manager.SetClusterValue(&SMRC_A3F3A0, 8);
 	}
 
 	PipelineStages					PipelineStages::Instance;
@@ -253,7 +280,7 @@ namespace ShadowPipeline
 
 	void ShadowMapTexturePool::SetShadowMapResolution(UInt16 Resolution) const
 	{
-		SME_ASSERT(Resolution <= 2048);
+		SME_ASSERT(Resolution <= kMaxResolution);
 
 		UInt16* ResolutionPtr = (UInt16*)0x00B2C67C;
 		*ResolutionPtr = Resolution;
@@ -287,21 +314,16 @@ namespace ShadowPipeline
 		UInt16 Tier1Res = Settings::kDynMapResolutionTier1().i;
 		UInt16 Tier2Res = Settings::kDynMapResolutionTier2().i;
 		UInt16 Tier3Res = Settings::kDynMapResolutionTier3().i;
-
-		if (Tier3Res < 128)
-			Tier3Res = 128;
-
-		if (Tier1Res > 2048)
-			Tier1Res = 2048;
-
-		SME_ASSERT(Tier1Res && Tier2Res && Tier3Res);
+		UInt16 ClusterRes = Settings::kDynMapResolutionClusters().i;
 
 		Create();
 		PoolResolution[kPool_Tier1] = Tier1Res;
 		PoolResolution[kPool_Tier2] = Tier2Res;
 		PoolResolution[kPool_Tier3] = Tier3Res;
+		PoolResolution[kPool_Clusters] = ClusterRes;
 
-		_MESSAGE("Shadow Map Tiers => %d > %d > %d", Tier1Res, Tier2Res, Tier3Res);
+		for (auto& Itr : PoolResolution)
+			Itr = std::max(128, std::min(Itr, kMaxResolution));
 	}
 
 	void ShadowMapTexturePool::HandleShadowPass(NiDX9Renderer* Renderer, UInt32 MaxShadowCount) const
@@ -322,7 +344,7 @@ namespace ShadowPipeline
 
 		BSTextureManager* Manager = nullptr;
 		if (xData->IsCluster())
-			Manager = TexturePool[kPool_Tier1];		// highest pool for clusters
+			Manager = TexturePool[kPool_Clusters];
 		else
 		{
 			auto Object = xData->D->Reference->Form;
@@ -335,7 +357,7 @@ namespace ShadowPipeline
 
 			if (Settings::kDynMapEnableDistance().i)
 			{
-				if (Distance > 0 && Distance < Settings::kDynMapDistanceNear().f)
+				if (Distance >= 0 && Distance < Settings::kDynMapDistanceNear().f)
 					DistancePool = kPool_Tier1;
 				else if (Distance > Settings::kDynMapDistanceNear().f && Distance < Settings::kDynMapDistanceFar().f)
 					DistancePool = kPool_Tier2;
@@ -345,9 +367,7 @@ namespace ShadowPipeline
 
 			if (Settings::kDynMapEnableBoundRadius().i)
 			{
-				if (Object && Object->IsActor())
-					BoundPool = kPool_Tier1;			// actors get off easy
-				else if (Bound < Settings::kObjectTier3BoundRadius().f)
+				if (Bound < Settings::kObjectTier3BoundRadius().f)
 					BoundPool = kPool_Tier3;
 				else if (Bound < Settings::kObjectTier4BoundRadius().f)
 					BoundPool = kPool_Tier2;
@@ -826,7 +846,9 @@ namespace ShadowPipeline
 
 	UInt32* Renderer::CasterCountTable::GetCurrentCount(Caster* Caster)
 	{
-		switch (Caster->GetRef()->baseForm->typeID)
+		if (Caster->IsCluster())
+			return nullptr;
+		else switch (Caster->GetRef()->baseForm->typeID)
 		{
 		case kFormType_NPC:
 		case kFormType_Creature:
@@ -850,13 +872,15 @@ namespace ShadowPipeline
 		case kFormType_Weapon:
 			return &Current[kMaxShadows_Equipment];
 		default:
-			return NULL;
+			return nullptr;
 		}
 	}
 
 	SInt32 Renderer::CasterCountTable::GetMaxCount(Caster* Caster) const
 	{
-		switch (Caster->GetRef()->baseForm->typeID)
+		if (Caster->IsCluster())
+			return -1;
+		else switch (Caster->GetRef()->baseForm->typeID)
 		{
 		case kFormType_NPC:
 		case kFormType_Creature:
@@ -898,7 +922,7 @@ namespace ShadowPipeline
 		SME_ASSERT(Caster);
 
 		if (Caster->IsCluster())
-			return GetSceneSaturated();
+			return !GetSceneSaturated();
 
 		UInt32* CurrentCount = GetCurrentCount(Caster);
 		SInt32 MaxCount = GetMaxCount(Caster);
@@ -1010,7 +1034,7 @@ namespace ShadowPipeline
 		for (auto Itr = &Cell->objectList; Itr && Itr->refr; Itr = Itr->next)
 		{
 			TESObjectREFR* Object = Itr->refr;
-			if (Object->niNode && Object->refID != 0x14)
+			if (Object->niNode && Object->parentCell && Object->refID != 0x14)
 			{
 				auto xData = ShadowExtraData::Get(Object->niNode);
 				if (xData && xData->IsInitialized())
@@ -1026,11 +1050,11 @@ namespace ShadowPipeline
 								if (xData->GetRef()->Flags.IsClustered() == false || Settings::kClusteringAllowIndividualShadows().i)
 								{
 									Caster NewCaster(FadeNode);
-									if (NewCaster.GetDistanceFromPlayer() < Settsings::kCasterMaxDistance().f)
+									if (NewCaster.GetDistanceFromPlayer() < Settings::kCasterMaxDistance().f)
 									{
 										if (ShadowDebugger::GetExclusiveCaster() == nullptr || Object == ShadowDebugger::GetExclusiveCaster())
 										{
-											ValidCasters.push_back(NewCaster);
+								//			ValidCasters.push_back(NewCaster);
 											SHADOW_DEBUG(xData, "Added to Scene Caster List");
 										}
 										else SHADOW_DEBUG(xData, "Failed Exclusive Caster check");
@@ -1206,8 +1230,8 @@ namespace ShadowPipeline
 		auto CellNode = CellData->GetCell()->Node;
 
 		// create and init cluster node if needed
-		bool HasAggregateNode = CellNode->m_children.numObjs > TESObjectCELL::kNodeChild__MAX;
-		Utilities::NiSmartPtr<NiNode> ClusterNode(HasAggregateNode ? (NiNode*)CellNode->m_children.data[TESObjectCELL::kNodeChild__MAX] : Utilities::CreateNiNode());
+		bool HasAggregateNode = CellData->GetCell()->Flags.HasStaticAggregate();
+		Utilities::NiSmartPtr<NiNode> ClusterNode(HasAggregateNode ? CellData->GetCell()->Clusters.at(0) : Utilities::CreateNiNode());
 
 		auto ClusterData = HasAggregateNode ? ShadowExtraData::Get(ClusterNode()) : ShadowExtraData::Create();
 		int ClusteredRefs = 0, No3Ds = 0;
@@ -1217,7 +1241,29 @@ namespace ShadowPipeline
 			ClusterData->GetCluster()->Quad = 0;
 			Utilities::AddNiExtraData(ClusterNode(), ClusterData);
 			Utilities::SetNiObjectName(ClusterNode(), "Cell Static Aggregate");
+
+			if (Settings::kClusteringClusterLandscape().i)
+			{
+				for (int i = TESObjectCELL::kNodeChild_Quad0; i <= TESObjectCELL::kNodeChild_Quad3; i++)
+				{
+					auto Quad = (NiNode*)CellNode->m_children.data[i];
+					auto LandNode = (NiNode*)Quad->m_children.data[TESObjectCELL::kQuadSubnode_Land];
+
+					for (int j = 0; j < LandNode->m_children.numObjs; j++)
+					{
+						auto QuadChild = (NiNode*)LandNode->m_children.data[j];
+
+						Utilities::AddNiNodeChild(ClusterNode(), QuadChild);
+						Utilities::UpdateAVObject(QuadChild);
+						Utilities::InitializePropertyState(QuadChild);
+						Utilities::UpdateDynamicEffectState(QuadChild);
+						ClusteredRefs++;
+					}
+				}
+			}
 		}
+		else
+			SME_ASSERT(ClusterData);
 
 		for (auto Itr = &CellData->GetCell()->Form->objectList; Itr && Itr->refr; Itr = Itr->next)
 		{
@@ -1230,6 +1276,9 @@ namespace ShadowPipeline
 				auto xData = ShadowExtraData::Get(Object->niNode);
 				if (xData && xData->IsInitialized())
 				{
+					if (Object->niNode->m_kWorldBound.radius < Settings::kObjectTier1BoundRadius().f)
+						continue;
+
 					switch (Object->baseForm->typeID)
 					{
 					case kFormType_Stat:
@@ -1272,6 +1321,7 @@ namespace ShadowPipeline
 			Utilities::UpdateAVObject(CellNode);
 
 			CellData->GetCell()->Clusters.push_back(ClusterNode());
+			CellData->GetCell()->Flags.Set(ShadowExtraData::CellFlags::kStaticAggregate, true);
 		}
 
 		static const int kMaxIterations = 30;
@@ -1309,7 +1359,7 @@ namespace ShadowPipeline
 		ShadowDebugger::Log("Executing ShadowSceneProc...");
 		gLog.Indent();
 		{
-	//		ProcessPlayerCharacter();
+			ProcessPlayerCharacter();
 
 			if (TES::GetSingleton()->currentInteriorCell)
 			{
@@ -1353,8 +1403,8 @@ namespace ShadowPipeline
 						return false;
 					else if (!LHSLO && !RHSLO)
 					{
-						bool LHSActor = LHS.GetRef()->IsActor();
-						bool RHSActor = RHS.GetRef()->IsActor();
+						bool LHSActor = LHS.GetRef()->baseForm->typeID == kFormType_NPC || LHS.GetRef()->baseForm->typeID == kFormType_Creature;
+						bool RHSActor = RHS.GetRef()->baseForm->typeID == kFormType_NPC || RHS.GetRef()->baseForm->typeID == kFormType_Creature;
 
 						if (LHSActor && !RHSActor)
 							return true;
@@ -1442,37 +1492,49 @@ namespace ShadowPipeline
 			{
 				RenderConstant::Swapper ProjDist(&ShadowConstants.SMRC_A38618);
 				RenderConstant::Swapper ExtendDist(&ShadowConstants.SMRC_A31C70);
+				RenderConstant::Swapper Resolution(&ShadowConstants.SMRC_A3B1B8);
+				RenderConstant::Swapper DepthMul(&ShadowConstants.SMRC_A3F3A0);
 
-				float Bound = Node->m_kWorldBound.radius;
-				float NewProjDistMul = 0.f;
-				float BaseRadius = Settings::kObjectTier2BoundRadius().f;
-				float MaxRadius = Settings::kObjectTier3BoundRadius().f;
-
-				float PerPart = (MaxRadius - BaseRadius) / 3.f;
-				float Part1 = BaseRadius + PerPart;
-				float Part2 = BaseRadius + PerPart * 2;
-				float Part3 = BaseRadius + PerPart * 3;
-
-				if (Bound < BaseRadius)
-					NewProjDistMul = 2.5f;
-				else if (Bound > BaseRadius && Bound < Part1)
-					NewProjDistMul = 2.6f;
-				else if (Bound > Part1 && Bound < Part2)
-					NewProjDistMul = 2.7f;
-				else if (Bound > Part2 && Bound < Part3)
-					NewProjDistMul = 2.8f;
-
-				if (NewProjDistMul)
+				if (xData->IsCluster())
 				{
-					ProjDist.Swap(NewProjDistMul);
-					SHADOW_DEBUG(xData, "Changed Projection Distance Multiplier to %f", NewProjDistMul);
+					ProjDist.Swap(ConstantManager.GetClusterValue(&ShadowConstants.SMRC_A38618));
+					ExtendDist.Swap(ConstantManager.GetClusterValue(&ShadowConstants.SMRC_A31C70));
+					Resolution.Swap(ConstantManager.GetClusterValue(&ShadowConstants.SMRC_A3B1B8));
+					DepthMul.Swap(ConstantManager.GetClusterValue(&ShadowConstants.SMRC_A3F3A0));
 				}
-
-				float NewExtendDistMul = 1.5f;
-				if (Bound < MaxRadius)
+				else
 				{
-					ExtendDist.Swap(NewExtendDistMul);
-					SHADOW_DEBUG(xData, "Changed Extend Distance Multiplier to %f", NewExtendDistMul);
+					float Bound = Node->m_kWorldBound.radius;
+					float NewProjDistMul = 0.f;
+					float BaseRadius = Settings::kObjectTier2BoundRadius().f;
+					float MaxRadius = Settings::kObjectTier3BoundRadius().f;
+
+					float PerPart = (MaxRadius - BaseRadius) / 3.f;
+					float Part1 = BaseRadius + PerPart;
+					float Part2 = BaseRadius + PerPart * 2;
+					float Part3 = BaseRadius + PerPart * 3;
+
+					if (Bound < BaseRadius)
+						NewProjDistMul = 2.5f;
+					else if (Bound > BaseRadius && Bound < Part1)
+						NewProjDistMul = 2.6f;
+					else if (Bound > Part1 && Bound < Part2)
+						NewProjDistMul = 2.7f;
+					else if (Bound > Part2 && Bound < Part3)
+						NewProjDistMul = 2.8f;
+
+					if (NewProjDistMul)
+					{
+						ProjDist.Swap(NewProjDistMul);
+						SHADOW_DEBUG(xData, "Changed Projection Distance Multiplier to %f", NewProjDistMul);
+					}
+
+					float NewExtendDistMul = 1.5f;
+					if (Bound < MaxRadius)
+					{
+						ExtendDist.Swap(NewExtendDistMul);
+						SHADOW_DEBUG(xData, "Changed Extend Distance Multiplier to %f", NewExtendDistMul);
+					}
 				}
 
 				thisCall<void>(0x007D2280, SSL, Throwaway);
@@ -1508,13 +1570,10 @@ namespace ShadowPipeline
 			if (xData->IsReference() && xData->GetRef()->Flags.IsClustered())
 			{
 				// clustered refs are only allowed to react to small lights close to them
-				SME_ASSERT(Settings::kClusteringAllowIndividualShadows().i);
-
-				static const float kMaxDistance = 850;
 				bool HasCloseLight = false;
 				for (auto Itr : Lights)
 				{
-					if (Itr->sourceLight->IsCulled() == false && Utilities::GetDistance(Itr->sourceLight, SSL->sourceNode) < kMaxDistance)
+					if (Itr->sourceLight->IsCulled() == false && Utilities::GetDistance(Itr->sourceLight, SSL->sourceNode) < Settings::kClusteringSecondaryLightMaxDistance().f)
 					{
 						HasCloseLight = true;
 						break;
@@ -1579,17 +1638,16 @@ namespace ShadowPipeline
 
 	void Renderer::Handler_LightLOD_Wrapper(ShadowSceneLight* SSL, void* CullProc)
 	{
-		auto xData = ShadowExtraData::Get(SSL->sourceNode);
-
 		thisCall<void>(0x007D6390, SSL, CullProc);
 
+		auto xData = ShadowExtraData::Get(SSL->sourceNode);
 		if (xData->IsCluster())
 		{
 			// uncull the cluster SSL after LOD checking
 			// ### figure out why it's being culled
-//			SSL->currentFadeAlpha = 1.0;
-//			SSL->lightState = 0;
-//			SSL->sourceLight->SetCulled(false);
+			SSL->currentFadeAlpha = 1.0;
+			SSL->lightState = 0;
+			SSL->sourceLight->SetCulled(false);
 		}
 	}
 
@@ -1698,28 +1756,34 @@ namespace ShadowPipeline
 	{
 		SME_ASSERT(SSL);
 
-		RenderConstant::Swapper SamplingScale(&ShadowConstants.SRC_A91280);
+		RenderConstant::Swapper FOV(&ShadowConstants.SRC_A91280);
+		RenderConstant::Swapper FarPlane(&ShadowConstants.SRC_A6BEA0);
+		auto xData = ShadowExtraData::Get(SSL->sourceNode);
 
-		float Bound = SSL->sourceNode->m_kWorldBound.radius;
-		float NewSampScale = 220.f;
-		float BaseRadius = Settings::kObjectTier2BoundRadius().f;
-		float MaxRadius = Settings::kObjectTier3BoundRadius().f;
-
-		if (Bound < MaxRadius)
+		if (xData->IsCluster())
 		{
-			SamplingScale.Swap(NewSampScale);
-			SHADOW_DEBUG(ShadowExtraData::Get(SSL->sourceNode), "Changed Sampling Scale Multiplier to %f", NewSampScale);
+			FOV.Swap(ConstantManager.GetClusterValue(&ShadowConstants.SRC_A91280));
+			FarPlane.Swap(ConstantManager.GetClusterValue(&ShadowConstants.SRC_A6BEA0));
+		}
+		else
+		{
+			float Bound = SSL->sourceNode->m_kWorldBound.radius;
+			float NewSampScale = 220.f;
+			float BaseRadius = Settings::kObjectTier2BoundRadius().f;
+			float MaxRadius = Settings::kObjectTier3BoundRadius().f;
+
+			if (Bound < MaxRadius)
+			{
+				FOV.Swap(NewSampScale);
+				SHADOW_DEBUG(ShadowExtraData::Get(SSL->sourceNode), "Changed Sampling Scale Multiplier to %f", NewSampScale);
+			}
 		}
 
 		ShadowMapRenderSource = SSL;
-		auto xData = ShadowExtraData::Get(SSL->sourceNode);
 		if (xData->IsCluster())
-		{
 			xData->GetCluster()->Node->m_worldTranslate = xData->GetCluster()->Center;
-		}
 
 		thisCall<void>(0x007D46C0, SSL, Throwaway);
-
 
 		if (xData->IsCluster())
 		{

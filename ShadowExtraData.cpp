@@ -119,6 +119,11 @@ bool ShadowExtraData::CellFlags::IsClustered() const
 	return Get(kClustered);
 }
 
+bool ShadowExtraData::CellFlags::HasStaticAggregate() const
+{
+	return Get(kStaticAggregate);
+}
+
 bool ShadowExtraData::StateFlags::IsInitialized() const
 {
 	return Get(kInitialized);

@@ -52,10 +52,12 @@ public:
 	public:
 		enum
 		{
-			kClustered		= 1 << 0,
+			kClustered			= 1 << 0,
+			kStaticAggregate	= 1 << 1,						// set when there's just a single cluster with all of the cell's statics
 		};
 
 		bool			IsClustered() const;
+		bool			HasStaticAggregate() const;
 	};
 
 	class StateFlags : public Utilities::Bitfield

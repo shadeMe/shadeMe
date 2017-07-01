@@ -55,6 +55,7 @@ namespace ShadowPipeline
 		{
 			long double		Interior;
 			long double		Exterior;
+			long double		Cluster;
 		};
 
 		using ConstantValueTableT = std::map<RenderConstant*, ValuePair>;
@@ -76,6 +77,8 @@ namespace ShadowPipeline
 
 		void							SetInteriorValue(RenderConstant* Constant, double Val);
 		void							SetExteriorValue(RenderConstant* Constant, double Val);
+		void							SetClusterValue(RenderConstant* Constant, double Val);
+		float							GetClusterValue(RenderConstant* Constant) const;
 	};
 
 	template<class Ret, class ... Args>
@@ -120,18 +123,21 @@ namespace ShadowPipeline
 	class ShadowMapTexturePool
 	{
 	private:
+		static constexpr int						kMaxResolution = 4096;
+
 		// highest resolution to lowest
 		enum
 		{
-			kPool_Tier1 = 0,
-			kPool_Tier2 = 1,
-			kPool_Tier3 = 2,
+			kPool_Tier1,
+			kPool_Tier2,
+			kPool_Tier3,
+			kPool_Clusters,
 
 			kPool__MAX
 		};
 
 		BSTextureManager*							TexturePool[kPool__MAX];
-		UInt16										PoolResolution[kPool__MAX];
+		int											PoolResolution[kPool__MAX];
 
 		void										Create();
 		void										Reset();
@@ -229,7 +235,6 @@ namespace ShadowPipeline
 				kMaxShadows_MiscItem,
 				kMaxShadows_AlchemyItem,
 				kMaxShadows_Equipment,
-				kMaxShadows_Clusters,
 
 				kMaxShadows__MAX
 			};

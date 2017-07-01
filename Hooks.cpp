@@ -660,42 +660,35 @@ namespace Hooks
 		_MemHdlr(CalculateProjectionProlog).WriteJump();
 		_MemHdlr(CalculateProjectionEpilog).WriteJump();
 		_MemHdlr(ShadowLightShaderDepthBias).WriteUInt32((UInt32)&ShadowPipeline::Renderer::ShadowDepthBias);
+		_MemHdlr(CullCellActorNodeA).WriteUInt8(1);
+		_MemHdlr(CullCellActorNodeB).WriteUInt8(0xEB);
 
-		if (Settings::kActorsReceiveAllShadows().i)
+		for (int i = 0; i < 5; i++)
 		{
-			_MemHdlr(CullCellActorNodeA).WriteUInt8(1);
-			_MemHdlr(CullCellActorNodeB).WriteUInt8(0xEB);
+			static const UInt32 kCallSites[5] =
+			{
+				0x007C5C6E,	0x007C5F19,
+				0x007D52CD, 0x007D688B,
+				0x007D5557
+			};
+
+			_DefineHookHdlr(TextureManagerDiscardShadowMap, kCallSites[i]);
+			_MemHdlr(TextureManagerDiscardShadowMap).WriteCall();
 		}
 
-		if (ShadowPipeline::ShadowMapTexturePool::GetEnabled())
+		for (int i = 0; i < 2; i++)
 		{
-			for (int i = 0; i < 5; i++)
+			static const UInt32 kCallSites[2] =
 			{
-				static const UInt32 kCallSites[5] =
-				{
-					0x007C5C6E,	0x007C5F19,
-					0x007D52CD, 0x007D688B,
-					0x007D5557
-				};
+				0x0040746D,	0x004074F3
+			};
 
-				_DefineHookHdlr(TextureManagerDiscardShadowMap, kCallSites[i]);
-				_MemHdlr(TextureManagerDiscardShadowMap).WriteCall();
-			}
-
-			for (int i = 0; i < 2; i++)
-			{
-				static const UInt32 kCallSites[2] =
-				{
-					0x0040746D,	0x004074F3
-				};
-
-				_DefineHookHdlr(TextureManagerReserveShadowMaps, kCallSites[i]);
-				_MemHdlr(TextureManagerReserveShadowMaps).WriteCall();
-			}
-
-			_MemHdlr(ShadowSceneLightGetShadowMap).WriteJump();
-			_MemHdlr(CreateWorldSceneGraph).WriteJump();
+			_DefineHookHdlr(TextureManagerReserveShadowMaps, kCallSites[i]);
+			_MemHdlr(TextureManagerReserveShadowMaps).WriteCall();
 		}
+
+		_MemHdlr(ShadowSceneLightGetShadowMap).WriteJump();
+		_MemHdlr(CreateWorldSceneGraph).WriteJump();
 
 		_MemHdlr(SwapLightProjectionStageConstants).WriteJump();
 		_MemHdlr(FixSSLLightSpaceProjectionStack).WriteUInt16(0x4);

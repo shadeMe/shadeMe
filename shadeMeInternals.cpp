@@ -86,6 +86,7 @@ namespace Settings
 	SME::INI::INISetting			kDynMapResolutionTier1("Tier1", "DynamicShadowMap::Resolution", "", (SInt32)1024);
 	SME::INI::INISetting			kDynMapResolutionTier2("Tier2", "DynamicShadowMap::Resolution", "", (SInt32)512);
 	SME::INI::INISetting			kDynMapResolutionTier3("Tier3", "DynamicShadowMap::Resolution", "", (SInt32)256);
+	SME::INI::INISetting			kDynMapResolutionClusters("Clusters", "DynamicShadowMap::Resolution", "", (SInt32)2048);
 
 	SME::INI::INISetting			kDynMapDistanceNear("Near", "DynamicShadowMap::Distance", "", (float)1500.f);
 	SME::INI::INISetting			kDynMapDistanceFar("Far", "DynamicShadowMap::Distance", "", (float)4000.f);
@@ -108,7 +109,9 @@ namespace Settings
 
 	SME::INI::INISetting			kClusteringEnable("Enable", "Shadows::Clustering", "", (SInt32)1);
 	SME::INI::INISetting			kClusteringExcludePath("ExcludePaths", "Shadows::Clustering", "Blacklist", "");
-	SME::INI::INISetting			kClusteringAllowIndividualShadows("AllowIndividualShadows", "Shadows::Clustering", "", (SInt32)1);
+	SME::INI::INISetting			kClusteringAllowIndividualShadows("AllowSecondaryLightShadows", "Shadows::Clustering", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringSecondaryLightMaxDistance("SecondaryLightMaxDistance", "Shadows::Clustering", "", 300.f);
+	SME::INI::INISetting			kClusteringClusterLandscape("IncludeLandscape", "Shadows::Clustering", "", (SInt32)0);
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -117,7 +120,6 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	_MESSAGE("INI Path: %s", INIPath);
 
 	RegisterSetting(&Settings::kCasterMaxDistance);
-	RegisterSetting(&Settings::kEnableDebugShader);
 	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
 	RegisterSetting(&Settings::kNightTimeMoonShadows);
 
@@ -173,6 +175,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kDynMapResolutionTier1);
 	RegisterSetting(&Settings::kDynMapResolutionTier2);
 	RegisterSetting(&Settings::kDynMapResolutionTier3);
+	RegisterSetting(&Settings::kDynMapResolutionClusters);
 
 	RegisterSetting(&Settings::kDynMapDistanceNear);
 	RegisterSetting(&Settings::kDynMapDistanceFar);
@@ -196,6 +199,8 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kClusteringEnable);
 	RegisterSetting(&Settings::kClusteringExcludePath);
 	RegisterSetting(&Settings::kClusteringAllowIndividualShadows);
+	RegisterSetting(&Settings::kClusteringSecondaryLightMaxDistance);
+	RegisterSetting(&Settings::kClusteringClusterLandscape);
 
 	Save();
 }
@@ -439,6 +444,14 @@ static bool Help_Execute(COMMAND_ARGS)
 	return true;
 }
 
+static bool ToggleCastsShadows_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	Settings::kEnableDebugShader.ToggleData();
+	return true;
+}
+
 void ShadowDebugger::Initialize()
 {
 	CommandInfo* ToggleShadowVolumes = (CommandInfo*)0x00B0B9C0;
@@ -464,4 +477,11 @@ void ShadowDebugger::Initialize()
 	Help->longName = "SetShadowExclusiveCaster";
 	Help->shortName = "sec";
 	Help->execute = Help_Execute;
+
+	CommandInfo* ToggleCastsShadows = (CommandInfo*)0x00B0C7A8;
+	ToggleCastsShadows->longName = "ToggleShadowDebugShader";
+	ToggleCastsShadows->shortName = "sds";
+	ToggleCastsShadows->execute = ToggleCastsShadows_Execute;
+	ToggleCastsShadows->numParams = 0;
+	ToggleCastsShadows->params = ToggleShadowVolumes->params;
 }

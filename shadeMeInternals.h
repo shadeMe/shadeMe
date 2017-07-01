@@ -114,6 +114,7 @@ namespace Settings
 	extern SME::INI::INISetting				kDynMapResolutionTier1;
 	extern SME::INI::INISetting				kDynMapResolutionTier2;
 	extern SME::INI::INISetting				kDynMapResolutionTier3;
+	extern SME::INI::INISetting				kDynMapResolutionClusters;
 
 	extern SME::INI::INISetting				kDynMapDistanceNear;
 	extern SME::INI::INISetting				kDynMapDistanceFar;
@@ -137,6 +138,9 @@ namespace Settings
 	extern SME::INI::INISetting				kClusteringEnable;
 	extern SME::INI::INISetting				kClusteringExcludePath;
 	extern SME::INI::INISetting				kClusteringAllowIndividualShadows;
+	extern SME::INI::INISetting				kClusteringSecondaryLightMaxDistance;
+	extern SME::INI::INISetting				kClusteringClusterLandscape;
+
 }
 
 typedef std::vector<ShadowSceneLight*>			ShadowLightListT;
