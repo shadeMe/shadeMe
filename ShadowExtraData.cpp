@@ -202,11 +202,13 @@ ShadowExtraData::CellData::CellData(TESObjectCELL* Cell) :
 {
 	Form = Cell;
 	Node = Cell->niNode;
+	FrameCounter = 0;
 }
 
 ShadowExtraData::ClusterData::ClusterData(NiNode* Node) :
 	Node(Node),
-	Center()
+	Center(),
+	StaticAggregate(false)
 {
 	SME_ASSERT(Node);
 

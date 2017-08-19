@@ -107,11 +107,14 @@ namespace Settings
 	SME::INI::INISetting			kMaxCountAlchemyItem("AlchemyItem", "Shadows::MaxCount", "", (SInt32)5);
 	SME::INI::INISetting			kMaxCountEquipment("Equipment", "Shadows::MaxCount", "", (SInt32)-1);
 
-	SME::INI::INISetting			kClusteringEnable("Enable", "Shadows::Clustering", "", (SInt32)1);
+	SME::INI::INISetting			kClusteringType("Type", "Shadows::Clustering", "", (SInt32)0);
 	SME::INI::INISetting			kClusteringExcludePath("ExcludePaths", "Shadows::Clustering", "Blacklist", "");
 	SME::INI::INISetting			kClusteringAllowIndividualShadows("AllowSecondaryLightShadows", "Shadows::Clustering", "", (SInt32)0);
 	SME::INI::INISetting			kClusteringSecondaryLightMaxDistance("SecondaryLightMaxDistance", "Shadows::Clustering", "", 300.f);
-	SME::INI::INISetting			kClusteringClusterLandscape("IncludeLandscape", "Shadows::Clustering", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringClusterLandscape("AggregateLandscape", "Shadows::Clustering", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringMaxBoundRadius("MaxBoundRadius", "Shadows::Clustering", "", 1000.f);
+	SME::INI::INISetting			kClusteringMaxDistance("MaxDistance", "Shadows::Clustering", "", 750.f);
+	SME::INI::INISetting			kClusteringMaxObjPerCluster("MaxObjPerCluster", "Shadows::Clustering", "", (SInt32)-1);
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -196,11 +199,14 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMaxCountAlchemyItem);
 	RegisterSetting(&Settings::kMaxCountEquipment);
 
-	RegisterSetting(&Settings::kClusteringEnable);
+	RegisterSetting(&Settings::kClusteringType);
 	RegisterSetting(&Settings::kClusteringExcludePath);
 	RegisterSetting(&Settings::kClusteringAllowIndividualShadows);
 	RegisterSetting(&Settings::kClusteringSecondaryLightMaxDistance);
 	RegisterSetting(&Settings::kClusteringClusterLandscape);
+	RegisterSetting(&Settings::kClusteringMaxBoundRadius);
+	RegisterSetting(&Settings::kClusteringMaxDistance);
+	RegisterSetting(&Settings::kClusteringMaxObjPerCluster);
 
 	Save();
 }

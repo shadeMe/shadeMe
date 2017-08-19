@@ -135,11 +135,14 @@ namespace Settings
 	extern SME::INI::INISetting				kMaxCountAlchemyItem;
 	extern SME::INI::INISetting				kMaxCountEquipment;			// includes armor, weapon, clothing, ammo
 
-	extern SME::INI::INISetting				kClusteringEnable;
+	extern SME::INI::INISetting				kClusteringType;
 	extern SME::INI::INISetting				kClusteringExcludePath;
 	extern SME::INI::INISetting				kClusteringAllowIndividualShadows;
 	extern SME::INI::INISetting				kClusteringSecondaryLightMaxDistance;
 	extern SME::INI::INISetting				kClusteringClusterLandscape;
+	extern SME::INI::INISetting				kClusteringMaxBoundRadius;
+	extern SME::INI::INISetting				kClusteringMaxDistance;
+	extern SME::INI::INISetting				kClusteringMaxObjPerCluster;
 
 }
 

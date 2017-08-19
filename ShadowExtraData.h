@@ -123,6 +123,7 @@ public:
 
 		TESObjectCELL*			Form;
 		std::vector<NiNode*>	Clusters;
+		int						FrameCounter;
 
 		CellData(TESObjectCELL* Cell);
 	};
@@ -133,6 +134,7 @@ public:
 
 		UInt8					Quad;
 		Vector3					Center;
+		bool					StaticAggregate;
 
 		ClusterData(NiNode* Node);
 	};

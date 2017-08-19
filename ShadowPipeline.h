@@ -286,6 +286,13 @@ namespace ShadowPipeline
 			kSSLExtraFlag_NoShadowLightSource		= 1 << 3,
 		};
 
+		enum
+		{
+			kClustering_Disabled			= 0,
+			kClustering_NearestNeighbour,
+			kClustering_StaticAggregate,
+		};
+
 		void			Handler_ShadowPass_Begin(void*);
 		void			Handler_QueueShadowCasters(int MaxShadowCount);
 

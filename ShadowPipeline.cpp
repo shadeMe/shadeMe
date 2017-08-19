@@ -1012,10 +1012,17 @@ namespace ShadowPipeline
 		}
 
 		// perform static clustering for exteriors if it hasn't been done already
-		if (Cell->IsInterior() == false)
+		if (Cell->IsInterior() == false && CellData->GetCell()->Flags.IsClustered() == false)
 		{
-			if (Settings::kClusteringEnable().i && CellData->GetCell()->Flags.IsClustered() == false)
+			switch (Settings::kClusteringType().i)
+			{
+			case kClustering_NearestNeighbour:
+				DoClustering(CellData);
+				break;
+			case kClustering_StaticAggregate:
 				DoCellStaticAggregation(CellData);
+				break;
+			}
 		}
 
 		// useful for debugging
@@ -1080,6 +1087,14 @@ namespace ShadowPipeline
 		* ### The stack gets trampled on something fierce
 		*/
 		SME_ASSERT(CellData->GetCell()->Flags.IsClustered() == false);
+
+		// skip so frames so that all the reference models are loaded when we start clustering
+		static const int kSkipFrames = 120;
+		if (CellData->GetCell()->FrameCounter < kSkipFrames)
+		{
+			CellData->GetCell()->FrameCounter++;
+			return;
+		}
 
 		// walk through all the quads and cluster statics
 		auto CellNode = CellData->GetCell()->Node;
@@ -1179,20 +1194,21 @@ namespace ShadowPipeline
 					ClusterXData->GetCluster()->Center += (Vector3&)Addend->posX;
 				};
 
-				static const float kMaxBoundRadius = 2000, kMaxDistance = 1000;
 				for (const auto& Point : *Closest)
 				{
 					auto Potential = Point();
 					if (Potential == Pivot)
 						continue;
 
-					if (ClusterNode()->m_kWorldBound.radius > kMaxBoundRadius)
+					if (ClusterNode()->m_kWorldBound.radius > Settings::kClusteringMaxBoundRadius().f)
+						break;
+					else if (Settings::kClusteringMaxObjPerCluster().i >= 0 && ValidNeighbours >= Settings::kClusteringMaxObjPerCluster().i)
 						break;
 
 					auto NeighbourXData = ShadowExtraData::Get(Potential->niNode);
 					if (NeighbourXData->GetRef()->Flags.IsClustered() == false)
 					{
-						if (Utilities::GetDistance(Pivot, Potential) < kMaxDistance)
+						if (Utilities::GetDistance(Pivot, Potential) < Settings::kClusteringMaxDistance().f)
 							AddToCluster(ClusterData, NeighbourXData);
 					}
 				}
@@ -1211,10 +1227,10 @@ namespace ShadowPipeline
 					Utilities::UpdateDynamicEffectState(ClusterNode());
 					Utilities::UpdateAVObject(StaticNode);
 
-					ClusterData->GetCluster()->Center.Scale(1 / (float)ValidNeighbours);
-					ClusterNode()->m_worldTranslate = ClusterData->GetCluster()->Center;
-
 					CellData->GetCell()->Clusters.push_back(ClusterNode());
+
+					ClusterData->GetCluster()->Center = *(Vector3*)&ClusterNode()->m_kWorldBound.x;
+					ClusterNode()->m_worldTranslate = ClusterData->GetCluster()->Center;
 				}
 			}
 		}
@@ -1239,6 +1255,7 @@ namespace ShadowPipeline
 		{
 			ClusterData->Initialize(ClusterNode());
 			ClusterData->GetCluster()->Quad = 0;
+			ClusterData->GetCluster()->StaticAggregate = true;
 			Utilities::AddNiExtraData(ClusterNode(), ClusterData);
 			Utilities::SetNiObjectName(ClusterNode(), "Cell Static Aggregate");
 
@@ -1324,9 +1341,9 @@ namespace ShadowPipeline
 			CellData->GetCell()->Flags.Set(ShadowExtraData::CellFlags::kStaticAggregate, true);
 		}
 
-		static const int kMaxIterations = 30;
+		static const int kMaxIterations = 60;
 		// keep accumulating until all refs have been collected or the max iterations had been reached
-		if (No3Ds == 0 || ClusterData->GetCluster()->Quad > kMaxIterations)
+		if (No3Ds == 0 || CellData->GetCell()->FrameCounter > kMaxIterations)
 		{
 			CellData->GetCell()->Flags.Set(ShadowExtraData::CellFlags::kClustered, true);
 
@@ -1337,7 +1354,7 @@ namespace ShadowPipeline
 			ClusterNode()->m_worldTranslate = ClusterData->GetCluster()->Center;
 		}
 		else
-			ClusterData->GetCluster()->Quad++;
+			CellData->GetCell()->FrameCounter++;
 	}
 
 	Renderer::RenderProcess::RenderProcess(ShadowSceneNode* Root) :
@@ -1815,9 +1832,6 @@ namespace ShadowPipeline
 		if (xData->IsCluster())
 		{
 			RenderBackfaces = true;
-			Camera->m_kViewFrustum.n = 0.0001f;
-			Camera->m_kViewFrustum.f = 1e10f;
-			Utilities::UpdateAVObject(Camera);
 		}
 
 		if (xData->IsReference() && xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kRenderBackFacesToShadowMap))
