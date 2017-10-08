@@ -184,6 +184,9 @@
     <ClInclude Include="Hooks.h" />
     <ClInclude Include="ShadowPipeline.h" />
     <ClInclude Include="ShadowUtilities.h" />
+    <ClInclude Include="..\OBSE\obse\BSRenderer.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\obse\obse\GameRTTI_1_1.inl">

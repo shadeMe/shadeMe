@@ -20,6 +20,7 @@
 #include "obse/NiExtraData.h"
 #include "obse/NiRTTI.h"
 #include "obse/NiRenderer.h"
+#include "obse/BSRenderer.h"
 
 #include <SME_Prefix.h>
 #include <MemoryHandler.h>
