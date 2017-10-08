@@ -1,7 +1,6 @@
 #include "shadeMeInternals.h"
-#include "ShadowFacts.h"
-#include "ShadowFigures.h"
-#include "ShadowSundries.h"
+#include "ShadowPipeline.h"
+#include "Hooks.h"
 #include "VersionInfo.h"
 
 IDebugLog	gLog("shadeMe.log");
@@ -18,7 +17,7 @@ void OBSEMessageHandler(OBSEMessagingInterface::Message* Msg)
 				{
 					// overwrite Trifle's player shadow caster enumeration hook
 					// as we override the enumeration process
-					ShadowFacts::_MemHdlr(TrifleSupportPatch).WriteBuffer();
+					Hooks::_MemHdlr(TrifleSupportPatch).WriteBuffer();
 				}
 			}
 		}
@@ -77,20 +76,17 @@ extern "C"
 		_MESSAGE("Initializing INI Manager");
 		shadeMeINIManager::Instance.Initialize("Data\\OBSE\\Plugins\\shadeMe.ini", NULL);
 
-		ShadowSundries::Patch(obse->isEditor == 1);
+		Hooks::Patch(obse->isEditor == 1);
 
 		if (obse->isEditor)
-		{
 			_MESSAGE("Editor support, ho!");
-		}
 		else
 		{
 			Interfaces::kOBSEMessaging->RegisterListener(Interfaces::kOBSEPluginHandle, "OBSE", OBSEMessageHandler);
 
-			ShadowFacts::Patch();
-			ShadowFacts::Initialize();
-			ShadowFigures::Patch();
-			ShadowFigures::Initialize();
+			ShadowPipeline::Renderer::Instance.Initialize();
+			FilterData::Initialize();
+			ShadowDebugger::Initialize();
 
 			_MESSAGE("You get a shadow! He gets a shadow! EVERYBDY GETZ SHADOZZZ!!\n\n");
 		}

@@ -1,7 +1,7 @@
 #include "shadeMeInternals.h"
-#include "BoundsCalculator.h"
-
-#pragma warning(disable: 4005 4748)
+#include "ShadowExtraData.h"
+#include "ShadowPipeline.h"
+#include "ShadowUtilities.h"
 
 namespace Interfaces
 {
@@ -13,7 +13,7 @@ namespace Interfaces
 
 shadeMeINIManager					shadeMeINIManager::Instance;
 
-BSTextureManager**					BSTextureManager::Singleton = (BSTextureManager**)0x00B42F50;
+
 
 namespace Settings
 {
@@ -22,16 +22,9 @@ namespace Settings
 	SME::INI::INISetting			kEnableDebugShader("EnableDebugShader", "Shadows::General", "Toggle debug shader", (SInt32)0);
 	SME::INI::INISetting			kEnableDetailedDebugSelection("EnableDetailedDebugSelection", "Shadows::General",
 													"Toggle the expanded console debug selection description", (SInt32)1);
-	SME::INI::INISetting			kForceActorShadows("ForceActorShadows", "Shadows::General", "Queue actors regardless of their deficiencies", (SInt32)0);
-	SME::INI::INISetting			kNoInteriorSunShadows("ValidateInteriorLightSources", "Shadows::General", "Prevents arbitrary sun shadows", (SInt32)1);
-	SME::INI::INISetting			kActorsReceiveAllShadows("ActorsReceiveAllShadows", "Shadows::General", "Actors are valid shadow receivers", (SInt32)1);
 	SME::INI::INISetting			kNightTimeMoonShadows("NightTimeMoonShadows", "Shadows::General", "Moons are shadow casting lights", (SInt32)0);
 
-	SME::INI::INISetting			kLargeObjectHigherPriority("HigherPriority", "Shadows::LargeObjects",
-																"Large objects are rendered before smaller ones", (SInt32)0);
 	SME::INI::INISetting			kLargeObjectExcludedPath("ExcludePaths", "Shadows::LargeObjects", "Large object blacklist", "rocks\\");
-	SME::INI::INISetting			kLargeObjectSunShadowsOnly("OnlyCastSunShadows", "Shadows::LargeObjects",
-															"Large objects will not react to small light sources", (SInt32)1);
 
 	SME::INI::INISetting			kRenderBackfacesIncludePath("IncludePaths", "Shadows::BackfaceRendering", "Backface rendering whitelist", "");
 
@@ -46,13 +39,10 @@ namespace Settings
 													"");
 
 	SME::INI::INISetting			kLightLOSCheckInterior("Interior", "Shadows::LightLOSCheck", "Check source light LOS with caster", (SInt32)1);
-	SME::INI::INISetting			kLightLOSCheckExterior("Exterior", "Shadows::LightLOSCheck", "Check source light with caster", (SInt32)1);
-	SME::INI::INISetting			kLightLOSSkipLargeObjects("SkipLargeObjects", "Shadows::LightLOSCheck", "Don't perform checks on large objects", (SInt32)1);
 	SME::INI::INISetting			kLightLOSExcludedPath("ExcludePaths", "Shadows::LightLOSCheck", "Light LOS blacklist", "");
 	SME::INI::INISetting			kLightLOSSkipActors("SkipActors", "Shadows::LightLOSCheck", "Don't perform checks on actors", (SInt32)0);
 
 	SME::INI::INISetting			kPlayerLOSCheckInterior("Interior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
-	SME::INI::INISetting			kPlayerLOSCheckExterior("Exterior", "Shadows::PlayerLOSCheck", "Check player LOS with caster", (SInt32)1);
 	SME::INI::INISetting			kPlayerLOSCheckHighAccuracy("HighAccuracy", "Shadows::PlayerLOSCheck", "Remove the Z-delta constraint from the check", (SInt32)0);
 	SME::INI::INISetting			kPlayerLOSCheckThresholdDist("ThresholdDistance", "Shadows::PlayerLOSCheck", "", (float)200.f);
 
@@ -96,6 +86,7 @@ namespace Settings
 	SME::INI::INISetting			kDynMapResolutionTier1("Tier1", "DynamicShadowMap::Resolution", "", (SInt32)1024);
 	SME::INI::INISetting			kDynMapResolutionTier2("Tier2", "DynamicShadowMap::Resolution", "", (SInt32)512);
 	SME::INI::INISetting			kDynMapResolutionTier3("Tier3", "DynamicShadowMap::Resolution", "", (SInt32)256);
+	SME::INI::INISetting			kDynMapResolutionClusters("Clusters", "DynamicShadowMap::Resolution", "", (SInt32)2048);
 
 	SME::INI::INISetting			kDynMapDistanceNear("Near", "DynamicShadowMap::Distance", "", (float)1500.f);
 	SME::INI::INISetting			kDynMapDistanceFar("Far", "DynamicShadowMap::Distance", "", (float)4000.f);
@@ -116,7 +107,14 @@ namespace Settings
 	SME::INI::INISetting			kMaxCountAlchemyItem("AlchemyItem", "Shadows::MaxCount", "", (SInt32)5);
 	SME::INI::INISetting			kMaxCountEquipment("Equipment", "Shadows::MaxCount", "", (SInt32)-1);
 
-	SME::INI::INISetting			kMiscForceSM3RenderPath("ForceSM3RenderPath", "Misc::Renderer", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringType("Type", "Shadows::Clustering", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringExcludePath("ExcludePaths", "Shadows::Clustering", "Blacklist", "");
+	SME::INI::INISetting			kClusteringAllowIndividualShadows("AllowSecondaryLightShadows", "Shadows::Clustering", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringSecondaryLightMaxDistance("SecondaryLightMaxDistance", "Shadows::Clustering", "", 300.f);
+	SME::INI::INISetting			kClusteringClusterLandscape("AggregateLandscape", "Shadows::Clustering", "", (SInt32)0);
+	SME::INI::INISetting			kClusteringMaxBoundRadius("MaxBoundRadius", "Shadows::Clustering", "", 1000.f);
+	SME::INI::INISetting			kClusteringMaxDistance("MaxDistance", "Shadows::Clustering", "", 750.f);
+	SME::INI::INISetting			kClusteringMaxObjPerCluster("MaxObjPerCluster", "Shadows::Clustering", "", (SInt32)-1);
 }
 
 void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
@@ -125,16 +123,10 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	_MESSAGE("INI Path: %s", INIPath);
 
 	RegisterSetting(&Settings::kCasterMaxDistance);
-	RegisterSetting(&Settings::kEnableDebugShader);
 	RegisterSetting(&Settings::kEnableDetailedDebugSelection);
-	RegisterSetting(&Settings::kForceActorShadows);
-	RegisterSetting(&Settings::kNoInteriorSunShadows);
-	RegisterSetting(&Settings::kActorsReceiveAllShadows);
 	RegisterSetting(&Settings::kNightTimeMoonShadows);
 
-	RegisterSetting(&Settings::kLargeObjectHigherPriority);
 	RegisterSetting(&Settings::kLargeObjectExcludedPath);
-	RegisterSetting(&Settings::kLargeObjectSunShadowsOnly);
 
 	RegisterSetting(&Settings::kRenderBackfacesIncludePath);
 
@@ -145,13 +137,10 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMainExcludedPathExterior);
 
 	RegisterSetting(&Settings::kLightLOSCheckInterior);
-	RegisterSetting(&Settings::kLightLOSCheckExterior);
-	RegisterSetting(&Settings::kLightLOSSkipLargeObjects);
 	RegisterSetting(&Settings::kLightLOSExcludedPath);
 	RegisterSetting(&Settings::kLightLOSSkipActors);
 
 	RegisterSetting(&Settings::kPlayerLOSCheckInterior);
-	RegisterSetting(&Settings::kPlayerLOSCheckExterior);
 	RegisterSetting(&Settings::kPlayerLOSCheckHighAccuracy);
 	RegisterSetting(&Settings::kPlayerLOSCheckThresholdDist);
 
@@ -189,6 +178,7 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kDynMapResolutionTier1);
 	RegisterSetting(&Settings::kDynMapResolutionTier2);
 	RegisterSetting(&Settings::kDynMapResolutionTier3);
+	RegisterSetting(&Settings::kDynMapResolutionClusters);
 
 	RegisterSetting(&Settings::kDynMapDistanceNear);
 	RegisterSetting(&Settings::kDynMapDistanceFar);
@@ -209,7 +199,14 @@ void shadeMeINIManager::Initialize( const char* INIPath, void* Parameter )
 	RegisterSetting(&Settings::kMaxCountAlchemyItem);
 	RegisterSetting(&Settings::kMaxCountEquipment);
 
-	RegisterSetting(&Settings::kMiscForceSM3RenderPath);
+	RegisterSetting(&Settings::kClusteringType);
+	RegisterSetting(&Settings::kClusteringExcludePath);
+	RegisterSetting(&Settings::kClusteringAllowIndividualShadows);
+	RegisterSetting(&Settings::kClusteringSecondaryLightMaxDistance);
+	RegisterSetting(&Settings::kClusteringClusterLandscape);
+	RegisterSetting(&Settings::kClusteringMaxBoundRadius);
+	RegisterSetting(&Settings::kClusteringMaxDistance);
+	RegisterSetting(&Settings::kClusteringMaxObjPerCluster);
 
 	Save();
 }
@@ -219,487 +216,278 @@ shadeMeINIManager::~shadeMeINIManager()
 	;//
 }
 
-void BSTextureManager::DiscardShadowMap( BSRenderedTexture* Texture )
+TESObjectREFR*		ShadowDebugger::kDebugSelection = nullptr;
+TESObjectREFR*		ShadowDebugger::kExclusiveCaster = nullptr;
+
+void ShadowDebugger::Log(ShadowExtraData* xData, const char* Format, ...)
 {
-	thisCall<void>(0x007C1A30, this, Texture);
-}
+	if (Utilities::GetConsoleOpen())
+		return;
 
-BSRenderedTexture* BSTextureManager::FetchShadowMap( void )
-{
-	return thisCall<BSRenderedTexture*>(0x007C1960, this);
-}
-
-BSTextureManager* BSTextureManager::CreateInstance( void )
-{
-	BSTextureManager* Instance = (BSTextureManager*)FormHeap_Allocate(0x48);
-	thisCall<void>(0x007C1FF0, Instance);
-	return Instance;
-}
-
-void BSTextureManager::DeleteInstance( void )
-{
-	thisCall<void>(0x007C2100, this);
-	FormHeap_Free(this);
-}
-
-void BSTextureManager::ReserveShadowMaps( UInt32 Count )
-{
-	thisCall<void>(0x007C2710, this, *g_renderer, Count);
-}
-
-BSRenderedTexture* BSTextureManager::GetDefaultRenderTarget(UInt32 Type)
-{
-	return thisCall<BSRenderedTexture*>(0x007C23C0, this, *g_renderer, Type);
-}
-
-namespace Utilities
-{
-	float GetDistanceFromPlayer( NiAVObject* Source )
-{
-		SME_ASSERT(Source);
-
-		NiNode* ThirdPersonNode = thisCall<NiNode*>(0x00660110, *g_thePlayer, false);
-		SME_ASSERT(ThirdPersonNode);
-
-		return GetDistance(ThirdPersonNode, Source);
-	}
-
-	bool GetAbovePlayer( TESObjectREFR* Ref, float Threshold )
+	if (kDebugSelection)
 	{
-		SME_ASSERT(Ref);
-
-		float PlayerZ = (*g_thePlayer)->posZ + 128.f;	// account for height
-		float RefZ = Ref->posZ;
-
-		return RefZ > PlayerZ + Threshold;
-	}
-
-	bool GetBelowPlayer( TESObjectREFR* Ref, float Threshold )
-	{
-		SME_ASSERT(Ref);
-
-		float PlayerZ = (*g_thePlayer)->posZ;
-		float RefZ = Ref->posZ;
-
-		return RefZ < PlayerZ - Threshold;
-	}
-
-	NiObjectNET* GetNiObjectByName(NiObjectNET* Source, const char* Name)
-	{
-		SME_ASSERT(Source && Name);
-
-		return cdeclCall<NiObjectNET*>(0x006F94A0, Source, Name);
-	}
-
-	void UpdateBounds( NiNode* Node )
-	{
-		static NiVector3	kZeroVec3 = { 0.0, 0.0, 0.0 };
-		static NiMatrix33	kIdentityMatrix = { { 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0 } };
-		static float		kUnity = 1.0;
-
-		if (GetNiExtraDataByName(Node, "BBX") == NULL)
+		if (xData->IsReference() && xData->D->Reference->Form == kDebugSelection)
 		{
-			BSBound* Bounds = (BSBound*)FormHeap_Allocate(0x24);
-			thisCall<void>(0x006FB8B0, Bounds);
-			CalculateBoundsForNiNode(Node, &Bounds->center, &Bounds->extents, &kZeroVec3, &kIdentityMatrix, &kUnity);
-			thisCall<void>(0x006FF8A0, Node, Bounds);
+			char Buffer[0x1000] = { 0 };
 
-#if 0
-			_MESSAGE("Bounds:\t\tCenter = %.4f, %.4f, %.4f\t\tExtents = %.4f, %.4f, %.4f",
-				Bounds->center.x,
-				Bounds->center.y,
-				Bounds->center.z,
-				Bounds->extents.x,
-				Bounds->extents.y,
-				Bounds->extents.z);
-#endif
+			va_list Args;
+			va_start(Args, Format);
+			vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
+			va_end(Args);
+
+			_MESSAGE("SDR[%08X %s]: %s", kDebugSelection->refID,
+				(kDebugSelection->niNode ? kDebugSelection->niNode->m_pcName : "<null>"),
+					 Buffer);
 		}
 	}
+}
 
-	NiExtraData* GetNiExtraDataByName( NiAVObject* Source, const char* Name )
+void ShadowDebugger::Log(const char* Format, ...)
+{
+	if (Utilities::GetConsoleOpen())
+		return;
+
+	if (kDebugSelection)
 	{
-		SME_ASSERT(Source && Name);
+		char Buffer[0x1000] = { 0 };
 
-		return thisCall<NiExtraData*>(0x006FF9C0, Source, Name);
+		va_list Args;
+		va_start(Args, Format);
+		vsprintf_s(Buffer, sizeof(Buffer), Format, Args);
+		va_end(Args);
+
+		_MESSAGE("%s", Buffer);
 	}
+}
 
-	void* NiRTTI_Cast( const NiRTTI* TypeDescriptor, NiRefObject* NiObject )
+void ShadowDebugger::SetDebugSelection(TESObjectREFR* Ref /*= nullptr*/)
+{
+	kDebugSelection = Ref;
+}
+
+TESObjectREFR* ShadowDebugger::GetDebugSelection()
+{
+	return kDebugSelection;
+}
+
+void ShadowDebugger::SetExclusiveCaster(TESObjectREFR* Ref /*= nullptr*/)
+{
+	kExclusiveCaster = Ref;
+}
+
+TESObjectREFR* ShadowDebugger::GetExclusiveCaster()
+{
+	return kExclusiveCaster;
+}
+
+static bool ToggleShadowVolumes_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	_MESSAGE("Refreshing shadeMe params...");
+	gLog.Indent();
+	ShadowPipeline::Renderer::Instance.ReloadConstants();
+
+	shadeMeINIManager::Instance.Load();
+	FilterData::MainShadowExParams::Instance.RefreshParameters();
+	FilterData::SelfShadowExParams::Instance.RefreshParameters();
+	FilterData::ShadowReceiverExParams::Instance.RefreshParameters();
+	FilterData::ReloadMiscPathLists();
+
+	ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
+	Utilities::NiNodeChildrenWalker Walker((NiNode*)RootNode->m_children.data[3]);
+	Walker.Walk(&ShadowPipeline::FadeNodeShadowFlagUpdater());
+	gLog.Outdent();
+
+	return true;
+}
+
+static bool WasteMemory_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	TESObjectREFR* Ref = InterfaceManager::GetSingleton()->debugSelection;
+	if (Ref && Ref->niNode)
 	{
-		return cdeclCall<void*>(0x00560920, TypeDescriptor, NiObject);
-	}
-
-	_DeclareMemHdlr(SkipActorCheckA, "");
-	_DeclareMemHdlr(SkipActorCheckB, "");
-	_DeclareMemHdlr(CatchFallthrough, "");
-
-	_DefineHookHdlrWithBuffer(SkipActorCheckA, 0x004F9187, 5, 0xFF, 0xD2, 0x84, 0xC0, 0xF);
-	_DefineHookHdlrWithBuffer(SkipActorCheckB, 0x004F928F, 5, 0xE8, 0x4C, 0x19, 0x16, 0x0);
-	_DefineHookHdlrWithBuffer(CatchFallthrough, 0x004F9353, 5, 0x8B, 0x4C, 0x24, 0x28, 0x53);
-
-	NiAVObject* RayCastSource = NULL;
-
-	#define _hhName	SkipActorCheckA
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x004F91F7);
-		__asm
+		BSFadeNode* Node = NI_CAST(Ref->niNode, BSFadeNode);
+		if (Node)
 		{
-			mov		edi, RayCastSource
-			jmp		_hhGetVar(Retn)
-		}
-	}
+			Console_Print(" ");
+			Console_Print("Light data for Node %s ==>>", Node->m_pcName);
+			Console_Print("========================================================================================");
 
-	#define _hhName	SkipActorCheckB
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x004F9294);
-		__asm
-		{
-			pop		edx
-			mov		[edx], 0
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	#define _hhName	CatchFallthrough
-	_hhBegin()
-	{
-		_hhSetVar(Retn, 0x004F93BE);
-		__asm
-		{
-			xor		al, al
-			fldz
-			jmp		_hhGetVar(Retn)
-		}
-	}
-
-	// HACK! HACK! HACKATTACK!
-	// should have my tongue beaten wafer-thin with a steak tenderizer and stapled to the floor with a croquet hoop
-	// seems reliable enough though
-	bool GetLightLOS( NiAVObject* Light, TESObjectREFR* Target )
-	{
-		SME_ASSERT(Target && RayCastSource == NULL);
-
-		RayCastSource = Light;
-		double Result = 0;
-
-		// the no of havok picks per frame is very limited when the game's not paused
-		// this severely limits ray casting accuracy
-		// so we trick the engine into thinking otherwise when we do our checks
-		// this obviously affects performance, but it's for a good cause...
-		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;
-		UInt8 PauseGameBuffer = *HavokGamePausedFlag;
-
-		// prevent console spam
-		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;
-		UInt8 ConsoleTextBuffer = *ShowConsoleTextFlag;
-
-		_MemHdlr(SkipActorCheckA).WriteJump();
-		_MemHdlr(SkipActorCheckB).WriteJump();
-		_MemHdlr(CatchFallthrough).WriteJump();
-
-		*HavokGamePausedFlag = 1;
-		*ShowConsoleTextFlag = 0;
-		cdeclCall<void>(0x004F9120, (*g_thePlayer), Target, 0, &Result);
-		*HavokGamePausedFlag = PauseGameBuffer;
-		*ShowConsoleTextFlag = ConsoleTextBuffer;
-
-		_MemHdlr(SkipActorCheckA).WriteBuffer();
-		_MemHdlr(SkipActorCheckB).WriteBuffer();
-		_MemHdlr(CatchFallthrough).WriteBuffer();
-
-		RayCastSource = NULL;
-
-		return Result != 0.f;
-	}
-
-	bool GetPlayerHasLOS( TESObjectREFR* Target, bool HighAccuracy )
-	{
-		SME_ASSERT(Target);
-
-		double Result =  0;
-
-		// as before, muck about with flags to improve picking accuracy
-		UInt8* HavokGamePausedFlag = (UInt8*)0x00BA790A;
-		UInt8 PauseGameBuffer = *HavokGamePausedFlag;
-		UInt8* ShowConsoleTextFlag = (UInt8*)0x00B361AC;
-		UInt8 ConsoleTextBuffer = *ShowConsoleTextFlag;
-
-		if (HighAccuracy)
-		{
-			*HavokGamePausedFlag = 1;
-			*ShowConsoleTextFlag = 0;
-		}
-
-		cdeclCall<void>(0x004F9120, (*g_thePlayer), Target, 0, &Result);
-
-		if (HighAccuracy)
-		{
-			*HavokGamePausedFlag = PauseGameBuffer;
-			*ShowConsoleTextFlag = ConsoleTextBuffer;
-		}
-
-		return Result != 0.f;
-	}
-
-	float GetDistance( NiAVObject* Source, NiAVObject* Destination )
-	{
-		SME_ASSERT(Source && Destination);
-
-		Vector3* WorldTranslateDest = (Vector3*)&Destination->m_worldTranslate;
-		Vector3* WorldTranslateSource = (Vector3*)&Source->m_worldTranslate;
-
-		return GetDistance(WorldTranslateSource, WorldTranslateDest);
-	}
-
-	float GetDistance( Vector3* Source, Vector3* Destination )
-	{
-		SME_ASSERT(Source && Destination);
-
-		Vector3 Buffer;
-		Buffer.x = Destination->x - Source->x;
-		Buffer.y= Destination->y - Source->y;
-		Buffer.z = Destination->z - Source->z;
-
-		return sqrt((Buffer.x * Buffer.x) + (Buffer.y * Buffer.y) + (Buffer.z * Buffer.z));
-	}
-
-	void IntegerINIParamList::HandleParam( const char* Param )
-	{
-		int Arg = atoi(Param);
-		Params.push_back(Arg);
-	}
-
-	IntegerINIParamList::IntegerINIParamList( const char* Delimiters /*= ","*/ ) :
-		DelimitedINIStringList(Delimiters)
-	{
-		;//
-	}
-
-	IntegerINIParamList::~IntegerINIParamList()
-	{
-		;//
-	}
-
-	void IntegerINIParamList::Dump( void ) const
-	{
-		gLog.Indent();
-
-		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
-			_MESSAGE("%d", *Itr);
-
-		gLog.Outdent();
-	}
-
-	void FilePathINIParamList::HandleParam( const char* Param )
-	{
-		std::string Arg(Param);
-		SME::StringHelpers::MakeLower(Arg);
-		Params.push_back(Arg);
-	}
-
-	FilePathINIParamList::FilePathINIParamList( const char* Delimiters /*= ","*/ ) :
-		DelimitedINIStringList(Delimiters)
-	{
-		;//
-	}
-
-	FilePathINIParamList::~FilePathINIParamList()
-	{
-		;//
-	}
-
-	void FilePathINIParamList::Dump( void ) const
-	{
-		gLog.Indent();
-
-		for (ParameterListT::const_iterator Itr = Params.begin(); Itr != Params.end(); Itr++)
-			_MESSAGE("%s", Itr->c_str());
-
-		gLog.Outdent();
-	}
-
-	NiProperty* GetNiPropertyByID( NiAVObject* Source, UInt8 ID )
-	{
-		SME_ASSERT(Source);
-
-		return thisCall<NiProperty*>(0x00707530, Source, ID);
-	}
-
-	UInt32 GetNodeActiveLights( NiNode* Source, ShadowLightListT* OutList, UInt32 Params )
-	{
-		SME_ASSERT(Source && OutList);
-
-		NiNodeChildrenWalker Walker(Source);
-		OutList->clear();
-		Walker.Walk(&ActiveShadowSceneLightEnumerator(OutList, Params));
-
-		return OutList->size();
-	}
-
-	void NiNodeChildrenWalker::Traverse( NiNode* Branch )
-	{
-		SME_ASSERT(Visitor && Branch);
-
-		for (int i = 0; i < Branch->m_children.numObjs; i++)
-		{
-			NiAVObject* AVObject = Branch->m_children.data[i];
-
-			if (AVObject)
+			ShadowLightListT Lights;
+			if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_NonShadowCasters))
 			{
-				NiNode* Node = NI_CAST(AVObject, NiNode);
+				Console_Print("Active lights = %d", Lights.size());
 
-				if (Node)
+				for (ShadowLightListT::iterator Itr = Lights.begin(); Itr != Lights.end(); Itr++)
 				{
-					if (Visitor->AcceptBranch(Node))
-						Traverse(Node);
+					ShadowSceneLight* Source = *Itr;
+					bool LOSCheck = Utilities::GetLightLOS(Source->sourceLight, Ref);
+
+					Console_Print("Light%s@ %0.f, %0.f, %0.f ==> DIST[%.0f] LOS[%d]", (Source->sourceLight->IsCulled() ? " (Culled) " : " "),
+								  Source->sourceLight->m_worldTranslate.x,
+								  Source->sourceLight->m_worldTranslate.y,
+								  Source->sourceLight->m_worldTranslate.z,
+								  Utilities::GetDistance(Source->sourceLight, Node),
+								  LOSCheck);
 				}
-				else
-					Visitor->AcceptLeaf(AVObject);
 			}
-		}
-	}
+			else
+				Console_Print("No active lights");
 
-	NiNodeChildrenWalker::NiNodeChildrenWalker( NiNode* Source ) :
-		Root(Source),
-		Visitor(NULL)
-	{
-		SME_ASSERT(Root);
-	}
+			Console_Print("========================================================================================");
 
-	NiNodeChildrenWalker::~NiNodeChildrenWalker()
-	{
-		;//
-	}
-
-	void NiNodeChildrenWalker::Walk( NiNodeChildVisitor* Visitor )
-	{
-		SME_ASSERT(Visitor);
-
-		this->Visitor = Visitor;
-		Traverse(Root);
-	}
-
-	ActiveShadowSceneLightEnumerator::ActiveShadowSceneLightEnumerator( ShadowLightListT* OutList, UInt32 Params ) :
-		ActiveLights(OutList),
-		Param(Params)
-	{
-		SME_ASSERT(OutList);
-	}
-
-	ActiveShadowSceneLightEnumerator::~ActiveShadowSceneLightEnumerator()
-	{
-		;//
-	}
-
-	bool ActiveShadowSceneLightEnumerator::AcceptBranch( NiNode* Node )
-	{
-		return true;
-	}
-
-	void ActiveShadowSceneLightEnumerator::AcceptLeaf( NiAVObject* Object )
-	{
-		NiGeometry* Geometry = NI_CAST(Object, NiGeometry);
-		if (Geometry)
-		{
-			BSShaderLightingProperty* LightingProperty = NI_CAST(Utilities::GetNiPropertyByID(Object, 0x4), BSShaderLightingProperty);
-			if (LightingProperty && LightingProperty->lights.numItems)
+			Lights.clear();
+			if (Utilities::GetNodeActiveLights(Node, &Lights, Utilities::ActiveShadowSceneLightEnumerator::kParam_ShadowCasters))
 			{
-				for (NiTPointerList<ShadowSceneLight>::Node* Itr = LightingProperty->lights.start; Itr; Itr = Itr->next)
+				Console_Print("Shadow casters = %d", Lights.size());
+
+				for (ShadowLightListT::iterator Itr = Lights.begin(); Itr != Lights.end(); Itr++)
 				{
-					ShadowSceneLight* Current = Itr->data;
-					if (Current && Current->unk118 != 0xFF)
+					ShadowSceneLight* ShadowLight = *Itr;
+					if (ShadowLight->sourceNode)
 					{
-						if (Param == kParam_Both ||
-							(Param == kParam_NonShadowCasters && Current->unkF4 == 0) ||
-							(Param == kParam_ShadowCasters) && Current->unkF4)
+						if (ShadowLight->sourceNode != Node)
 						{
-							if (std::find(ActiveLights->begin(), ActiveLights->end(), Current) == ActiveLights->end())
-								ActiveLights->push_back(Current);
+							Console_Print("Node %s @ %0.f, %0.f, %0.f",
+										  ShadowLight->sourceNode->m_pcName,
+										  ShadowLight->sourceNode->m_worldTranslate.x,
+										  ShadowLight->sourceNode->m_worldTranslate.y,
+										  ShadowLight->sourceNode->m_worldTranslate.z);
 						}
+						else
+							Console_Print("Node SELF-SHADOW");
 					}
 				}
 			}
+			else
+				Console_Print("No shadow casters");
 		}
-	}
 
-	ShadowSceneLight* GetShadowCasterLight( NiNode* Caster )
-	{
-		ShadowSceneNode* RootNode = GetShadowSceneNode();
-		SME_ASSERT(RootNode && Caster);
+		Console_Print("========================================================================================");
 
+		ShadowSceneNode* RootNode = Utilities::GetShadowSceneNode();
+		ShadowSceneLight* CasterSSL = NULL;
 		for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->shadowCasters.start; Itr && Itr->data; Itr = Itr->next)
 		{
-			if (Itr->data->sourceNode == Caster)
-				return Itr->data;
+			ShadowSceneLight* ShadowLight = Itr->data;
+			if (ShadowLight->sourceNode == Node)
+			{
+				CasterSSL = ShadowLight;
+				break;
+			}
 		}
 
-		return NULL;
-	}
-
-	BSXFlags* GetBSXFlags( NiAVObject* Source, bool Allocate /*= false*/ )
-	{
-		BSXFlags* xFlags = (BSXFlags*)Utilities::GetNiExtraDataByName(Source, "BSX");
-		if (xFlags == NULL && Allocate)
+		if (CasterSSL == NULL)
+			Console_Print("No shadow caster SSL");
+		else
 		{
-			xFlags = (BSXFlags*)FormHeap_Allocate(0x10);
-			thisCall<void>(0x006FA820, xFlags);
-			thisCall<void>(0x006FF8A0, Source, xFlags);
+			bool LOSCheck = Utilities::GetLightLOS(CasterSSL->sourceLight, Ref);
+			Console_Print("Shadow caster SSL: Active[%d] Light%s[%.0f, %.0f, %.0f] LOS[%d] Fade[%f, %f] Alpha[%.0f, %.0f]",
+						  CasterSSL->lightState != 0xFF,
+						  CasterSSL->sourceLight->IsCulled() ? " (Culled)" : "",
+						  CasterSSL->sourceLight->m_worldTranslate.x,
+						  CasterSSL->sourceLight->m_worldTranslate.y,
+						  CasterSSL->sourceLight->m_worldTranslate.z,
+						  LOSCheck,
+						  CasterSSL->unkDC,
+						  CasterSSL->unkE0,
+						  CasterSSL->unkD4,
+						  CasterSSL->currentFadeAlpha);
 		}
 
-		return xFlags;
+		Console_Print("========================================================================================");
+
+		Console_Print("Scene lights = %d", RootNode->lights.numItems);
+		for (NiTPointerList<ShadowSceneLight>::Node* Itr = RootNode->lights.start; Itr && Itr->data; Itr = Itr->next)
+		{
+			ShadowSceneLight* ShadowLight = Itr->data;
+			bool LOSCheck = Utilities::GetLightLOS(ShadowLight->sourceLight, Ref);
+
+			Console_Print("Light @ %.0f, %.0f, %.0f | Att. = %0.f, %0.f, %0.f ==> DIST[%.0f] LOS[%d]",
+						  ShadowLight->sourceLight->m_worldTranslate.x,
+						  ShadowLight->sourceLight->m_worldTranslate.y,
+						  ShadowLight->sourceLight->m_worldTranslate.z,
+						  ShadowLight->sourceLight->m_fAtten0,
+						  ShadowLight->sourceLight->m_fAtten1,
+						  ShadowLight->sourceLight->m_fAtten2,
+						  Utilities::GetDistance(ShadowLight->sourceLight, Node),
+						  LOSCheck);
+
+			for (NiTPointerList<NiNode>::Node* j = ShadowLight->sourceLight->affectedNodes.start; j && j->data; j = j->next)
+			{
+				Console_Print("\tAffects %s  @ %.0f, %.0f, %.0f ==> DIST[%.0f]",
+							  j->data->m_pcName,
+							  j->data->m_worldTranslate.x,
+							  j->data->m_worldTranslate.y,
+							  j->data->m_worldTranslate.z,
+							  Utilities::GetDistance(ShadowLight->sourceLight, j->data));
+			}
+		}
+
+		Console_Print("========================================================================================");
+		Console_Print(" ");
 	}
 
-	bool GetConsoleOpen( void )
-	{
-		return *((UInt8*)0x00B33415) != 0;
-	}
-
-	TESObjectREFR* GetNodeObjectRef( NiAVObject* Source )
-	{
-		TESObjectExtraData* xRef = (TESObjectExtraData*)Utilities::GetNiExtraDataByName(Source, "REF");
-		if (xRef)
-			return xRef->refr;
-		else
-			return NULL;
-	}
-
-	BSFadeNode* GetPlayerNode( bool FirstPerson /*= false*/ )
-	{
-		return thisCall<BSFadeNode*>(0x00660110, *g_thePlayer, FirstPerson);
-	}
-
-	ShadowSceneNode* GetShadowSceneNode( void )
-	{
-		return cdeclCall<ShadowSceneNode*>(0x007B4280, 0);
-	}
-
-	enum
-	{
-		kWeatherPrecipType_Pleasant = 1 << 0,
-		kWeatherPrecipType_Cloudy	= 1 << 1,
-		kWeatherPrecipType_Rainy	= 1 << 2,
-		kWeatherPrecipType_Snow		= 1 << 3,
-	};
-
-	UInt8 GetWeatherClassification( TESWeather* Weather )
-	{
-		SME_ASSERT(Weather);
-
-		if ((Weather->precipType & kWeatherPrecipType_Pleasant))
-			return TESWeather::kType_Pleasant;
-		else if ((Weather->precipType & kWeatherPrecipType_Cloudy))
-			return TESWeather::kType_Cloudy;
-		else if ((Weather->precipType & kWeatherPrecipType_Rainy))
-			return TESWeather::kType_Rainy;
-		else if ((Weather->precipType & kWeatherPrecipType_Snow))
-			return TESWeather::kType_Snow;
-		else
-			return TESWeather::kType_None;
-	}
+	return true;
 }
 
-const char* BSRenderPassData::GetRenderPassName()
+static bool BeginTrace_Execute(COMMAND_ARGS)
 {
-	return cdeclCall<const char*>(0x007B4920, type);
+	*result = 0;
+
+	ShadowDebugger::SetDebugSelection(InterfaceManager::GetSingleton()->debugSelection);
+	return true;
+}
+
+static bool Help_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	ShadowDebugger::SetExclusiveCaster(InterfaceManager::GetSingleton()->debugSelection);
+	return true;
+}
+
+static bool ToggleCastsShadows_Execute(COMMAND_ARGS)
+{
+	*result = 0;
+
+	Settings::kEnableDebugShader.ToggleData();
+	return true;
+}
+
+void ShadowDebugger::Initialize()
+{
+	CommandInfo* ToggleShadowVolumes = (CommandInfo*)0x00B0B9C0;
+	ToggleShadowVolumes->longName = "RefreshShadeMeParams";
+	ToggleShadowVolumes->shortName = "rsc";
+	ToggleShadowVolumes->execute = ToggleShadowVolumes_Execute;
+
+	CommandInfo* WasteMemory = (CommandInfo*)0x00B0C758;
+	WasteMemory->longName = "DumpShadowLightData";
+	WasteMemory->shortName = "dsd";
+	WasteMemory->execute = WasteMemory_Execute;
+	WasteMemory->numParams = ToggleShadowVolumes->numParams;
+	WasteMemory->params = ToggleShadowVolumes->params;
+
+	CommandInfo* BeginTrace = (CommandInfo*)0x00B0C618;
+	BeginTrace->longName = "SetShadowDebugRef";
+	BeginTrace->shortName = "sdr";
+	BeginTrace->execute = BeginTrace_Execute;
+	BeginTrace->numParams = ToggleShadowVolumes->numParams;
+	BeginTrace->params = ToggleShadowVolumes->params;
+
+	CommandInfo* Help = (CommandInfo*)0x00B0B740;
+	Help->longName = "SetShadowExclusiveCaster";
+	Help->shortName = "sec";
+	Help->execute = Help_Execute;
+
+	CommandInfo* ToggleCastsShadows = (CommandInfo*)0x00B0C7A8;
+	ToggleCastsShadows->longName = "ToggleShadowDebugShader";
+	ToggleCastsShadows->shortName = "sds";
+	ToggleCastsShadows->execute = ToggleCastsShadows_Execute;
+	ToggleCastsShadows->numParams = 0;
+	ToggleCastsShadows->params = ToggleShadowVolumes->params;
 }

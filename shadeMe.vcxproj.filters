@@ -48,9 +48,6 @@
     <ClCompile Include="..\obse\obse\Script.cpp">
       <Filter>OBSE</Filter>
     </ClCompile>
-    <ClCompile Include="..\obse\obse\Utilities.cpp">
-      <Filter>OBSE</Filter>
-    </ClCompile>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="..\OBSE\obse\GameOSDepend.cpp">
       <Filter>OBSE</Filter>
@@ -90,9 +87,10 @@
     </ClCompile>
     <ClCompile Include="shadeMeInternals.cpp" />
     <ClCompile Include="BoundsCalculator.cpp" />
-    <ClCompile Include="ShadowFigures.cpp" />
-    <ClCompile Include="ShadowSundries.cpp" />
-    <ClCompile Include="ShadowFacts.cpp" />
+    <ClCompile Include="ShadowExtraData.cpp" />
+    <ClCompile Include="Hooks.cpp" />
+    <ClCompile Include="ShadowPipeline.cpp" />
+    <ClCompile Include="ShadowUtilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\obse\obse\GameActorValues.h">
@@ -140,9 +138,6 @@
     <ClInclude Include="..\obse\obse\Script.h">
       <Filter>OBSE</Filter>
     </ClInclude>
-    <ClInclude Include="..\obse\obse\Utilities.h">
-      <Filter>OBSE</Filter>
-    </ClInclude>
     <ClInclude Include="VersionInfo.h">
       <Filter>Resources</Filter>
     </ClInclude>
@@ -184,9 +179,14 @@
     </ClInclude>
     <ClInclude Include="shadeMeInternals.h" />
     <ClInclude Include="BoundsCalculator.h" />
-    <ClInclude Include="ShadowFigures.h" />
-    <ClInclude Include="ShadowSundries.h" />
-    <ClInclude Include="ShadowFacts.h" />
+    <ClInclude Include="CoverTree.h" />
+    <ClInclude Include="ShadowExtraData.h" />
+    <ClInclude Include="Hooks.h" />
+    <ClInclude Include="ShadowPipeline.h" />
+    <ClInclude Include="ShadowUtilities.h" />
+    <ClInclude Include="..\OBSE\obse\BSRenderer.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\obse\obse\GameRTTI_1_1.inl">
@@ -201,6 +201,12 @@
     <None Include="Exports.def">
       <Filter>OBSE</Filter>
     </None>
+    <ClCompile Include="..\OBSE\obse\Utilities.cpp">
+      <Filter>OBSE</Filter>
+    </ClCompile>
+    <ClInclude Include="..\OBSE\obse\Utilities.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="VersionInfo.rc">

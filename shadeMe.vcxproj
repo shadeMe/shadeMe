@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -20,18 +20,19 @@
     <SccProvider>
     </SccProvider>
     <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <PlatformToolset>v140_xp</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
-    <PlatformToolset>v140_xp</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -79,6 +80,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <ForcedIncludeFiles>obse_common/obse_prefix.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
@@ -100,7 +102,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..;$(SolutionDir)\..\obse\obse;$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;OBLIVION_VERSION=0x010201A0;OBLIVION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;OBLIVION_VERSION=0x010201A0;OBLIVION;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
@@ -109,8 +111,10 @@
       <ForcedIncludeFiles>obse_common/obse_prefix.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <OmitFramePointers>true</OmitFramePointers>
+      <OmitFramePointers>false</OmitFramePointers>
       <EnableFiberSafeOptimizations />
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <ModuleDefinitionFile>exports.def</ModuleDefinitionFile>
@@ -167,15 +171,17 @@
     <ClCompile Include="..\obse\obse\NiRTTI.cpp" />
     <ClCompile Include="..\OBSE\obse\NiTypes.cpp" />
     <ClCompile Include="..\obse\obse\Script.cpp" />
-    <ClCompile Include="..\obse\obse\Utilities.cpp" />
+    <ClCompile Include="..\OBSE\obse\Utilities.cpp" />
     <ClCompile Include="BoundsCalculator.cpp" />
+    <ClCompile Include="Hooks.cpp" />
+    <ClCompile Include="ShadowExtraData.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="shadeMeInternals.cpp" />
-    <ClCompile Include="ShadowFacts.cpp" />
-    <ClCompile Include="ShadowFigures.cpp" />
-    <ClCompile Include="ShadowSundries.cpp" />
+    <ClCompile Include="ShadowPipeline.cpp" />
+    <ClCompile Include="ShadowUtilities.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\OBSE\obse\BSRenderer.h" />
     <ClInclude Include="..\obse\obse\GameActorValues.h" />
     <ClInclude Include="..\obse\obse\GameAPI.h" />
     <ClInclude Include="..\obse\obse\GameBSExtraData.h" />
@@ -203,13 +209,15 @@
     <ClInclude Include="..\obse\obse\ParamInfos.h" />
     <ClInclude Include="..\obse\obse\PluginAPI.h" />
     <ClInclude Include="..\obse\obse\Script.h" />
-    <ClInclude Include="..\obse\obse\Utilities.h" />
     <ClInclude Include="BoundsCalculator.h" />
+    <ClInclude Include="Hooks.h" />
+    <ClInclude Include="ShadowExtraData.h" />
+    <ClInclude Include="CoverTree.h" />
     <ClInclude Include="shadeMeInternals.h" />
-    <ClInclude Include="ShadowFacts.h" />
-    <ClInclude Include="ShadowFigures.h" />
-    <ClInclude Include="ShadowSundries.h" />
+    <ClInclude Include="ShadowPipeline.h" />
+    <ClInclude Include="ShadowUtilities.h" />
     <ClInclude Include="VersionInfo.h" />
+    <ClInclude Include="..\OBSE\obse\Utilities.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\obse\obse\GameRTTI_1_1.inl" />
