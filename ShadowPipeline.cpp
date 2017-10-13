@@ -1104,9 +1104,8 @@ namespace ShadowPipeline
 			auto Quad = (NiNode*)CellNode->m_children.data[i];
 			auto StaticNode = (NiNode*)Quad->m_children.data[TESObjectCELL::kQuadSubnode_StaticObject];
 
-			// ### allocating on the heap to workaround stack corruption in the release build
-			auto NeighbourAccum(std::make_unique<CoverTree<Utilities::TESObjectREFCoverTreePoint>>(kMaxClusterDistance));
-			auto AuxAccum(std::make_unique<std::vector<TESObjectREFR*>>());		// stores references yet to be clustered
+			CoverTree<Utilities::TESObjectREFCoverTreePoint> NeighbourAccum(kMaxClusterDistance);
+			std::vector<TESObjectREFR*> AuxAccum;		// stores references yet to be clustered
 
 			int ClusterableRefs = 0;
 
@@ -1133,15 +1132,15 @@ namespace ShadowPipeline
 						(Ref->flags & kTESFormSpecialFlag_DoesntCastShadow) == false &&
 						xData->GetRef()->Flags.Get(ShadowExtraData::ReferenceFlags::kDontCluster) == false)
 					{
-						NeighbourAccum->insert(Ref);
-						AuxAccum->push_back(Ref);
+						NeighbourAccum.insert(Ref);
+						AuxAccum.push_back(Ref);
 						ClusterableRefs++;
 					}
 				}
 			}
 
 			// sort the queue on world bound radius in descending order
-			std::sort(AuxAccum->begin(), AuxAccum->end(), [](const TESObjectREFR* LHS, const TESObjectREFR* RHS) -> bool {
+			std::sort(AuxAccum.begin(), AuxAccum.end(), [](const TESObjectREFR* LHS, const TESObjectREFR* RHS) -> bool {
 				return LHS->niNode->m_kWorldBound.radius > RHS->niNode->m_kWorldBound.radius;
 			});
 
@@ -1151,16 +1150,16 @@ namespace ShadowPipeline
 			//		> all refs have been clustered
 			for (int j = 0; j < kMaxIterations; j++)
 			{
-				if (AuxAccum->empty())
+				if (AuxAccum.empty())
 					break;		// all refs have been clustered
 
 								// cluster the smallest items first
-				auto Pivot = AuxAccum->at(AuxAccum->size() - 1);
+				auto Pivot = AuxAccum.at(AuxAccum.size() - 1);
 				auto PivotData = ShadowExtraData::Get(Pivot->niNode);
 				SME_ASSERT(PivotData->GetRef()->Flags.IsClustered() == false);
 
 				auto Closest(std::make_unique<std::vector<Utilities::TESObjectREFCoverTreePoint>>());
-				NeighbourAccum->kNearestNeighbors(Pivot, ClusterableRefs - 1, *Closest);
+				NeighbourAccum.kNearestNeighbors(Pivot, ClusterableRefs - 1, *Closest);
 				int ValidNeighbours = 0;
 
 				// create and init cluster node
@@ -1187,9 +1186,9 @@ namespace ShadowPipeline
 					Utilities::UpdateDynamicEffectState(AddendNode);
 
 					// remove from the aux accum
-					auto AuxAccumItr = std::find(AuxAccum->begin(), AuxAccum->end(), Addend);
-					SME_ASSERT(AuxAccumItr != AuxAccum->end());
-					AuxAccum->erase(AuxAccumItr);
+					auto AuxAccumItr = std::find(AuxAccum.begin(), AuxAccum.end(), Addend);
+					SME_ASSERT(AuxAccumItr != AuxAccum.end());
+					AuxAccum.erase(AuxAccumItr);
 
 					ClusterXData->GetCluster()->Center += (Vector3&)Addend->posX;
 				};
