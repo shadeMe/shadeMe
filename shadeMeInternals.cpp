@@ -112,8 +112,8 @@ namespace Settings
 	SME::INI::INISetting			kClusteringAllowIndividualShadows("AllowSecondaryLightShadows", "Shadows::Clustering", "", (SInt32)0);
 	SME::INI::INISetting			kClusteringSecondaryLightMaxDistance("SecondaryLightMaxDistance", "Shadows::Clustering", "", 300.f);
 	SME::INI::INISetting			kClusteringClusterLandscape("AggregateLandscape", "Shadows::Clustering", "", (SInt32)0);
-	SME::INI::INISetting			kClusteringMaxBoundRadius("MaxBoundRadius", "Shadows::Clustering", "", 1000.f);
-	SME::INI::INISetting			kClusteringMaxDistance("MaxDistance", "Shadows::Clustering", "", 750.f);
+	SME::INI::INISetting			kClusteringMaxBoundRadius("MaxBoundRadius", "Shadows::Clustering", "", 1500.f);
+	SME::INI::INISetting			kClusteringMaxDistance("MaxDistance", "Shadows::Clustering", "", 650.f);
 	SME::INI::INISetting			kClusteringMaxObjPerCluster("MaxObjPerCluster", "Shadows::Clustering", "", (SInt32)-1);
 }
 
