@@ -635,7 +635,7 @@ namespace Hooks
 			_MemHdlr(ConsoleDebugSelectionB).WriteJump();
 
 			TODO("Turn off after testing");
-			_MemHdlr(ForceShaderModel3RenderPath).WriteJump();
+//			_MemHdlr(ForceShaderModel3RenderPath).WriteJump();
 		}
 	}
 
